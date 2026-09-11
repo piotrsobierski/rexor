@@ -5,6 +5,7 @@ import {
   Bike,
   Bold,
   Calculator,
+  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -22,6 +23,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  X,
   Zap,
 } from 'lucide-react';
 import { computeBatteryEstimates, detectCellSpec, formatWeightKg, formatWh } from '@/lib/battery';
@@ -80,6 +82,20 @@ export function AdminPanel() {
     catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się pobrać danych.'); if ((error as Error).message.includes('Sesja')) logout(); }
   }
 
+  // Osobna funkcja zamiast zmiany sygnatury loadCatalog() - reload w edytorach
+  // poniżej oczekuje () => Promise<void> i nigdy nie rzuca, a RefreshButton
+  // musi dostać odrzuconą obietnicę, żeby pokazać czerwony X po błędzie.
+  async function refreshCatalog() {
+    try {
+      setCatalog(await request('/admin/catalog'));
+      setMessage('');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się pobrać danych.');
+      if (error instanceof Error && error.message.includes('Sesja')) logout();
+      throw error;
+    }
+  }
+
   async function login(event: FormEvent) {
     event.preventDefault(); setMessage('Logowanie…');
     try { const result = await request('/admin/login', { method: 'POST', body: JSON.stringify({ email, password }) }, ''); sessionStorage.setItem('rexor_admin_token', result.token); setToken(result.token); setPassword(''); await loadCatalog(result.token); }
@@ -96,7 +112,7 @@ export function AdminPanel() {
 
   if (!token || !catalog) return <main className="grid min-h-screen place-items-center bg-[#111] px-4"><Toaster /><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-7"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" /><p className="eyebrow mt-10">Panel administracyjny</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Zaloguj się</h1><div className="mt-6 grid gap-4"><div className="grid gap-1.5"><Label htmlFor="admin-email">E-mail</Label><Input id="admin-email" type="email" required className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} /></div><div className="grid gap-1.5"><Label htmlFor="admin-password">Hasło</Label><Input id="admin-password" type="password" required className="h-11" value={password} onChange={(event) => setPassword(event.target.value)} /></div><Button type="submit" className="h-11 rounded-full bg-ink text-white">Zaloguj</Button>{message && <p className="text-center text-sm text-ink-muted">{message}</p>}</div></form></main>;
 
-  return <div className="min-h-screen bg-[#f4f5f2]"><Toaster /><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => loadCatalog()}><RefreshCw /> Odśwież</Button><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
+  return <div className="min-h-screen bg-[#f4f5f2]"><Toaster /><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><RefreshButton onRefresh={refreshCatalog} /><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
     <Tabs defaultValue="models"><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Serwis</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="categories"><SimpleEditor resource="categories" rows={catalog.categories} patch={patch} fields={[['name', 'Nazwa'], ['short_description', 'Krótki opis']]} /></TabsContent>
@@ -134,6 +150,35 @@ function InfoTooltip({ text, side = 'top' }: { text: string; side?: 'top' | 'rig
 }
 
 function Panel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <section className="rounded-3xl border border-line bg-white p-5 sm:p-7"><h2 className="text-2xl font-semibold tracking-tight">{title}</h2><p className="mt-1 text-sm text-ink-muted">{description}</p><div className="mt-6">{children}</div></section>; }
+
+/**
+ * Przycisk "Odśwież" z wizualnym potwierdzeniem: wirująca ikona w trakcie,
+ * zielony haczyk po sukcesie, czerwony X po błędzie - bez tego przycisk nie
+ * dawał żadnego znaku, czy dane faktycznie się odświeżyły.
+ */
+function RefreshButton({ onRefresh, label = 'Odśwież' }: { onRefresh: () => Promise<void>; label?: string }) {
+  const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+  async function run() {
+    setState('loading');
+    try {
+      await onRefresh();
+      setState('done');
+    } catch {
+      setState('error');
+    } finally {
+      setTimeout(() => setState('idle'), 1500);
+    }
+  }
+
+  const icon = state === 'loading' ? <RefreshCw className="animate-spin" />
+    : state === 'done' ? <Check className="text-emerald-600" />
+    : state === 'error' ? <X className="text-red-600" />
+    : <RefreshCw />;
+  const text = state === 'loading' ? 'Odświeżanie…' : state === 'done' ? 'Odświeżono' : state === 'error' ? 'Błąd' : label;
+
+  return <Button variant="outline" size="sm" onClick={run} disabled={state === 'loading'}>{icon} {text}</Button>;
+}
 
 function PartsEditor({
   rows,
@@ -1236,8 +1281,9 @@ function ActivityLogPanel({ request }: { request: (path: string, options?: Reque
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function load(reset: boolean) {
+  async function load(reset: boolean): Promise<boolean> {
     setLoading(true);
+    let ok = true;
     try {
       const params = new URLSearchParams({ limit: '50' });
       if (eventType) params.set('eventType', eventType);
@@ -1248,9 +1294,15 @@ function ActivityLogPanel({ request }: { request: (path: string, options?: Reque
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nie udało się pobrać dziennika.');
+      ok = false;
     } finally {
       setLoading(false);
     }
+    return ok;
+  }
+
+  async function refresh() {
+    if (!(await load(true))) throw new Error('refresh failed');
   }
 
   useEffect(() => { void load(true); }, [eventType]);
@@ -1262,7 +1314,7 @@ function ActivityLogPanel({ request }: { request: (path: string, options?: Reque
         <NativeSelectOption value="">Wszystkie</NativeSelectOption>
         {Object.entries(activityEventLabels).map(([value, label]) => <NativeSelectOption key={value} value={value}>{label}</NativeSelectOption>)}
       </NativeSelect>
-      <Button variant="outline" size="sm" onClick={() => load(true)}><RefreshCw /> Odśwież</Button>
+      <RefreshButton onRefresh={refresh} />
     </div>
     {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
     <Table><TableHeader><TableRow><TableHead>Kiedy</TableHead><TableHead>Co</TableHead><TableHead>Kto</TableHead><TableHead>Szczegóły</TableHead><TableHead className="w-10"></TableHead></TableRow></TableHeader>
