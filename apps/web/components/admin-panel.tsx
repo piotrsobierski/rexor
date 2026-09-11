@@ -75,51 +75,62 @@ function Panel({ title, description, children }: { title: string; description: s
 
 function SimpleEditor({ resource, rows, patch, fields }: { resource: string; rows: Row[]; patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>; fields: string[][] }) {
   const [drafts, setDrafts] = useState<Record<number, Row>>(() => Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+  }, [rows]);
+
   return <Panel title={resource === 'parts' ? 'Części i ceny brutto' : 'Kategorie'} description="Zmieniaj dane bez edycji kodu. Zapis dotyczy pojedynczego wiersza."><Table><TableHeader><TableRow>{fields.map(([, label]) => <TableHead key={label}>{label}</TableHead>)}<TableHead className="w-28">Akcja</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}>{fields.map(([field]) => <TableCell key={field} className="min-w-52"><Input type={field.includes('price') ? 'number' : 'text'} step={field.includes('price') ? '0.01' : undefined} value={String(drafts[row.id]?.[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], [field]: event.target.value } })} /></TableCell>)}<TableCell><Button size="sm" variant="outline" onClick={() => patch(resource, row.id, Object.fromEntries(fields.map(([field]) => [field, drafts[row.id]?.[field]])))}><Save /> Zapisz</Button></TableCell></TableRow>)}</TableBody></Table></Panel>;
 }
 
 function WysiwygEditor({
   value,
+  initialHtml,
   onChange,
   onUploadImage,
+  onRef,
   minHeight = 'min-h-48',
 }: {
-  value: string;
-  onChange: (html: string) => void;
+  value?: string;
+  initialHtml?: string;
+  onChange?: (html: string) => void;
   onUploadImage?: (file: File) => Promise<string | null>;
+  onRef?: (el: HTMLDivElement | null) => void;
   minHeight?: string;
 }) {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const isInternalChange = useRef(false);
+  const localRef = useRef<HTMLDivElement | null>(null);
+  const content = value ?? initialHtml ?? '';
 
   useEffect(() => {
-    if (editorRef.current && !isInternalChange.current) {
-      if (editorRef.current.innerHTML !== value) {
-        editorRef.current.innerHTML = value;
-      }
+    try {
+      document.execCommand('defaultParagraphSeparator', false, 'p');
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (localRef.current && localRef.current.innerHTML !== content) {
+      localRef.current.innerHTML = content;
     }
-    isInternalChange.current = false;
-  }, [value]);
+  }, [content]);
+
+  function setRef(node: HTMLDivElement | null) {
+    localRef.current = node;
+    onRef?.(node);
+  }
 
   function format(command: string, arg?: string) {
-    editorRef.current?.focus();
+    localRef.current?.focus();
     document.execCommand(command, false, arg);
-    if (editorRef.current) {
-      isInternalChange.current = true;
-      onChange(editorRef.current.innerHTML);
-    }
+    onChange?.(localRef.current?.innerHTML ?? '');
   }
 
   async function handleImage(file?: File) {
     if (!file || !onUploadImage) return;
     const url = await onUploadImage(file);
     if (url) {
-      editorRef.current?.focus();
+      localRef.current?.focus();
       document.execCommand('insertImage', false, url);
-      if (editorRef.current) {
-        isInternalChange.current = true;
-        onChange(editorRef.current.innerHTML);
-      }
+      onChange?.(localRef.current?.innerHTML ?? '');
     }
   }
 
@@ -139,20 +150,16 @@ function WysiwygEditor({
         )}
       </div>
       <div
-        ref={editorRef}
+        ref={setRef}
         contentEditable
         suppressContentEditableWarning
         className={`rich-content ${minHeight} max-h-[460px] overflow-y-auto rounded-2xl border bg-white p-4 text-sm outline-none focus:border-[var(--ring)] focus:ring-2 focus:ring-[var(--ring)]/20`}
-        onInput={() => {
-          if (editorRef.current) {
-            isInternalChange.current = true;
-            onChange(editorRef.current.innerHTML);
-          }
+        onInput={(e) => {
+          onChange?.(e.currentTarget.innerHTML);
         }}
-        onBlur={() => {
-          if (editorRef.current) {
-            isInternalChange.current = true;
-            onChange(editorRef.current.innerHTML);
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.stopPropagation();
           }
         }}
       />
@@ -162,10 +169,16 @@ function WysiwygEditor({
 
 function ModelsEditor({ rows, media, categories, patch, request, reload, setMessage }: { rows: Row[]; media: MediaRow[]; categories: Row[]; patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
   const [drafts, setDrafts] = useState<Record<number, Row>>(() => Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+  const editorRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+  }, [rows]);
+
   async function upload(model: Row, file?: File) { if (!file) return; const form = new FormData(); form.append('file', file); form.append('ownerType', 'model'); form.append('ownerId', String(model.id)); form.append('role', 'gallery'); form.append('altText', String(model.name)); setMessage('Wysyłam zdjęcie…'); try { const result = await request('/admin/media', { method: 'POST', body: form }); if (!model.default_image_path) await patch('models', model.id, { default_image_path: `${API_BASE}${result.url}` }); await reload(); setMessage('Zdjęcie dodane do galerii.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się dodać zdjęcia.'); } }
   async function removePhoto(model: Row, mediaId: number) { if (!window.confirm('Usunąć to zdjęcie z galerii modelu?')) return; setMessage('Usuwam zdjęcie…'); try { await request(`/admin/models/${model.id}/media/${mediaId}`, { method: 'DELETE' }); await reload(); setMessage('Zdjęcie usunięte.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się usunąć zdjęcia.'); } }
   function imageSrc(path: string) { return path.startsWith('http') ? path : `${API_BASE}${path}`; }
-  return <Panel title="Modele i galerie" description="Zdjęcia są wieloelementową galerią. Kliknij zdjęcie, aby zobaczyć je w pełnym rozmiarze w nowej karcie, albo usuń je krzyżykiem."><div className="grid gap-6">{rows.map((row) => { const modelMedia = media.filter((item) => item.model_id === row.id); return <article key={row.id} className="min-w-0 rounded-2xl border border-line p-5 sm:p-6"><div className="flex gap-3 overflow-x-auto pb-3">{modelMedia.length === 0 && <img src={String(row.default_image_path || '/models/e82/01.jpg')} alt="" className="h-28 w-40 shrink-0 rounded-xl bg-[var(--muted)] object-contain" />}{modelMedia.map((item) => <div key={item.media_id} className="group/photo relative h-28 w-40 shrink-0"><a href={imageSrc(item.storage_path)} target="_blank" rel="noopener noreferrer"><img src={imageSrc(item.storage_path)} alt={item.alt_text} className="size-full rounded-xl bg-[var(--muted)] object-contain" /></a><button type="button" onClick={() => removePhoto(row, item.media_id)} aria-label="Usuń zdjęcie" className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 shadow transition-opacity group-hover/photo:opacity-100 hover:bg-white"><Trash2 className="size-3.5" /></button></div>)}</div><div className="mt-4 grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-name-${row.id}`}>Nazwa modelu</Label><Input id={`model-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-cat-${row.id}`}>Kategoria</Label><NativeSelect id={`model-cat-${row.id}`} value={String(drafts[row.id]?.category_id ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], category_id: event.target.value } })} className="w-full">{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{String(category.name)}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid gap-2 sm:grid-cols-3">{([['frame_price_gross', 'Cena ramy brutto'], ['assembly_price_gross', 'Cena składania brutto'], ['margin_percent', 'Narzut %']] as const).map(([field, label]) => <div key={field} className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`${field}-${row.id}`}>{label}</Label><Input id={`${field}-${row.id}`} type="number" step="0.01" value={String(drafts[row.id]?.[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], [field]: event.target.value } })} /></div>)}</div><p className="rounded-xl bg-ink-wash px-3 py-2 text-sm text-ink-muted">Cena „od” {row.computed_base_price_gross ? <strong className="tabular-nums text-ink">{String(row.computed_base_price_gross)} zł</strong> : <strong>wymaga wyceny</strong>} — wyliczona z ramy, baterii, części domyślnych i składania. Nie wpisuje się jej ręcznie.</p><details className="rounded-xl border border-line p-3" open><summary className="cursor-pointer text-sm font-semibold text-ink">Opis modelu (edytor WYSIWYG / strona produktu)</summary><div className="mt-3"><WysiwygEditor value={String(drafts[row.id]?.description_html ?? '')} onChange={(html) => setDrafts((current) => ({ ...current, [row.id]: { ...current[row.id], description_html: html } }))} onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('ownerType', 'model'); form.append('ownerId', String(row.id)); form.append('role', 'content'); form.append('altText', `Zdjęcie w opisie ${row.name}`); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} minHeight="min-h-56" /></div></details><div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => patch('models', row.id, { name: drafts[row.id].name, category_id: drafts[row.id].category_id, frame_price_gross: drafts[row.id].frame_price_gross, assembly_price_gross: drafts[row.id].assembly_price_gross, margin_percent: drafts[row.id].margin_percent, description_html: drafts[row.id].description_html })}><Save /> Zapisz model</Button><Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0])} /></Label></div></div></article>; })}</div></Panel>;
+  return <Panel title="Modele i galerie" description="Zdjęcia są wieloelementową galerią. Kliknij zdjęcie, aby zobaczyć je w pełnym rozmiarze w nowej karcie, albo usuń je krzyżykiem."><div className="grid gap-6">{rows.map((row) => { const modelMedia = media.filter((item) => item.model_id === row.id); return <article key={row.id} className="min-w-0 rounded-2xl border border-line p-5 sm:p-6"><div className="flex gap-3 overflow-x-auto pb-3">{modelMedia.length === 0 && <img src={String(row.default_image_path || '/models/e82/01.jpg')} alt="" className="h-28 w-40 shrink-0 rounded-xl bg-[var(--muted)] object-contain" />}{modelMedia.map((item) => <div key={item.media_id} className="group/photo relative h-28 w-40 shrink-0"><a href={imageSrc(item.storage_path)} target="_blank" rel="noopener noreferrer"><img src={imageSrc(item.storage_path)} alt={item.alt_text} className="size-full rounded-xl bg-[var(--muted)] object-contain" /></a><button type="button" onClick={() => removePhoto(row, item.media_id)} aria-label="Usuń zdjęcie" className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 shadow transition-opacity group-hover/photo:opacity-100 hover:bg-white"><Trash2 className="size-3.5" /></button></div>)}</div><div className="mt-4 grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-name-${row.id}`}>Nazwa modelu</Label><Input id={`model-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-cat-${row.id}`}>Kategoria</Label><NativeSelect id={`model-cat-${row.id}`} value={String(drafts[row.id]?.category_id ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], category_id: event.target.value } })} className="w-full">{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{String(category.name)}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid gap-2 sm:grid-cols-3">{([['frame_price_gross', 'Cena ramy brutto'], ['assembly_price_gross', 'Cena składania brutto'], ['margin_percent', 'Narzut %']] as const).map(([field, label]) => <div key={field} className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`${field}-${row.id}`}>{label}</Label><Input id={`${field}-${row.id}`} type="number" step="0.01" value={String(drafts[row.id]?.[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], [field]: event.target.value } })} /></div>)}</div><p className="rounded-xl bg-ink-wash px-3 py-2 text-sm text-ink-muted">Cena „od” {row.computed_base_price_gross ? <strong className="tabular-nums text-ink">{String(row.computed_base_price_gross)} zł</strong> : <strong>wymaga wyceny</strong>} — wyliczona z ramy, baterii, części domyślnych i składania. Nie wpisuje się jej ręcznie.</p><details className="rounded-xl border border-line p-3" open><summary className="cursor-pointer text-sm font-semibold text-ink">Opis modelu (edytor WYSIWYG / strona produktu)</summary><div className="mt-3"><WysiwygEditor value={String(drafts[row.id]?.description_html ?? '')} onRef={(el) => { editorRefs.current[row.id] = el; }} onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', `Zdjęcie w opisie ${row.name}`); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} minHeight="min-h-56" /></div></details><div className="flex flex-wrap gap-2"><Button size="sm" onClick={async () => { const currentHtml = editorRefs.current[row.id]?.innerHTML ?? String(drafts[row.id]?.description_html ?? ''); await patch('models', row.id, { name: drafts[row.id]?.name ?? row.name, category_id: drafts[row.id]?.category_id ?? row.category_id, frame_price_gross: drafts[row.id]?.frame_price_gross ?? row.frame_price_gross, assembly_price_gross: drafts[row.id]?.assembly_price_gross ?? row.assembly_price_gross, margin_percent: drafts[row.id]?.margin_percent ?? row.margin_percent, description_html: currentHtml }); }}><Save /> Zapisz model</Button><Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie do galerii<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0])} /></Label></div></div></article>; })}</div></Panel>;
 }
 
 const batteryFields: Array<[string, string, string]> = [
@@ -190,6 +203,10 @@ function batteryMath(row: Row) {
 function BatteriesEditor({ batteries, models, request, reload, setMessage }: { batteries: Row[]; models: Row[]; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
   const [drafts, setDrafts] = useState<Record<number, Row>>(() => Object.fromEntries(batteries.map((row) => [row.id, { ...row }])));
   const [newRows, setNewRows] = useState<Record<number, Row>>({});
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(batteries.map((row) => [row.id, { ...row }])));
+  }, [batteries]);
 
   async function save(id: number) {
     setMessage('Zapisuję baterię…');
@@ -248,13 +265,27 @@ function PageEditor({ page, patch, request }: { page?: Row; patch: (resource: st
   const [title, setTitle] = useState(String(page?.title ?? 'Serwis'));
   const [contentHtml, setContentHtml] = useState(String(page?.content_html ?? ''));
   const [published, setPublished] = useState(Boolean(page?.is_published));
+
+  useEffect(() => {
+    if (page) {
+      setTitle(String(page.title ?? 'Serwis'));
+      setContentHtml(String(page.content_html ?? ''));
+      setPublished(Boolean(page.is_published));
+    }
+  }, [page]);
+
   if (!page) return <Panel title="Serwis" description="Brak strony w bazie."><p>Uruchom preseed danych.</p></Panel>;
 
   return <Panel title="Strona Serwis" description="Edytor WYSIWYG zapisuje formatowanie oraz obrazy w treści."><div className="grid gap-4"><div className="grid gap-1.5"><Label>Tytuł</Label><Input className="h-11" value={title} onChange={(event) => setTitle(event.target.value)} /></div><div className="grid gap-1.5"><Label>Treść</Label><WysiwygEditor value={contentHtml} onChange={setContentHtml} minHeight="min-h-80" onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', 'Zdjęcie w treści serwisu'); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} /></div><div className="flex items-center justify-between"><label className="flex items-center gap-2 text-sm"><Switch checked={published} onCheckedChange={setPublished} /> Opublikowana</label><Button onClick={() => patch('pages', page.id, { title, content_html: contentHtml, is_published: published })}><Save /> Zapisz stronę</Button></div></div></Panel>;
 }
 
 function ThemeEditor({ theme, request, reload, setMessage }: { theme: Record<string, string>; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
-  const [draft, setDraft] = useState(theme); const labels: Record<string, string> = { background: 'Tło strony', foreground: 'Tekst', surface: 'Karty', muted: 'Tło pomocnicze', accent: 'Akcent', accentForeground: 'Tekst akcentu', border: 'Obramowania' };
+  const [draft, setDraft] = useState(theme);
+  const labels: Record<string, string> = { background: 'Tło strony', foreground: 'Tekst', surface: 'Karty', muted: 'Tło pomocnicze', accent: 'Akcent', accentForeground: 'Tekst akcentu', border: 'Obramowania' };
+
+  useEffect(() => {
+    setDraft(theme);
+  }, [theme]);
   async function save() { try { await request('/admin/settings/theme', { method: 'PATCH', body: JSON.stringify(draft) }); await reload(); setMessage('Kolory zapisane w bazie. Odśwież stronę publiczną, aby zobaczyć zmianę.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać motywu.'); } }
   return <Panel title="Kolorystyka serwisu" description="Jeden motyw dla strony publicznej i konfiguratora, przechowywany w bazie."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(labels).map(([key, label]) => <label key={key} className="flex items-center gap-3 rounded-2xl border p-3"><input type="color" value={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} className="size-10 cursor-pointer rounded-lg border-0 bg-transparent" /><span><strong className="block text-sm">{label}</strong><span className="font-mono text-xs text-ink-subtle">{draft[key]}</span></span></label>)}</div><Button onClick={save} className="mt-6"><Save /> Zapisz motyw</Button></Panel>;
 }

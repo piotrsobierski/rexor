@@ -140,14 +140,14 @@ export const bikeModels: BikeModel[] = [
 <h3>Dlaczego E55?</h3>
 <p>E55 ma <strong>150 mm skoku tylnego zawieszenia</strong>, kąt główki ramy <strong>64°</strong> oraz stromy <strong>77° kąt rury podsiodłowej</strong>. Jest więc nadal nowoczesnym rowerem górskim, ale ma wyraźnie dłuższy tylny trójkąt — około <strong>478 mm</strong> — niż E82.</p>
 <p>To nie przypadek. Rama została zaprojektowana wokół większego i cięższego silnika M620. Rezultatem jest bardzo dobra stabilność, przyczepność na podjazdach i spokojniejsze zachowanie roweru przy dużej mocy.</p>
-<p>Fabryczna platforma obsługuje silnik <strong>Bafang M620 52 V</strong>, akumulator około <strong>1040 Wh</strong>, opony do <strong>29 × 2,6"</strong> lub <strong>27,5 × 2,8"</strong>, tylne koło Boost 148 × 12 mm oraz wewnętrzne prowadzenie przewodów.</p>
+<p>W konfiguracji Rexor platforma łączy potężny silnik <strong>Bafang M620 52 V</strong> z powiększonym pakietem <strong>FEB 21700 · 14S4P · 1310,4 Wh</strong> (oferującym znacznie większy zasięg niż podstawowa bateria OEM ok. 1040 Wh), oponami do <strong>29 × 2,6"</strong> lub <strong>27,5 × 2,8"</strong>, tylnym kołem Boost 148 × 12 mm oraz wewnętrznym prowadzeniem przewodów.</p>
 <h3>Dla kogo?</h3>
 <p>E55 jest szczególnie dobrym wyborem dla osoby, która:</p>
 <ul>
 <li>chce możliwie mocnego centralnego napędu,</li>
 <li>dużo podjeżdża,</li>
 <li>pokonuje długie trasy,</li>
-<li>chce dużej baterii,</li>
+<li>chce pojemnej baterii 1310,4 Wh pod wymagające wyprawy,</li>
 <li>przedkłada moc i wytrzymałość nad minimalną masę,</li>
 <li>szuka e-bike'a do ciężkiego terenu, a nie tylko lekkich leśnych ścieżek.</li>
 </ul>
@@ -169,7 +169,7 @@ export const bikeModels: BikeModel[] = [
 <tr><td>Rozmiary</td><td>17" / 19"</td></tr>
 <tr><td>Napęd platformy</td><td>Bafang M620</td></tr>
 <tr><td>Napięcie platformy</td><td>52 V</td></tr>
-<tr><td>Bateria OEM</td><td>ok. 1040 Wh</td></tr>
+<tr><td>Bateria Rexor</td><td>FEB 21700 · 14S4P · 1310,4 Wh (OEM: ok. 1040 Wh)</td></tr>
 </tbody>
 </table>
 <p><strong>„Moc, która nie kończy się tam, gdzie zaczyna się podjazd.”</strong></p>`,

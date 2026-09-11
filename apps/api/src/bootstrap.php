@@ -101,7 +101,7 @@ function publicId(): string
 
 function sanitizeRichHtml(string $html): string
 {
-    $allowedTags = '<p><br><h2><h3><h4><strong><em><ul><ol><li><blockquote><a><img>';
+    $allowedTags = '<p><br><h2><h3><h4><strong><em><ul><ol><li><blockquote><a><img><table><thead><tbody><tfoot><tr><th><td><span><hr>';
     $html = strip_tags($html, $allowedTags);
     $document = new DOMDocument('1.0', 'UTF-8');
     libxml_use_internal_errors(true);
@@ -109,8 +109,20 @@ function sanitizeRichHtml(string $html): string
     libxml_clear_errors();
 
     $allowedAttributes = [
-        'a' => ['href', 'title', 'target', 'rel'],
-        'img' => ['src', 'alt', 'title'],
+        'a' => ['href', 'title', 'target', 'rel', 'class'],
+        'img' => ['src', 'alt', 'title', 'class', 'width', 'height'],
+        'table' => ['class'],
+        'th' => ['colspan', 'rowspan', 'scope', 'class'],
+        'td' => ['colspan', 'rowspan', 'class'],
+        'span' => ['class'],
+        'p' => ['class'],
+        'h2' => ['class'],
+        'h3' => ['class'],
+        'h4' => ['class'],
+        'ul' => ['class'],
+        'ol' => ['class'],
+        'li' => ['class'],
+        'blockquote' => ['class'],
     ];
     foreach ($document->getElementsByTagName('*') as $element) {
         if (!$element instanceof DOMElement || $element->getAttribute('id') === 'root') {
