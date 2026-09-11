@@ -11,9 +11,9 @@ function publicCatalog(PDO $pdo): array
 {
     $categories = $pdo->query('SELECT slug, name, short_description, description_html, default_image_path FROM bike_categories WHERE is_published = TRUE ORDER BY sort_order')->fetchAll();
     $models = $pdo->query(
-        "SELECT id, category_id, slug, name, short_description, description_html, computed_base_price_gross, " .
-        "frame_price_gross, assembly_price_gross, margin_percent, fit_requirements, default_image_path, specifications " .
-        "FROM bike_models WHERE status <> 'archived' ORDER BY sort_order"
+        "SELECT m.id, m.category_id, bc.slug AS category_slug, m.slug, m.name, m.short_description, m.description_html, m.computed_base_price_gross, " .
+        "m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.fit_requirements, m.default_image_path, m.specifications " .
+        "FROM bike_models m JOIN bike_categories bc ON bc.id = m.category_id WHERE m.status <> 'archived' ORDER BY m.sort_order"
     )->fetchAll();
 
     $mediaStatement = $pdo->prepare('SELECT me.storage_path, me.alt_text, mm.role, mm.sort_order FROM model_media mm JOIN media me ON me.id = mm.media_id WHERE mm.model_id = :model ORDER BY mm.sort_order, mm.media_id');

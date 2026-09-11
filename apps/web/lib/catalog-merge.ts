@@ -7,8 +7,10 @@ export type PublicCategory = { slug: string; name: string; short_description: st
 
 export type ApiModel = {
   slug: string;
+  category_slug: string;
   name: string;
   short_description: string | null;
+  description_html: string | null;
   base_price: number | null;
   framePriceGross: number;
   assemblyPriceGross: number;
@@ -46,7 +48,9 @@ export function mergeCatalog(data: { models: ApiModel[]; categories: PublicCateg
       return {
         ...fallback,
         name: apiModel.name,
+        categorySlug: apiModel.category_slug,
         description: apiModel.short_description || fallback.description,
+        descriptionHtml: apiModel.description_html || fallback.descriptionHtml,
         basePrice: apiModel.base_price,
         framePriceGross: apiModel.framePriceGross ?? 0,
         assemblyPriceGross: apiModel.assemblyPriceGross ?? 0,

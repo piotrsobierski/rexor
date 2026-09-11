@@ -93,6 +93,14 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .rich-content li { @apply list-disc pl-2; }
   .rich-content img { @apply my-8 h-auto max-w-full rounded-3xl; }
   .rich-content a { @apply font-medium underline underline-offset-4; }
+  .rich-content strong { @apply font-semibold text-ink; }
+  .rich-content blockquote { @apply my-6 border-l-2 border-ink pl-4 italic text-ink; }
+  .rich-content table { @apply my-6 w-full text-left text-sm border-collapse rounded-2xl overflow-hidden border border-line; }
+  .rich-content thead { @apply bg-[var(--muted)] text-ink font-semibold; }
+  .rich-content th { @apply px-4 py-3 border-b border-line font-medium text-ink; }
+  .rich-content td { @apply px-4 py-3 border-b border-line last:border-b-0; }
+  .rich-content tr:last-child td { @apply border-b-0; }
+  .rich-content tr:nth-child(even) td { @apply bg-black/[0.015]; }
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }

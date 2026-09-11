@@ -266,6 +266,15 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               <span className="spec-pill"><BatteryCharging /> {batteryLabel}</span>
             </div>
           </div>
+          {(model.descriptionHtml || model.description) && (
+            <details className="mt-4 rounded-[28px] border border-line bg-white p-5 sm:p-6" open>
+              <summary className="cursor-pointer text-base font-semibold tracking-tight text-ink flex items-center justify-between">
+                <span>O modelu {model.name}</span>
+                <span className="text-xs font-normal text-ink-muted">Opis i specyfikacja</span>
+              </summary>
+              <div className="rich-content mt-4 border-t border-line pt-4 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: model.descriptionHtml || model.description }} />
+            </details>
+          )}
         </div>
 
         <aside className="rounded-[28px] border border-line bg-white p-5 sm:p-7 lg:p-8">
