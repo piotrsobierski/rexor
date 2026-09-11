@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Bot, User, ArrowUpRight } from 'lucide-react';
-import type { ChatMessage } from '@/app/api/chat/route';
+import type { ChatMessage } from '@/lib/chatbot/types';
 
 /**
  * Zaawansowany i bezpieczny renderer Markdown dla czatbota:
@@ -265,7 +265,7 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
       )}
 
       <div
-        className={`relative max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm transition-all ${
+        className={`relative min-w-0 max-w-[85%] break-words rounded-2xl px-4 py-3 text-sm shadow-sm transition-all ${
           isUser
             ? 'bg-ink text-white rounded-br-sm'
             : 'bg-white border border-line text-ink rounded-bl-sm shadow-[0_2px_12px_rgba(0,0,0,0.03)]'

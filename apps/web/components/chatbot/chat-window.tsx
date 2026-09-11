@@ -3,11 +3,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, RotateCcw, Sparkles, Loader2 } from 'lucide-react';
 import { ChatMessageItem } from './chat-message-item';
-import type { ChatMessage } from '@/app/api/chat/route';
+import type { ChatMessage } from '@/lib/chatbot/types';
 
 interface ChatWindowProps {
   onClose: () => void;
 }
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
 const INITIAL_MESSAGE: ChatMessage = {
   role: 'assistant',
@@ -17,14 +19,6 @@ Znam pełne specyfikacje naszych maszyn, geometrie, silniki Bafang M560 i M620, 
 
 O co chciałbyś zapytać?`,
 };
-
-const SUGGESTIONS = [
-  'Czym się różni E82 od E55?',
-  'Jaki zasięg ma Rexor E82 na baterii 982 Wh?',
-  'Opowiedz o silniku Bafang M620 w modelu E55',
-  'Czy mogę zamontować własny widelec lub hamulce?',
-  'Ile kosztuje Rexor E82 i co jest w cenie?',
-];
 
 export function ChatWindow({ onClose }: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
@@ -44,7 +38,11 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
   }, [messages, isLoading]);
 
   useEffect(() => {
-    if (textareaRef.current) {
+    // Nie focusujemy automatycznie na dotykowych ekranach: programowy focus
+    // na polu z font-size < 16px natychmiast wywołuje zoom całej strony
+    // w Safari na iOS (klasyczny efekt "wybuchającej" strony po otwarciu czatu).
+    const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+    if (!isTouchDevice && textareaRef.current) {
       textareaRef.current.focus();
     }
   }, []);
@@ -63,28 +61,14 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
     setError(null);
     setIsLoading(true);
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
-
     try {
-      // Zapytanie do backendu PHP (obsługuje hosting współdzielony Apache/PHP na home.pl),
-      // z awaryjnym fallbackiem do lokalnego handlera /api/chat
-      let response: Response;
-      try {
-        response = await fetch(`${API_BASE}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: newMessages }),
-        });
-        if (!response.ok && response.status === 404) {
-          throw new Error('404 on PHP endpoint');
-        }
-      } catch {
-        response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: newMessages }),
-        });
-      }
+      // Jedynym backendem czatu jest API PHP. Nie przełączamy się na drugi,
+      // niepełny endpoint, gdy PHP lub baza są niedostępne.
+      const response = await fetch(`${API_BASE}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: newMessages }),
+      });
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as { error?: string };
@@ -104,17 +88,20 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/
       console.error('[Chatbot error]:', err);
       const errMsg = err instanceof Error ? err.message : 'Wystąpił problem z połączeniem.';
       setError(errMsg);
-      setMessages((prev) => [
-        ...prev,
+      setMessages([
+        ...newMessages,
         {
           role: 'assistant',
-          content: `⚠️ **Przepraszam, wystąpił problem**: ${errMsg}\n\nUpewnij się, że klucz OpenRouter jest aktywny lub spróbuj ponownie za chwilę.`,
+          content: `⚠️ **Przepraszam, API Rexor jest niedostępne**: ${errMsg}\n\nSprawdź połączenie z backendem PHP i spróbuj ponownie za chwilę.`,
         },
       ]);
     } finally {
       setIsLoading(false);
-      // autofocus textarea po odpowiedzi
-      setTimeout(() => textareaRef.current?.focus(), 50);
+      // autofocus textarea po odpowiedzi (pomijamy na dotyku - patrz komentarz wyżej)
+      const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+      if (!isTouchDevice) {
+        setTimeout(() => textareaRef.current?.focus(), 50);
+      }
     }
   };
 
@@ -207,7 +194,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/
             onKeyDown={handleKeyDown}
             placeholder="Zadaj pytanie o Rexor E82, E55, zasięg, cennik..."
             disabled={isLoading}
-            className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none"
+            className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none"
           />
           <button
             onClick={() => { void handleSend(); }}
