@@ -70,7 +70,6 @@ Umożliwić klientowi zbudowanie poprawnej konfiguracji roweru Rexor, zobaczenie
 - `model_batteries` - edytowalne konfiguracje baterii per model,
 - `option_groups` - kategorie wyboru,
 - `parts` - części/warianty i ich ceny sprzedaży brutto,
-- `category_parts` - relacja wiele-do-wielu między kategoriami i częściami,
 - `model_parts` - opcje dostępne dla konkretnego modelu oraz ewentualne nadpisanie ceny,
 - `compatibility_rules` - zależności i wykluczenia,
 - `configurations` - zapisane konfiguracje, cena i status,
@@ -85,7 +84,7 @@ Umożliwić klientowi zbudowanie poprawnej konfiguracji roweru Rexor, zobaczenie
 
 Cenę i nazwy wybranych opcji utrwalamy jako migawkę w konfiguracji. Dzięki temu późniejsza zmiana cennika nie zmieni historycznej wyceny.
 
-Cena konfiguracji jest liczona po stronie API według zasady: cena bazowa modelu plus suma różnic między ceną wybranej i domyślnej części w każdym zmienionym wyborze. Przykład: część domyślna kosztuje 1000 zł brutto, opcjonalna 1300 zł brutto, więc system pokazuje dopłatę +300 zł. Nie przechowujemy +300 zł jako niezależnej wartości.
+Cena konfiguracji jest liczona po stronie API jako suma składników: rama z dopłatą rozmiaru, bateria, ceny wybranych części we wszystkich grupach modelu, cena składania i narzut modelu. Cena „od” modelu jest wyliczana tą samą formułą dla wyborów domyślnych i zapisywana wyłącznie przez serwer. Dopłata widoczna przy opcji to różnica wobec pozycji domyślnej w jej grupie i służy tylko prezentacji: nie przechowujemy jej jako niezależnej wartości ani nie sumujemy. Szczegóły w `docs/CENY_I_DOPLATY.md`.
 
 „Dostarczam własną część” jest specjalnym typem wyboru, a nie fikcyjnym produktem. Zwykle ma cenę części 0 zł, więc system sam odejmuje cenę części domyślnej. Panel pozwala dopuścić tę możliwość osobno dla danej pozycji/modelu i w razie potrzeby ustawić inną wartość rozliczeniową.
 
