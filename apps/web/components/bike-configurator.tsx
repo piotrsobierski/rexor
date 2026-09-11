@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { ArrowRight, BatteryCharging, Bike, Check, Gauge, ShieldCheck } from 'lucide-react';
+import { ArrowRight, BatteryCharging, Bike, Check, Gauge, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { CUSTOMER_SUPPLIED_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
+import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
 import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/pricing';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 type ContactForm = { customerName: string; customerEmail: string; customerPhone: string; notes: string; privacyAccepted: boolean };
@@ -67,7 +68,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   // jako różnica względem niego.
   const defaultBattery = model.batteries.find((item) => item.isDefault) ?? model.batteries[0];
   const battery = model.batteries.find((item) => item.code === batteryByModel[model.id]) ?? defaultBattery;
-  const batteryLabel = battery ? `${battery.name} · ${formatEnergy(battery.energyWh)}` : model.battery;
+  const batteryLabel = battery
+    ? (battery.name.includes('Wh') ? battery.name : `${battery.name} · ${formatEnergy(battery.energyWh)}`)
+    : model.battery;
 
   const selectedSize = model.sizes.find((item) => item.code === size) ?? model.sizes[0] ?? null;
   // Cena liczona z tej samej formuły co API: rama, rozmiar, bateria, części,
@@ -290,11 +293,66 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                   <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2 font-semibold">{item.name}{item.isDefault && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-subtle">W standardzie</span>}</span>
-                    <span className="mt-0.5 block text-sm text-ink-muted">{item.shortLabel} · {formatEnergy(item.energyWh)}</span>
+                    <span className="mt-0.5 block text-sm text-ink-muted">
+                      {item.shortLabel?.includes('Wh') ? item.shortLabel : `${item.shortLabel ? `${item.shortLabel} · ` : ''}${formatEnergy(item.energyWh)}`}
+                      {(() => {
+                        const est = computeBatteryEstimates(item);
+                        return est.estimatedTotalPackWeightKg > 0 ? ` · ~${est.estimatedTotalPackWeightKg.toFixed(1).replace('.', ',')} kg` : '';
+                      })()}
+                    </span>
                   </span>
                   <span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{delta === 0 ? 'w cenie' : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span>
                 </label>; })}
               </RadioGroup>
+
+              {battery && battery.energyWh > 0 && (
+                <div className="mt-3.5 rounded-2xl border border-line bg-[#fafbfa] p-4 text-ink">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line/70 pb-2.5">
+                    <div>
+                      <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink">
+                        <Zap className="size-3.5 text-amber-600" />
+                        Szacowane zasięgi ({formatEnergy(battery.energyWh)})
+                      </h4>
+                      <p className="mt-0.5 text-[11px] text-ink-muted">
+                        Wyliczone na żywo w oparciu o typowe zużycie energii w zróżnicowanych warunkach.
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-white border border-line px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-ink">
+                      {battery.energyWh} Wh
+                    </span>
+                  </div>
+
+                  <div className="mt-2.5 overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="text-[11px] text-ink-subtle">
+                          <th className="pb-1.5 font-medium">Tryb / warunki</th>
+                          <th className="pb-1.5 font-medium text-center">Typowe zużycie</th>
+                          <th className="pb-1.5 text-right font-semibold text-ink">Estymowany zasięg</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line/60">
+                        {computeRangeEstimates(battery.energyWh).map((row) => (
+                          <tr key={row.mode + row.condition} className="group">
+                            <td className="py-2 pr-2">
+                              <strong className="font-semibold text-ink">{row.mode}</strong>
+                              <span className="block text-[11px] text-ink-muted">{row.condition}</span>
+                            </td>
+                            <td className="py-2 px-2 text-center font-mono text-[11px] text-ink-muted">
+                              {row.consumptionLabel}
+                            </td>
+                            <td className="py-2 pl-2 text-right">
+                              <span className="inline-block rounded-md bg-emerald-50 px-2 py-0.5 font-semibold tabular-nums text-emerald-900 group-hover:bg-emerald-100">
+                                {row.rangeMinKm}–{row.rangeMaxKm} km
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </section>}
             {model.groups.filter((group) => group.selectionMode !== 'fixed').map((group, groupIndex) => {
               const choices = groupChoices(group);

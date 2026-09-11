@@ -17,9 +17,12 @@ import {
   RefreshCw,
   Save,
   Search,
+  Sparkles,
   Trash2,
   Upload,
+  Zap,
 } from 'lucide-react';
+import { computeBatteryEstimates, formatWeightKg, formatWh } from '@/lib/battery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -479,23 +482,181 @@ function ModelsEditor({ rows, media, categories, patch, request, reload, setMess
   return <Panel title="Modele i galerie" description="Zdjęcia są wieloelementową galerią. Kliknij zdjęcie, aby zobaczyć je w pełnym rozmiarze w nowej karcie, albo usuń je krzyżykiem."><div className="grid gap-6">{rows.map((row) => { const modelMedia = media.filter((item) => item.model_id === row.id); return <article key={row.id} className="min-w-0 rounded-2xl border border-line p-5 sm:p-6"><div className="flex gap-3 overflow-x-auto pb-3">{modelMedia.length === 0 && <img src={String(row.default_image_path || '/models/e82/01.jpg')} alt="" className="h-28 w-40 shrink-0 rounded-xl bg-[var(--muted)] object-contain" />}{modelMedia.map((item) => <div key={item.media_id} className="group/photo relative h-28 w-40 shrink-0"><a href={imageSrc(item.storage_path)} target="_blank" rel="noopener noreferrer"><img src={imageSrc(item.storage_path)} alt={item.alt_text} className="size-full rounded-xl bg-[var(--muted)] object-contain" /></a><button type="button" onClick={() => removePhoto(row, item.media_id)} aria-label="Usuń zdjęcie" className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 shadow transition-opacity group-hover/photo:opacity-100 hover:bg-white"><Trash2 className="size-3.5" /></button></div>)}</div><div className="mt-4 grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-name-${row.id}`}>Nazwa modelu</Label><Input id={`model-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-cat-${row.id}`}>Kategoria</Label><NativeSelect id={`model-cat-${row.id}`} value={String(drafts[row.id]?.category_id ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], category_id: event.target.value } })} className="w-full">{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{String(category.name)}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid gap-2 sm:grid-cols-3">{([['frame_price_gross', 'Cena ramy brutto'], ['assembly_price_gross', 'Cena składania brutto'], ['margin_percent', 'Narzut %']] as const).map(([field, label]) => <div key={field} className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`${field}-${row.id}`}>{label}</Label><Input id={`${field}-${row.id}`} type="number" step="0.01" value={String(drafts[row.id]?.[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], [field]: event.target.value } })} /></div>)}</div><p className="rounded-xl bg-ink-wash px-3 py-2 text-sm text-ink-muted">Cena „od” {row.computed_base_price_gross ? <strong className="tabular-nums text-ink">{String(row.computed_base_price_gross)} zł</strong> : <strong>wymaga wyceny</strong>} — wyliczona z ramy, baterii, części domyślnych i składania. Nie wpisuje się jej ręcznie.</p><details className="rounded-xl border border-line p-3" open><summary className="cursor-pointer text-sm font-semibold text-ink">Opis modelu (edytor WYSIWYG / strona produktu)</summary><div className="mt-3"><WysiwygEditor value={String(drafts[row.id]?.description_html ?? '')} onRef={(el) => { editorRefs.current[row.id] = el; }} onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', `Zdjęcie w opisie ${row.name}`); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} minHeight="min-h-56" /></div></details><div className="flex flex-wrap gap-2"><Button size="sm" onClick={async () => { const currentHtml = editorRefs.current[row.id]?.innerHTML ?? String(drafts[row.id]?.description_html ?? ''); await patch('models', row.id, { name: drafts[row.id]?.name ?? row.name, category_id: drafts[row.id]?.category_id ?? row.category_id, frame_price_gross: drafts[row.id]?.frame_price_gross ?? row.frame_price_gross, assembly_price_gross: drafts[row.id]?.assembly_price_gross ?? row.assembly_price_gross, margin_percent: drafts[row.id]?.margin_percent ?? row.margin_percent, description_html: currentHtml }); }}><Save /> Zapisz model</Button><Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie do galerii<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0])} /></Label></div></div></article>; })}</div></Panel>;
 }
 
-const batteryFields: Array<[string, string, string]> = [
-  ['name', 'Nazwa pakietu', 'text'],
-  ['cell_format', 'Format ogniwa', 'text'],
-  ['series_count', 'Ogniwa szeregowo (S)', 'number'],
-  ['parallel_count', 'Gałęzie równolegle (P)', 'number'],
-  ['cell_capacity_ah', 'Pojemność ogniwa (Ah)', 'number'],
-  ['nominal_voltage_v', 'Napięcie nominalne (V)', 'number'],
-  ['charge_voltage_v', 'Napięcie ładowania (V)', 'number'],
-  ['gross_price', 'Cena brutto', 'number'],
+const batteryFields: Array<[string, string, string, string]> = [
+  ['name', 'Nazwa pakietu', 'text', 'np. Samsung 35E 14S4P'],
+  ['cell_format', 'Format ogniwa', 'text', 'np. 18650 lub 21700'],
+  ['series_count', 'Ogniwa szeregowo (S)', 'number', 'np. 14'],
+  ['parallel_count', 'Gałęzie równolegle (P)', 'number', 'np. 4'],
+  ['cell_capacity_ah', 'Pojemność ogniwa (Ah)', 'text', 'np. 3.5'],
+  ['nominal_voltage_v', 'Napięcie nominalne (V)', 'text', 'np. 50.4 lub 50,4'],
+  ['charge_voltage_v', 'Napięcie ładowania (V)', 'text', 'np. 58.8 lub 58,8'],
+  ['gross_price', 'Cena brutto (zł)', 'text', '0 = w cenie bazowej'],
 ];
 
-const emptyBattery: Row = { id: 0, code: '', name: '', cell_format: '21700', series_count: 14, parallel_count: 4, cell_capacity_ah: 5, nominal_voltage_v: 50.4, charge_voltage_v: 58.8, gross_price: 0, sort_order: 10, is_default: false, is_active: true };
+const emptyBattery: Row = {
+  id: 0,
+  code: '',
+  name: '',
+  cell_format: '18650',
+  series_count: 14,
+  parallel_count: 4,
+  cell_capacity_ah: 3.5,
+  nominal_voltage_v: 50.4,
+  charge_voltage_v: 58.8,
+  gross_price: 0,
+  sort_order: 10,
+  is_default: false,
+  is_active: true,
+};
 
-/** Pojemność i energia pakietu są policzone, nie wpisywane ręcznie. */
-function batteryMath(row: Row) {
-  const capacity = Number(row.parallel_count ?? 0) * Number(row.cell_capacity_ah ?? 0);
-  return { capacity, energy: capacity * Number(row.nominal_voltage_v ?? 0) };
+function cleanBatteryPayload(draft: Row): Record<string, unknown> {
+  const parseNum = (v: unknown) => {
+    if (typeof v === 'number') return v;
+    const s = String(v ?? '').trim().replace(',', '.');
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+  return {
+    ...draft,
+    series_count: Math.max(1, Math.round(parseNum(draft.series_count))),
+    parallel_count: Math.max(1, Math.round(parseNum(draft.parallel_count))),
+    cell_capacity_ah: parseNum(draft.cell_capacity_ah),
+    nominal_voltage_v: parseNum(draft.nominal_voltage_v),
+    charge_voltage_v: parseNum(draft.charge_voltage_v),
+    gross_price: parseNum(draft.gross_price),
+    is_default: Boolean(draft.is_default),
+    is_active: draft.is_active !== undefined ? Boolean(draft.is_active) : true,
+  };
+}
+
+function BatteryLiveMetrics({
+  draft,
+  modelSlug,
+  onApplyUpdate,
+}: {
+  draft: Row;
+  modelSlug?: string;
+  onApplyUpdate?: (patch: Partial<Row>) => void;
+}) {
+  const est = computeBatteryEstimates(draft, modelSlug);
+
+  return (
+    <div className="rounded-xl border border-line bg-white p-3.5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-8 items-center justify-center rounded-xl bg-amber-100 text-amber-900">
+            <Zap className="size-4 text-amber-700" />
+          </span>
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+              Estymacja w locie
+            </span>
+            <div className="flex items-baseline gap-2">
+              <strong className="text-xl font-bold tabular-nums text-ink">
+                {est.energyWh > 0 ? `${est.energyWh.toFixed(1)} Wh` : '0 Wh'}
+              </strong>
+              {est.energyWh >= 1000 && (
+                <span className="text-xs font-medium text-ink-muted">
+                  ({(est.energyWh / 1000).toFixed(2)} kWh)
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {onApplyUpdate && draft.code !== est.suggestedCode && est.energyWh > 0 && (
+            <button
+              type="button"
+              onClick={() => onApplyUpdate({ code: est.suggestedCode })}
+              className="inline-flex items-center gap-1 rounded-lg border border-line bg-ink-wash px-2.5 py-1 font-mono text-ink transition hover:border-ink/40 hover:bg-white"
+              title={`Ustaw sugerowany kod: ${est.suggestedCode}`}
+            >
+              <Sparkles className="size-3 text-ink-muted" /> Kod: <strong>{est.suggestedCode}</strong>
+            </button>
+          )}
+
+          {onApplyUpdate && est.cellSpec.suggestedFormat && (
+            <button
+              type="button"
+              onClick={() => onApplyUpdate({ cell_format: est.cellSpec.suggestedFormat })}
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 font-medium text-amber-900 transition hover:bg-amber-100"
+              title="Popraw literówkę formatu ogniwa"
+            >
+              Popraw na <strong>{est.cellSpec.suggestedFormat}</strong>
+            </button>
+          )}
+
+          {onApplyUpdate && est.series > 0 && (!draft.nominal_voltage_v || Math.abs(Number(String(draft.nominal_voltage_v).replace(',', '.')) - est.suggestedNominalV) > 1.5) && (
+            <button
+              type="button"
+              onClick={() => onApplyUpdate({
+                nominal_voltage_v: est.suggestedNominalV,
+                charge_voltage_v: est.suggestedChargeV,
+              })}
+              className="inline-flex items-center gap-1 rounded-lg border border-line bg-ink-wash px-2.5 py-1 text-ink-muted transition hover:border-ink/40 hover:bg-white"
+              title={`Ustaw standardowe napięcia Li-ion: ${est.suggestedNominalV} V nom. / ${est.suggestedChargeV} V max`}
+            >
+              Napięcia {est.series}S ({est.suggestedNominalV} V / {est.suggestedChargeV} V)
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 text-xs">
+        <div className="rounded-lg bg-ink-wash p-2.5">
+          <span className="text-ink-subtle">Pojemność pakietu</span>
+          <strong className="mt-0.5 block text-sm font-semibold tabular-nums text-ink">
+            {est.packCapacityAh > 0 ? `${est.packCapacityAh.toFixed(2)} Ah` : '—'}
+          </strong>
+          <span className="text-[11px] text-ink-muted">
+            {est.parallel}P × {est.cellCapacityAh || 0} Ah
+          </span>
+        </div>
+
+        <div className="rounded-lg bg-ink-wash p-2.5">
+          <span className="text-ink-subtle">Liczba ogniw</span>
+          <strong className="mt-0.5 block text-sm font-semibold tabular-nums text-ink">
+            {est.cellCount > 0 ? `${est.cellCount} szt.` : '—'}
+          </strong>
+          <span className="text-[11px] text-ink-muted">
+            {est.series}S {est.parallel}P ({est.cellSpec.format})
+          </span>
+        </div>
+
+        <div className="rounded-lg bg-ink-wash p-2.5">
+          <span className="text-ink-subtle">Masa ogniw (est.)</span>
+          <strong className="mt-0.5 block text-sm font-semibold tabular-nums text-ink">
+            {est.cellsWeightKg > 0 ? formatWeightKg(est.cellsWeightKg) : '—'}
+          </strong>
+          <span className="text-[11px] text-ink-muted">
+            ~{est.cellSpec.cellWeightGrams} g / ogniwo
+          </span>
+        </div>
+
+        <div className="rounded-lg bg-ink-wash p-2.5">
+          <span className="text-ink-subtle">Masa pakietu (est.)</span>
+          <strong className="mt-0.5 block text-sm font-semibold tabular-nums text-ink">
+            {est.estimatedTotalPackWeightKg > 0 ? formatWeightKg(est.estimatedTotalPackWeightKg) : '—'}
+          </strong>
+          <span className="text-[11px] text-ink-muted" title="Z BMS-em, taśmami niklowymi, przewodami zasilającymi i obudową">
+            z BMS, niklem i obudową
+          </span>
+        </div>
+      </div>
+
+      {est.series > 0 && est.nominalVoltageV > 0 && (
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-2 text-[11px] text-ink-muted">
+          <span>
+            Napięcie na ogniwo: <strong className="font-semibold text-ink">{est.cellNominalV.toFixed(2)} V</strong> nom. · <strong className="font-semibold text-ink">{est.cellChargeV.toFixed(2)} V</strong> max
+          </span>
+          <span className="text-ink-subtle">
+            {est.cellSpec.note}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function BatteriesEditor({ batteries, models, request, reload, setMessage }: { batteries: Row[]; models: Row[]; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
@@ -508,51 +669,193 @@ function BatteriesEditor({ batteries, models, request, reload, setMessage }: { b
 
   async function save(id: number) {
     setMessage('Zapisuję baterię…');
-    try { await request(`/admin/batteries/${id}`, { method: 'PATCH', body: JSON.stringify(drafts[id]) }); await reload(); setMessage('Bateria zapisana.'); }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać baterii.'); }
+    try {
+      const payload = cleanBatteryPayload(drafts[id]);
+      await request(`/admin/batteries/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      await reload();
+      setMessage('Bateria zapisana.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać baterii.');
+    }
   }
 
-  async function create(modelId: number) {
+  async function create(modelId: number, modelSlug = 'e82') {
     const draft = newRows[modelId] ?? emptyBattery;
+    const est = computeBatteryEstimates(draft, modelSlug);
+    const resolvedCode = String(draft.code || '').trim() || est.suggestedCode;
+
+    if (!resolvedCode) {
+      setMessage('Podaj kod pakietu.');
+      return;
+    }
+
     setMessage('Dodaję baterię…');
     try {
-      await request('/admin/batteries', { method: 'POST', body: JSON.stringify({ ...draft, model_id: modelId }) });
+      const payload = {
+        ...cleanBatteryPayload(draft),
+        code: resolvedCode,
+        model_id: modelId,
+      };
+      await request('/admin/batteries', { method: 'POST', body: JSON.stringify(payload) });
       setNewRows({ ...newRows, [modelId]: { ...emptyBattery } });
       await reload();
       setMessage('Bateria dodana do modelu.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się dodać baterii.'); }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się dodać baterii.');
+    }
   }
 
-  return <Panel title="Baterie per model" description="Każdy model ma własną listę pakietów. Pakiet domyślny wyznacza cenę bazową, pozostałe pokazują się w konfiguratorze jako dopłata lub upust.">
+  return <Panel title="Baterie per model" description="Każdy model ma własną listę pakietów. Pakiet domyślny wyznacza cenę bazową, pozostałe pokazują się w konfiguratorze jako dopłata lub upust. Watogodziny oraz szacowana masa pakietu i ogniw liczą się automatycznie w locie.">
     <div className="grid gap-5">{models.map((model) => {
       const rows = batteries.filter((row) => Number(row.model_id) === Number(model.id));
-      const draftNew = newRows[Number(model.id)] ?? emptyBattery;
-      return <article key={model.id} className="rounded-2xl border border-line p-4">
-        <h3 className="text-lg font-semibold tracking-tight">{String(model.name)}</h3>
-        {rows.length === 0 && <p className="mt-2 text-sm text-ink-muted">Ten model nie ma jeszcze żadnego pakietu baterii.</p>}
-        <div className="mt-4 grid gap-4">{rows.map((row) => { const draft = drafts[row.id] ?? row; const math = batteryMath(draft); return <div key={row.id} className="rounded-xl bg-ink-wash p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs text-ink-subtle">{String(row.code)}</span><span className="text-sm tabular-nums text-ink-muted">{math.capacity.toFixed(2)} Ah · {math.energy.toFixed(1)} Wh</span></div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{batteryFields.map(([field, label, type]) => <label key={field} className="grid gap-1.5 text-sm">
-            <span className="text-ink-muted">{label}</span>
-            <Input type={type} step={type === 'number' ? '0.01' : undefined} value={String(draft[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...draft, [field]: event.target.value } })} />
-          </label>)}</div>
-          <div className="mt-3 flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm"><Switch checked={Boolean(draft.is_default)} onCheckedChange={(checked) => setDrafts({ ...drafts, [row.id]: { ...draft, is_default: checked } })} /> Domyślna</label>
-            <label className="flex items-center gap-2 text-sm"><Switch checked={Boolean(draft.is_active)} onCheckedChange={(checked) => setDrafts({ ...drafts, [row.id]: { ...draft, is_active: checked } })} /> Widoczna w konfiguratorze</label>
-            <Button size="sm" onClick={() => save(row.id)}><Save /> Zapisz</Button>
-          </div>
-        </div>; })}</div>
+      const modelSlug = String(model.slug || model.name || 'e82').toLowerCase().includes('e55') ? 'e55' : 'e82';
+      const draftNew = newRows[Number(model.id)] ?? { ...emptyBattery };
 
-        <details className="mt-4 rounded-xl border border-line p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Dodaj pakiet do modelu {String(model.name)}</summary>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="grid gap-1.5 text-sm"><span className="text-ink-muted">Kod (np. e82-982wh)</span><Input value={String(draftNew.code ?? '')} onChange={(event) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, code: event.target.value } })} /></label>
-            {batteryFields.map(([field, label, type]) => <label key={field} className="grid gap-1.5 text-sm">
-              <span className="text-ink-muted">{label}</span>
-              <Input type={type} step={type === 'number' ? '0.01' : undefined} value={String(draftNew[field] ?? '')} onChange={(event) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, [field]: event.target.value } })} />
-            </label>)}
+      return <article key={model.id} className="rounded-2xl border border-line p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight">{String(model.name)}</h3>
+            <p className="text-xs text-ink-muted">Pakiety skonfigurowane dla tego modelu: {rows.length}</p>
           </div>
-          <Button size="sm" className="mt-3" onClick={() => create(Number(model.id))}><Save /> Dodaj baterię</Button>
+        </div>
+
+        {rows.length === 0 && <p className="mt-3 text-sm text-ink-muted">Ten model nie ma jeszcze żadnego pakietu baterii.</p>}
+
+        <div className="mt-4 grid gap-4">{rows.map((row) => {
+          const draft = drafts[row.id] ?? row;
+
+          return <div key={row.id} className="rounded-2xl bg-ink-wash p-4 sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-semibold text-ink-subtle">{String(row.code)}</span>
+                {Boolean(draft.is_default) && (
+                  <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                    Domyślna w modelu
+                  </span>
+                )}
+                {!draft.is_active && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
+                    Ukryta
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <BatteryLiveMetrics
+              draft={draft}
+              modelSlug={modelSlug}
+              onApplyUpdate={(patch) => setDrafts({ ...drafts, [row.id]: { ...draft, ...patch } })}
+            />
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {batteryFields.map(([field, label, type, placeholder]) => <label key={field} className="grid gap-1.5 text-sm">
+                <span className="text-xs font-medium text-ink-muted">{label}</span>
+                <Input
+                  type={type}
+                  placeholder={placeholder}
+                  value={String(draft[field] ?? '')}
+                  onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...draft, [field]: event.target.value } })}
+                />
+              </label>)}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-line/60 pt-3">
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Switch checked={Boolean(draft.is_default)} onCheckedChange={(checked) => setDrafts({ ...drafts, [row.id]: { ...draft, is_default: checked } })} />
+                  Domyślna
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Switch checked={draft.is_active !== undefined ? Boolean(draft.is_active) : true} onCheckedChange={(checked) => setDrafts({ ...drafts, [row.id]: { ...draft, is_active: checked } })} />
+                  Widoczna w konfiguratorze
+                </label>
+              </div>
+              <Button size="sm" onClick={() => save(row.id)}><Save /> Zapisz pakiet</Button>
+            </div>
+          </div>;
+        })}</div>
+
+        <details className="mt-5 rounded-2xl border border-line bg-white p-4 sm:p-5" open={rows.length === 0}>
+          <summary className="cursor-pointer text-sm font-semibold tracking-tight text-ink hover:text-ink/80">
+            Dodaj pakiet do modelu {String(model.name)}
+          </summary>
+
+          <div className="mt-4 grid gap-4">
+            <BatteryLiveMetrics
+              draft={draftNew}
+              modelSlug={modelSlug}
+              onApplyUpdate={(patch) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, ...patch } })}
+            />
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="grid gap-1.5 text-sm">
+                <span className="text-xs font-medium text-ink-muted">Kod (np. e82-982wh)</span>
+                <Input
+                  placeholder="np. e82-706wh"
+                  value={String(draftNew.code ?? '')}
+                  onChange={(event) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, code: event.target.value } })}
+                />
+              </label>
+              {batteryFields.map(([field, label, type, placeholder]) => <label key={field} className="grid gap-1.5 text-sm">
+                <span className="text-xs font-medium text-ink-muted">{label}</span>
+                <Input
+                  type={type}
+                  placeholder={placeholder}
+                  value={String(draftNew[field] ?? '')}
+                  onChange={(event) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, [field]: event.target.value } })}
+                />
+              </label>)}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line/60 pt-3">
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Switch
+                    checked={draftNew.is_active !== undefined ? Boolean(draftNew.is_active) : true}
+                    onCheckedChange={(checked) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, is_active: checked } })}
+                  />
+                  Widoczna w konfiguratorze
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Switch
+                    checked={Boolean(draftNew.is_default)}
+                    onCheckedChange={(checked) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, is_default: checked } })}
+                  />
+                  Domyślna dla modelu
+                </label>
+
+                {modelSlug === 'e82' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setNewRows({
+                      ...newRows,
+                      [Number(model.id)]: {
+                        ...draftNew,
+                        code: 'e82-706wh',
+                        name: 'Samsung 35E 14S4P · 705,6 Wh',
+                        cell_format: '18650',
+                        series_count: 14,
+                        parallel_count: 4,
+                        cell_capacity_ah: 3.5,
+                        nominal_voltage_v: 50.4,
+                        charge_voltage_v: 58.8,
+                        gross_price: 1950,
+                        is_active: true,
+                        is_default: false,
+                      },
+                    })}
+                  >
+                    Wstaw wzorzec 14S4P (705,6 Wh)
+                  </Button>
+                )}
+              </div>
+
+              <Button size="sm" onClick={() => create(Number(model.id), modelSlug)}><Save /> Dodaj baterię do modelu</Button>
+            </div>
+          </div>
         </details>
       </article>;
     })}</div>
@@ -769,8 +1072,12 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-white/60">Przypisanych części w tym modelu: <strong className="text-white font-semibold">{assigned.length}</strong></span>
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 text-xs text-white/80 cursor-pointer">
+            <Switch checked={showIncompatible} onCheckedChange={setShowIncompatible} />
+            Pokaż wszystkie części z katalogu (w tym niezgodne)
+          </label>
+          <span className="text-white/60 text-xs">Przypisanych części w tym modelu: <strong className="text-white font-semibold">{assigned.length}</strong></span>
         </div>
       </div>
     </div>
@@ -862,12 +1169,12 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
       const groupId = Number(group.id);
       const settings = settingsByGroup.get(groupId);
       const mode = settings?.selection_mode ?? 'select_one';
-      const candidates = catalog.parts
-        .filter((part) => Number(part.group_id) === groupId)
+      const allInGroup = catalog.parts.filter((part) => Number(part.group_id) === groupId);
+      const candidates = allInGroup
         .map((part) => ({ part, status: fitStatus(part.fit_attributes, requirements), row: assignedByPart.get(Number(part.id)) }))
         .filter((item) => showIncompatible || item.status !== 'conflict' || item.row);
 
-      return <Panel key={group.id} title={String(group.name)} description={mode === 'fixed' ? 'Element stały: nie jest pokazywany jako wybór dla klienta, ale jego cena wchodzi do sumy.' : 'Zaznacz części oferowane w tym modelu i wskaż pozycję domyślną — to ona wyznacza cenę „od” i punkt odniesienia dla różnic.'}>
+      return <Panel key={group.id} title={String(group.name)} description={mode === 'fixed' ? 'Element stały: montowany fabrycznie jeden element wliczony w cenę bazową (niewidoczny dla klienta jako wybór w konfiguratorze).' : 'Zaznacz części oferowane w tym modelu i wskaż pozycję domyślną — to ona wyznacza cenę „od” i punkt odniesienia dla różnic.'}>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
           <div className="grid gap-1">
             <Label htmlFor={`mode-${group.id}`} className="flex items-center gap-1.5 text-xs text-ink-muted">
@@ -889,6 +1196,56 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
             {Boolean(Number(settings?.customer_part_allowed ?? 0)) && <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`customer-price-${group.id}`}>Wartość rozliczeniowa (zł)</Label><Input id={`customer-price-${group.id}`} type="number" step="0.01" defaultValue={String(settings?.customer_part_gross_price ?? 0)} onBlur={(event) => void saveGroup(groupId, { customer_part_gross_price: Number(event.target.value) })} className="w-32" /></div>}
           </div>
         </div>
+
+        {mode === 'fixed' && (
+          <div className="mt-3.5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-[#fafbfa] p-3.5 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-ink">Element montowany w modelu ({String(group.name)}):</span>
+              <NativeSelect
+                value={String(candidates.find((c) => c.row?.is_default)?.part.id ?? candidates.find((c) => c.row)?.part.id ?? '')}
+                onChange={(e) => {
+                  const newPartId = Number(e.target.value);
+                  if (newPartId) {
+                    void saveModelPart({ part_id: newPartId, assigned: true, is_default: true });
+                  }
+                }}
+                className="h-8 text-xs font-semibold bg-white border-line min-w-64"
+              >
+                <NativeSelectOption value="">Wybierz część…</NativeSelectOption>
+                {allInGroup.map((p) => (
+                  <NativeSelectOption key={p.id} value={p.id}>
+                    {String(p.name)} ({String(p.gross_price)} zł)
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="flex items-center gap-2 text-ink-muted">
+              <span>Chcesz udostępnić klientowi wybór {String(group.name).toLowerCase()} w konfiguratorze?</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 text-xs font-medium"
+                onClick={() => void saveGroup(groupId, { selection_mode: 'select_one' })}
+              >
+                Włącz wybór w konfiguratorze
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {allInGroup.length > candidates.length && (
+          <div className="mt-2.5 flex items-center justify-between rounded-xl bg-amber-50/70 border border-amber-200/60 px-3 py-1.5 text-xs text-amber-900">
+            <span>Ukryto {allInGroup.length - candidates.length} części z katalogu oznaczonych jako niezgodne z ramą/silnikiem.</span>
+            <button
+              type="button"
+              onClick={() => setShowIncompatible(true)}
+              className="font-semibold underline hover:text-amber-950"
+            >
+              Pokaż wszystkie ({allInGroup.length})
+            </button>
+          </div>
+        )}
 
         <Table className="mt-4">
           <TableHeader>

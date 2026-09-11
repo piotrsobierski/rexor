@@ -107,14 +107,36 @@ function batteryPayload(array $input, array $current = []): array
 {
     $value = static fn (string $field, mixed $fallback): mixed => array_key_exists($field, $input) ? $input[$field] : $fallback;
 
+    $toFloat = static function (mixed $raw): float {
+        if (is_numeric($raw)) {
+            return (float) $raw;
+        }
+        if (is_string($raw)) {
+            $cleaned = trim(str_replace([' ', ','], ['', '.'], $raw));
+            return is_numeric($cleaned) ? (float) $cleaned : 0.0;
+        }
+        return 0.0;
+    };
+
+    $toInt = static function (mixed $raw): int {
+        if (is_numeric($raw)) {
+            return (int) $raw;
+        }
+        if (is_string($raw)) {
+            $cleaned = trim(str_replace([' ', ','], ['', '.'], $raw));
+            return is_numeric($cleaned) ? (int) round((float) $cleaned) : 0;
+        }
+        return 0;
+    };
+
     $name = trim((string) $value('name', $current['name'] ?? ''));
     $cellFormat = trim((string) $value('cell_format', $current['cell_format'] ?? ''));
-    $series = (int) $value('series_count', $current['series_count'] ?? 0);
-    $parallel = (int) $value('parallel_count', $current['parallel_count'] ?? 0);
-    $cellCapacity = (float) $value('cell_capacity_ah', $current['cell_capacity_ah'] ?? 0);
-    $nominalVoltage = (float) $value('nominal_voltage_v', $current['nominal_voltage_v'] ?? 0);
-    $chargeVoltage = (float) $value('charge_voltage_v', $current['charge_voltage_v'] ?? 0);
-    $grossPrice = (float) $value('gross_price', $current['gross_price'] ?? 0);
+    $series = $toInt($value('series_count', $current['series_count'] ?? 0));
+    $parallel = $toInt($value('parallel_count', $current['parallel_count'] ?? 0));
+    $cellCapacity = $toFloat($value('cell_capacity_ah', $current['cell_capacity_ah'] ?? 0));
+    $nominalVoltage = $toFloat($value('nominal_voltage_v', $current['nominal_voltage_v'] ?? 0));
+    $chargeVoltage = $toFloat($value('charge_voltage_v', $current['charge_voltage_v'] ?? 0));
+    $grossPrice = $toFloat($value('gross_price', $current['gross_price'] ?? 0));
 
     if ($name === '' || mb_strlen($name) > 200) {
         throw new InvalidArgumentException('Podaj nazwę pakietu baterii.');
