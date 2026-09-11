@@ -3,7 +3,10 @@
 -- base_price staje się polem wyliczanym przez serwer (cena "od"), którego
 -- panel nie może edytować.
 ALTER TABLE bike_models
-    CHANGE COLUMN base_price computed_base_price_gross DECIMAL(12,2) NULL,
+    CHANGE COLUMN base_price computed_base_price_gross DECIMAL(12,2) NULL;
+
+-- Osobne ALTER, bo pozycja AFTER odwołuje się do nazwy nadanej powyżej.
+ALTER TABLE bike_models
     ADD COLUMN frame_price_gross DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER computed_base_price_gross,
     ADD COLUMN assembly_price_gross DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER frame_price_gross,
     ADD COLUMN margin_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER assembly_price_gross,

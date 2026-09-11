@@ -35,6 +35,10 @@ Cena opcji może mieć nadpisanie dla konkretnego modelu. Kolejność źródeł:
 
 „Dostarczam własną część” jest trybem grupy, nie produktem w katalogu. Ma własną wartość rozliczeniową, standardowo 0 zł, i wchodzi do sumy tą wartością. W modelu sumacyjnym nie potrzebujemy ujemnej dopłaty ani sztucznego SKU.
 
+## Jedna grupa to jedna pozycja w cenie
+
+Grupa części odpowiada jednemu wyborowi i wnosi do ceny jedną pozycję. Dlatego nie może być workiem na kilka różnych komponentów: grupa `cockpit` trzymała siodło, sztycę, kierownicę, gripy, mostek i pedały, a wszystkie sześć było oznaczone jako domyślne. Przy cenie liczonej jako różnica wobec pozycji domyślnej było to niewidoczne, bo każda dopłata wynosiła 0 zł. Przy sumie składników rower gubił około 1380 zł osprzętu. Migracja 004 rozdzieliła te grupy, a także piasty i komplet kół.
+
 ## Elementy stałe i rama
 
 Grupa w trybie `fixed` (np. silnik, ładowarka) nie jest pokazywana klientowi jako wybór, ale cena jej pozycji domyślnej wchodzi do sumy. Dzięki temu cena roweru zawiera cały osprzęt, a nie tylko to, co klient może zmienić.
@@ -62,7 +66,7 @@ Po zapisaniu konfiguracji utrwalamy nazwę i cenę każdej wybranej pozycji, roz
 
 Preseed zawiera komplet roboczych cen potrzebnych do działania algorytmu. Są to wartości demonstracyjne wyprowadzone z zamówień referencyjnych i orientacyjnych cen rynkowych, a nie zatwierdzona oferta Rexor.
 
-Po przejściu na sumę składników ceny „od” wzrosły względem wcześniejszych wartości wpisanych ręcznie: dla E82 z 15 000 zł do około 20 800 zł, dla E55 z 16 500 zł do około 22 300 zł przy roboczej cenie składania 1500 zł. Nowe kwoty wynikają z cen części w seedzie i wymagają zatwierdzenia razem z nimi.
+Po przejściu na sumę składników ceny „od” wzrosły względem wcześniejszych wartości wpisanych ręcznie: E82 z 15 000 zł na 21 179 zł, E55 z 16 500 zł na 22 329 zł, przy roboczej cenie składania 1500 zł i narzucie 0%. Nowe kwoty wynikają wyłącznie z cen części w seedzie i wymagają zatwierdzenia razem z nimi.
 
 Sprawdzone 11 września 2026 r. przykłady internetowe:
 

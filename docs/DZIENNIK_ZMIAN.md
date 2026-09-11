@@ -45,6 +45,12 @@ w panelu i obsłużone w konfiguratorze.
 
 ### Wprowadzone zmiany
 
+- `database/migrations/004_split_bundle_groups.sql`: grupy `cockpit` i `wheels`
+  były workami na kilka osobnych komponentów — sześć pozycji domyślnych w jednej
+  grupie kokpitu. Przy dopłatach liczonych jako różnica było to niewidoczne
+  (każda dopłata 0 zł), przy sumie składników rower gubił około 1380 zł. Nowe
+  grupy: siodło, sztyca, kierownica, gripy, mostek, pedały, piasta przednia
+  i tylna.
 - `database/migrations/003_component_pricing.sql`: `computed_base_price_gross`,
   `frame_price_gross`, `assembly_price_gross`, `margin_percent`,
   `fit_requirements` w `bike_models`, `price_delta_gross` w `model_sizes`,
@@ -84,9 +90,19 @@ około 22 300 zł. Wynikają z roboczych cen części w seedzie i roboczej ceny
 składania 1500 zł. Przed publikacją trzeba zatwierdzić cenę ramy, cenę
 składania i narzut każdego modelu razem z cenami części.
 
-Migracja 003 nie była uruchomiona na bazie: w tym środowisku nie ma
-działającego Dockera ani MySQL. Wymaga `php scripts/migrate.php` (podgląd),
-potem `--apply`, i sprawdzenia cen w panelu.
+### Weryfikacja
+
+Migracje 003 i 004 wykonane na lokalnym MySQL. Po nich każda grupa w każdym
+modelu ma dokładnie jedną pozycję domyślną, a ceny „od” wynoszą 21 179 zł dla
+E82 i 22 329 zł dla E55; CFR707 nadal nie ma składników i pozostaje bez ceny.
+Sprawdzone przez API: zmiana domyślnych hamulców z Shimano na Magurę podnosi
+cenę „od” o 300 zł i wraca po cofnięciu, zmiana ceny składania o 100 zł zmienia
+cenę o 100 zł. Wysłana konfiguracja E82 z Magurą i własnym widelcem dała
+20 479 zł, czyli 21 179 + 300 − 1000. Testowa konfiguracja została usunięta
+z bazy.
+
+Ceny robocze w seedzie nadal wymagają zatwierdzenia — zmieniła się metoda
+liczenia, nie źródło danych cenowych.
 
 ---
 
