@@ -45,6 +45,7 @@ type GroupSettingsRow = { model_id: number; group_id: number; group_slug: string
 type PricingLine = { groupSlug: string; groupName: string; name: string; grossPrice: number };
 type ModelPricing = { modelId: number; framePriceGross: number; batteryPriceGross: number; componentsPriceGross: number; assemblyPriceGross: number; marginPercent: number; marginAmountGross: number; grossTotal: number; issues: string[]; notes: string[]; lines: PricingLine[] };
 type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string> };
+type ActivityLogEntry = { id: number; event_type: string; actor_type: 'customer' | 'admin' | 'system'; actor_label: string | null; ip_address: string | null; summary: string; details: Record<string, unknown> | null; created_at: string };
 
 export function AdminPanel() {
   const [token, setToken] = useState('');
@@ -96,7 +97,7 @@ export function AdminPanel() {
   if (!token || !catalog) return <main className="grid min-h-screen place-items-center bg-[#111] px-4"><Toaster /><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-7"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" /><p className="eyebrow mt-10">Panel administracyjny</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Zaloguj się</h1><div className="mt-6 grid gap-4"><div className="grid gap-1.5"><Label htmlFor="admin-email">E-mail</Label><Input id="admin-email" type="email" required className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} /></div><div className="grid gap-1.5"><Label htmlFor="admin-password">Hasło</Label><Input id="admin-password" type="password" required className="h-11" value={password} onChange={(event) => setPassword(event.target.value)} /></div><Button type="submit" className="h-11 rounded-full bg-ink text-white">Zaloguj</Button>{message && <p className="text-center text-sm text-ink-muted">{message}</p>}</div></form></main>;
 
   return <div className="min-h-screen bg-[#f4f5f2]"><Toaster /><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => loadCatalog()}><RefreshCw /> Odśwież</Button><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
-    <Tabs defaultValue="models"><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Serwis</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger></TabsList>
+    <Tabs defaultValue="models"><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Serwis</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="categories"><SimpleEditor resource="categories" rows={catalog.categories} patch={patch} fields={[['name', 'Nazwa'], ['short_description', 'Krótki opis']]} /></TabsContent>
       <TabsContent value="equipment"><ModelEquipmentEditor catalog={catalog} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
@@ -105,6 +106,7 @@ export function AdminPanel() {
       <TabsContent value="service"><PageEditor page={catalog.pages.find((page) => page.slug === 'serwis')} patch={patch} request={request} /></TabsContent>
       <TabsContent value="theme"><ThemeEditor theme={catalog.theme} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="inquiries"><InquiriesTable rows={catalog.inquiries} /></TabsContent>
+      <TabsContent value="activity"><ActivityLogPanel request={request} /></TabsContent>
     </Tabs>
   </main></div>;
 }
@@ -1184,6 +1186,90 @@ const inquiryColumns: string[][] = [['public_id', 'Projekt'], ['customer_name', 
 
 function InquiriesTable({ rows }: { rows: Row[] }) {
   return <Panel title="Zapytania klientów" description="Konfiguracje zapisane przez formularz końcowy."><Table><TableHeader><TableRow>{inquiryColumns.map(([, label]) => <TableHead key={label}>{label}</TableHead>)}<TableHead className="w-28">Akcja</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}>{inquiryColumns.map(([field]) => <TableCell key={field}>{String(row[field] ?? '—')}</TableCell>)}<TableCell><Button size="sm" variant="outline" render={<a href={`/admin/konfiguracje/${row.public_id}`} target="_blank" rel="noopener noreferrer" />}><ExternalLink /> Szczegóły</Button></TableCell></TableRow>)}</TableBody></Table></Panel>;
+}
+
+const activityEventLabels: Record<string, string> = {
+  admin_login: 'Logowanie admina',
+  record_updated: 'Edycja rekordu',
+  model_created: 'Nowy model',
+  part_created: 'Nowa część',
+  part_deleted: 'Usunięcie części',
+  battery_saved: 'Zapis baterii',
+  theme_updated: 'Zmiana kolorów',
+  media_uploaded: 'Wgranie zdjęcia',
+  media_deleted: 'Usunięcie zdjęcia',
+  model_part_saved: 'Osprzęt modelu',
+  model_group_settings_saved: 'Ustawienia grupy',
+  model_parts_copied: 'Kopiowanie osprzętu',
+  configuration_created: 'Nowa konfiguracja',
+  chat_message: 'Wiadomość czatbota',
+};
+
+const activityActorLabels: Record<ActivityLogEntry['actor_type'], string> = { admin: 'Admin', customer: 'Klient', system: 'System' };
+
+function ActivityLogRow({ entry }: { entry: ActivityLogEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const who = entry.actor_label ?? (entry.ip_address ? `${activityActorLabels[entry.actor_type]} (${entry.ip_address})` : activityActorLabels[entry.actor_type]);
+  const when = new Date(entry.created_at.replace(' ', 'T') + 'Z').toLocaleString('pl-PL');
+  return <>
+    <TableRow className={cn(entry.details && 'cursor-pointer')} onClick={() => entry.details && setExpanded((value) => !value)}>
+      <TableCell className="whitespace-nowrap text-xs text-ink-subtle">{when}</TableCell>
+      <TableCell><span className="rounded-full bg-muted px-2 py-0.5 text-xs">{activityEventLabels[entry.event_type] ?? entry.event_type}</span></TableCell>
+      <TableCell className="text-sm">{who}</TableCell>
+      <TableCell className="text-sm">{entry.summary}</TableCell>
+      <TableCell className="w-10 text-center">{entry.details && (expanded ? <ChevronLeft className="mx-auto rotate-90" /> : <ChevronRight className="mx-auto rotate-90" />)}</TableCell>
+    </TableRow>
+    {expanded && entry.details && <TableRow><TableCell colSpan={5} className="bg-muted/40"><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(entry.details, null, 2)}</pre></TableCell></TableRow>}
+  </>;
+}
+
+/**
+ * Kto/co/kiedy dla całego panelu: konfiguracje klientów, edycje w panelu
+ * admina i każda wymiana z chatbotem. Stronicowanie po malejącym id (kursor
+ * beforeId), bo dziennik rośnie ciągle i strona nie może ładować wszystkiego.
+ */
+function ActivityLogPanel({ request }: { request: (path: string, options?: RequestInit) => Promise<any> }) {
+  const [items, setItems] = useState<ActivityLogEntry[]>([]);
+  const [eventType, setEventType] = useState('');
+  const [nextBeforeId, setNextBeforeId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function load(reset: boolean) {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: '50' });
+      if (eventType) params.set('eventType', eventType);
+      if (!reset && nextBeforeId) params.set('beforeId', String(nextBeforeId));
+      const result = await request(`/admin/activity-log?${params.toString()}`);
+      setItems((current) => (reset ? result.items : [...current, ...result.items]));
+      setNextBeforeId(result.nextBeforeId);
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nie udało się pobrać dziennika.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(true); }, [eventType]);
+
+  return <Panel title="Dziennik aktywności" description="Kto, co i kiedy zrobił: konfiguracje klientów, zmiany w panelu admina i rozmowy z chatbotem.">
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      <Label htmlFor="activity-filter" className="text-xs text-ink-subtle">Typ zdarzenia</Label>
+      <NativeSelect id="activity-filter" value={eventType} onChange={(event) => setEventType(event.target.value)} className="h-9 w-auto text-xs">
+        <NativeSelectOption value="">Wszystkie</NativeSelectOption>
+        {Object.entries(activityEventLabels).map(([value, label]) => <NativeSelectOption key={value} value={value}>{label}</NativeSelectOption>)}
+      </NativeSelect>
+      <Button variant="outline" size="sm" onClick={() => load(true)}><RefreshCw /> Odśwież</Button>
+    </div>
+    {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+    <Table><TableHeader><TableRow><TableHead>Kiedy</TableHead><TableHead>Co</TableHead><TableHead>Kto</TableHead><TableHead>Szczegóły</TableHead><TableHead className="w-10"></TableHead></TableRow></TableHeader>
+      <TableBody>{items.map((entry) => <ActivityLogRow key={entry.id} entry={entry} />)}</TableBody>
+    </Table>
+    {items.length === 0 && !loading && <p className="py-6 text-center text-sm text-ink-subtle">Brak zdarzeń.</p>}
+    {nextBeforeId && <div className="mt-4 flex justify-center"><Button variant="outline" size="sm" disabled={loading} onClick={() => load(false)}>{loading ? 'Wczytuję…' : 'Wczytaj więcej'}</Button></div>}
+  </Panel>;
 }
 
 const selectionModeLabels: Array<[string, string]> = [

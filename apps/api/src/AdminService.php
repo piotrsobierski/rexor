@@ -46,6 +46,7 @@ function loginAdmin(PDO $pdo, array $input): array
         'hash' => hash('sha256', $token),
     ]);
     $pdo->prepare('UPDATE admin_users SET last_login_at = UTC_TIMESTAMP() WHERE id = :id')->execute(['id' => $user['id']]);
+    logActivity($pdo, 'admin_login', 'admin', $user['email'], "Zalogowano jako {$user['email']}.");
     return ['token' => $token, 'user' => ['email' => $user['email'], 'displayName' => $user['display_name']]];
 }
 
@@ -120,7 +121,51 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
         }
     }
 
-    return ['id' => $id, 'updated' => array_keys(array_diff_key($parameters, ['id' => true])), 'recomputedBasePrices' => $prices];
+    $changedFields = array_keys(array_diff_key($parameters, ['id' => true]));
+    logActivity(
+        $pdo,
+        'record_updated',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Zmieniono {$resource} #{$id}: " . implode(', ', $changedFields) . '.',
+        ['resource' => $resource, 'id' => $id, 'fields' => $changedFields]
+    );
+
+    return ['id' => $id, 'updated' => $changedFields, 'recomputedBasePrices' => $prices];
+}
+
+/**
+ * Widok "Dziennik aktywności" w panelu admina: kto/co/kiedy, stronicowany po
+ * malejącym id (najnowsze najpierw). eventType filtruje po typie zdarzenia
+ * (np. tylko 'chat_message'), beforeId pobiera kolejną stronę starszych wpisów.
+ */
+function activityLog(PDO $pdo, int $limit, ?int $beforeId, ?string $eventType): array
+{
+    $limit = max(1, min($limit, 200));
+    $conditions = [];
+    $params = [];
+    if ($beforeId !== null) {
+        $conditions[] = 'id < :before_id';
+        $params['before_id'] = $beforeId;
+    }
+    if ($eventType !== null && $eventType !== '') {
+        $conditions[] = 'event_type = :event_type';
+        $params['event_type'] = $eventType;
+    }
+    $where = $conditions !== [] ? 'WHERE ' . implode(' AND ', $conditions) : '';
+    // $limit jest zaciśnięty do liczby całkowitej powyżej, więc jest bezpieczny
+    // do interpolacji — LIMIT jako parametr wiązany wymagałby jawnego
+    // PDO::PARAM_INT przy wyłączonej emulacji przygotowanych zapytań.
+    $statement = $pdo->prepare("SELECT id, event_type, actor_type, actor_label, ip_address, summary, details, created_at FROM activity_log {$where} ORDER BY id DESC LIMIT {$limit}");
+    $statement->execute($params);
+    $rows = $statement->fetchAll();
+    foreach ($rows as &$row) {
+        $row['id'] = (int) $row['id'];
+        $row['details'] = $row['details'] !== null ? json_decode((string) $row['details'], true, 32, JSON_THROW_ON_ERROR) : null;
+    }
+    unset($row);
+
+    return ['items' => $rows, 'nextBeforeId' => $rows !== [] ? (int) end($rows)['id'] : null];
 }
 
 function slugify(string $value, string $fallback = 'element'): string
@@ -175,7 +220,10 @@ function createAdminModel(PDO $pdo, array $input): array
         'sort_order' => $nextSort,
     ]);
 
-    return ['id' => (int) $pdo->lastInsertId(), 'slug' => $slug];
+    $newId = (int) $pdo->lastInsertId();
+    logActivity($pdo, 'model_created', 'admin', currentAdmin()['email'] ?? null, "Utworzono model \"{$name}\" (#{$newId}).", ['id' => $newId, 'slug' => $slug, 'name' => $name]);
+
+    return ['id' => $newId, 'slug' => $slug];
 }
 
 function createAdminPart(PDO $pdo, array $input): array
@@ -228,7 +276,10 @@ function createAdminPart(PDO $pdo, array $input): array
         'gross_price' => $grossPrice === null || $grossPrice === '' ? null : (float) $grossPrice,
     ]);
 
-    return ['id' => (int) $pdo->lastInsertId(), 'sku' => $sku];
+    $newId = (int) $pdo->lastInsertId();
+    logActivity($pdo, 'part_created', 'admin', currentAdmin()['email'] ?? null, "Utworzono część \"{$name}\" (#{$newId}).", ['id' => $newId, 'sku' => $sku, 'name' => $name]);
+
+    return ['id' => $newId, 'sku' => $sku];
 }
 
 function deleteAdminPart(PDO $pdo, int $id): array
@@ -251,6 +302,8 @@ function deleteAdminPart(PDO $pdo, int $id): array
     if ($statement->rowCount() === 0) {
         throw new InvalidArgumentException('Nie znaleziono części.');
     }
+
+    logActivity($pdo, 'part_deleted', 'admin', currentAdmin()['email'] ?? null, "Usunięto część #{$id}.", ['id' => $id]);
 
     return ['id' => $id, 'deleted' => true];
 }
@@ -393,6 +446,7 @@ function saveAdminBattery(PDO $pdo, ?int $id, array $input): array
 
     $payload = batteryPayload($input, $current);
     $isDefault = $payload['is_default'] === 1;
+    $isCreate = $id === null;
 
     $pdo->beginTransaction();
     try {
@@ -430,6 +484,16 @@ function saveAdminBattery(PDO $pdo, ?int $id, array $input): array
 
     $statement = $pdo->prepare('SELECT id, model_id, code, name, short_label, cell_format, cell_manufacturer, cell_model, series_count, parallel_count, cell_capacity_ah, nominal_voltage_v, charge_voltage_v, pack_capacity_ah, nominal_energy_wh, bms_continuous_a, gross_price, sort_order, is_default, is_active FROM model_batteries WHERE id = :id');
     $statement->execute(['id' => $id]);
+
+    logActivity(
+        $pdo,
+        'battery_saved',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        ($isCreate ? 'Utworzono' : 'Zaktualizowano') . " pakiet baterii \"{$payload['name']}\" (#{$id}) dla modelu #{$modelId}.",
+        ['id' => $id, 'modelId' => $modelId, 'code' => $code, 'name' => $payload['name']]
+    );
+
     // Bateria jest składnikiem ceny, więc zmiana pakietu domyślnego albo jego
     // ceny musi od razu przeliczyć cenę "od" modelu.
     return ['battery' => $statement->fetch(), 'basePriceGross' => recomputeModelBasePrice($pdo, $modelId)];
@@ -448,6 +512,7 @@ function updateTheme(PDO $pdo, array $input): array
     }
     $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('theme', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
     $statement->execute(['value' => json_encode($theme, JSON_THROW_ON_ERROR)]);
+    logActivity($pdo, 'theme_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono kolory motywu strony.', $theme);
     return $theme;
 }
 
@@ -562,6 +627,14 @@ function uploadAdminMedia(PDO $pdo): array
         $link = $pdo->prepare("INSERT INTO {$map['table']} ({$map['column']}, media_id, role, sort_order) VALUES (:owner, :media, :role, 0)");
         $link->execute(['owner' => $ownerId, 'media' => $mediaId, 'role' => $role]);
     }
+    logActivity(
+        $pdo,
+        'media_uploaded',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Wgrano zdjęcie #{$mediaId}" . ($ownerId > 0 ? " dla {$ownerType} #{$ownerId}" : '') . '.',
+        ['mediaId' => $mediaId, 'ownerType' => $ownerType, 'ownerId' => $ownerId, 'path' => $storagePath]
+    );
     return ['id' => $mediaId, 'url' => $storagePath, 'width' => $dimensions[0], 'height' => $dimensions[1]];
 }
 
@@ -605,6 +678,8 @@ function deleteModelMedia(PDO $pdo, int $modelId, int $mediaId): array
         $pdo->rollBack();
         throw $error;
     }
+
+    logActivity($pdo, 'media_deleted', 'admin', currentAdmin()['email'] ?? null, "Usunięto zdjęcie #{$mediaId} z modelu #{$modelId}.", ['modelId' => $modelId, 'mediaId' => $mediaId]);
 
     return ['modelId' => $modelId, 'mediaId' => $mediaId, 'deleted' => true];
 }
@@ -756,6 +831,16 @@ function saveModelPart(PDO $pdo, array $input): array
         throw $error;
     }
 
+    $assigned = ($input['assigned'] ?? true) !== false;
+    logActivity(
+        $pdo,
+        'model_part_saved',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        ($assigned ? 'Przypisano' : 'Odpięto') . " część \"{$part['name']}\" (#{$partId}) " . ($assigned ? 'do' : 'od') . " modelu #{$modelId}.",
+        ['modelId' => $modelId, 'partId' => $partId, 'assigned' => $assigned]
+    );
+
     return [
         'modelId' => $modelId,
         'partId' => $partId,
@@ -798,6 +883,15 @@ function saveModelGroupSettings(PDO $pdo, array $input): array
         'helper' => $helper !== '' ? $helper : null,
     ]);
 
+    logActivity(
+        $pdo,
+        'model_group_settings_saved',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Zmieniono ustawienia grupy #{$groupId} dla modelu #{$modelId} (tryb: {$mode}).",
+        ['modelId' => $modelId, 'groupId' => $groupId, 'mode' => $mode]
+    );
+
     return ['modelId' => $modelId, 'groupId' => $groupId, 'basePriceGross' => recomputeModelBasePrice($pdo, $modelId)];
 }
 
@@ -836,6 +930,15 @@ function copyModelParts(PDO $pdo, int $targetModelId, int $sourceModelId): array
         $pdo->rollBack();
         throw $error;
     }
+
+    logActivity(
+        $pdo,
+        'model_parts_copied',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Skopiowano osprzęt z modelu #{$sourceModelId} do modelu #{$targetModelId}.",
+        ['targetModelId' => $targetModelId, 'sourceModelId' => $sourceModelId]
+    );
 
     return ['modelId' => $targetModelId, 'copiedFrom' => $sourceModelId, 'basePriceGross' => recomputeModelBasePrice($pdo, $targetModelId)];
 }

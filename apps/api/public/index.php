@@ -87,6 +87,14 @@ if ($method === 'GET' && $path === '/admin/catalog') {
     jsonResponse(adminCatalog($pdo));
 }
 
+if ($method === 'GET' && $path === '/admin/activity-log') {
+    requireAdmin($pdo);
+    $limit = (int) ($_GET['limit'] ?? 50);
+    $beforeId = isset($_GET['beforeId']) && $_GET['beforeId'] !== '' ? (int) $_GET['beforeId'] : null;
+    $eventType = isset($_GET['eventType']) ? (string) $_GET['eventType'] : null;
+    jsonResponse(activityLog($pdo, $limit, $beforeId, $eventType));
+}
+
 if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts|sizes)/(\d+)$~', $path, $matches)) {
     requireAdmin($pdo);
     jsonResponse(updateAdminRecord($pdo, $matches[1], (int) $matches[2], requestJson()));

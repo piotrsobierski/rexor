@@ -185,6 +185,15 @@ function createConfiguration(PDO $pdo, array $input): array
         throw $error;
     }
 
+    logActivity(
+        $pdo,
+        'configuration_created',
+        'customer',
+        $email,
+        "Nowa konfiguracja {$model['name']} ({$size['label']}) dla {$name} — " . number_format($grossTotal, 0, ',', ' ') . ' zł.',
+        ['publicId' => $publicId, 'modelSlug' => $model['slug'], 'sizeCode' => $size['code'], 'batteryCode' => $battery['code'] ?? null, 'grossTotal' => $grossTotal, 'selections' => $selections]
+    );
+
     return [
         'publicId' => $publicId,
         'shareUrl' => $shareUrl,

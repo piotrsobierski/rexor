@@ -217,5 +217,46 @@ function requireAdmin(PDO $pdo): array
     if (!$user) {
         jsonResponse(['error' => 'Sesja wygasła lub jest nieprawidłowa.'], 401);
     }
+    currentAdmin($user);
     return $user;
+}
+
+/**
+ * Zalogowany admin bieżącego żądania, ustawiony raz przez requireAdmin().
+ * Trzymany tak samo jak połączenie PDO w database() - statyczna zmienna
+ * funkcji, żeby dziennik aktywności nie musiał przyjmować admina jako
+ * dodatkowego parametru w każdej funkcji panelu.
+ */
+function currentAdmin(?array $user = null): ?array
+{
+    static $current = null;
+    if ($user !== null) {
+        $current = $user;
+    }
+    return $current;
+}
+
+/**
+ * Dziennik aktywności panelu admina: kto (actorType/actorLabel), co
+ * (eventType/summary/details) i kiedy (created_at, domyślnie). Zapis logu
+ * nigdy nie blokuje właściwej operacji - błąd loguje się do error_log
+ * zamiast przerywać zapytanie, które akurat robi coś ważniejszego.
+ */
+function logActivity(PDO $pdo, string $eventType, string $actorType, ?string $actorLabel, string $summary, array $details = []): void
+{
+    try {
+        $pdo->prepare(
+            'INSERT INTO activity_log (event_type, actor_type, actor_label, ip_address, summary, details) ' .
+            'VALUES (:event_type, :actor_type, :actor_label, :ip, :summary, :details)'
+        )->execute([
+            'event_type' => $eventType,
+            'actor_type' => $actorType,
+            'actor_label' => $actorLabel,
+            'ip' => clientIp() ?: null,
+            'summary' => mb_substr($summary, 0, 500),
+            'details' => $details === [] ? null : json_encode($details, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ]);
+    } catch (Throwable $error) {
+        error_log('logActivity(' . $eventType . ') failed: ' . $error->getMessage());
+    }
 }

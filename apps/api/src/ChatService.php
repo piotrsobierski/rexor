@@ -301,6 +301,22 @@ function handleChatRequest(PDO $pdo, array $payload): array
         $cleanReply = 'Przepraszam, nie udało mi się wygenerować odpowiedzi. Proszę zadać pytanie ponownie.';
     }
 
+    $lastUserMessage = '';
+    for ($index = count($sanitizedHistory) - 1; $index >= 0; $index--) {
+        if ($sanitizedHistory[$index]['role'] === 'user') {
+            $lastUserMessage = $sanitizedHistory[$index]['content'];
+            break;
+        }
+    }
+    logActivity(
+        $pdo,
+        'chat_message',
+        'customer',
+        null,
+        mb_substr($lastUserMessage, 0, 200),
+        ['message' => $lastUserMessage, 'reply' => $cleanReply]
+    );
+
     return [
         'reply' => $cleanReply,
         'model' => 'Rexor AI',
