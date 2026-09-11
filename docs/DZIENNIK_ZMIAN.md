@@ -5,6 +5,52 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-11 — Wysyłanie zdjęć z telefonu i błędy w odpowiedziach API
+
+### Zgłoszenie
+
+Wysłanie zdjęcia `IMG_0203.jpg` z panelu kończyło się komunikatem
+„Wybierz plik obrazu”, mimo że plik był wybrany.
+
+### Stan zastany
+
+- PHP miał domyślne limity: `upload_max_filesize` 2 MB i `post_max_size` 8 MB.
+  Kod twierdził, że przyjmuje 8 MB, więc komunikat obiecywał więcej, niż PHP
+  w ogóle przyjmował. Zdjęcie miało 14 MB.
+- Przy przekroczeniu `post_max_size` PHP odrzuca żądanie przed wejściem do
+  kodu: `$_FILES` i `$_POST` są puste. Stary warunek uznawał to za brak
+  wybranego pliku, więc komunikat wskazywał na niewłaściwą przyczynę.
+- Limit wymiarów 8000 px odrzucał zdjęcia z aparatów 48 Mpix (8064x6048).
+- Ostrzeżenia PHP były wypisywane do treści odpowiedzi, przed nagłówkami.
+  Psuło to status HTTP, nagłówki CORS i parsowanie JSON po stronie panelu.
+
+### Wprowadzone zmiany
+
+- `docker/php/php.ini`: `upload_max_filesize` 32M, `post_max_size` 36M,
+  `memory_limit` 256M oraz `display_errors = Off` z `log_errors = On`.
+  Ten sam plik dostaje obraz Dockera i wbudowany serwer deweloperski
+  uruchamiany z `php -c docker/php/php.ini -S ...`.
+- `apps/api/src/AdminService.php`: rozpoznanie żądania odrzuconego przez
+  `post_max_size`, osobne komunikaty dla `UPLOAD_ERR_INI_SIZE` i przesyłki
+  przerwanej, limit aplikacji wyprowadzony z limitu serwera oraz wymiar
+  maksymalny podniesiony do 12000 px.
+- `docs/SRODOWISKO.md`, `README.md`: polecenie uruchomienia API z plikiem ini.
+
+### Weryfikacja
+
+Zdjęcie 5000x3000 o rozmiarze 7,2 MB przechodzi (HTTP 201). Plik 50,8 MB
+zwraca HTTP 422 i czysty JSON: „Plik ma 50,8 MB, a serwer przyjmuje wysyłki
+do 36,0 MB”. Wcześniej ta sama sytuacja zwracała ostrzeżenia HTML przed
+treścią JSON. Testowe zdjęcia zostały usunięte z bazy i z dysku.
+
+### Do rozważenia
+
+Zdjęcia są zapisywane w oryginalnym rozmiarze i w takim trafiają na stronę.
+Plik 7 MB na karcie modelu to realny koszt ładowania. Przeskalowanie przy
+wysyłce i warianty rozmiarowe to osobne zadanie.
+
+---
+
 ## 2026-09-11 — Cena roweru jako suma składników
 
 ### Zgłoszenie

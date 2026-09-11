@@ -7,7 +7,7 @@ Na maszynie developerskiej działają PHP 8.5.10 i MySQL 8.0.46. Baza `rexor_con
 ```bash
 brew services start mysql@8.0
 php scripts/startup.php
-php -S 127.0.0.1:8081 -t apps/api/public apps/api/public/index.php
+php -c docker/php/php.ini -S 127.0.0.1:8081 -t apps/api/public apps/api/public/index.php
 ```
 
 W drugim terminalu:
@@ -19,6 +19,14 @@ npm run dev
 ```
 
 Adresy: frontend `http://localhost:3000`, API `http://localhost:8081/api`, panel `http://localhost:3000/admin`.
+
+Wbudowany serwer PHP startuje z domyślnymi limitami wysyłki (2 MB na plik,
+8 MB na żądanie), przy których zdjęcie z telefonu nie przejdzie: PHP odrzuca
+żądanie przed wejściem do kodu. Dlatego serwer API uruchamiamy z
+`docker/php/php.ini`, czyli tym samym plikiem, który dostaje obraz Dockera.
+Ten plik wyłącza też wypisywanie ostrzeżeń do odpowiedzi, bo w API psują one
+nagłówki i JSON.
+
 
 Kolejkę wiadomości przetwarza polecenie `php apps/api/scripts/process-email-outbox.php`. Lokalnie zapisuje ono treść do `storage/logs/mail.log`; na hostingu można ustawić `MAIL_TRANSPORT=mail` i wywoływać skrypt z CRON-a.
 

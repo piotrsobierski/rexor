@@ -44,7 +44,7 @@ Taki zestaw technologii pasuje do ograniczeń widocznych w panelu i wystarczy dl
 ```bash
 brew services start mysql@8.0
 php scripts/startup.php
-php -S 127.0.0.1:8081 -t apps/api/public apps/api/public/index.php
+php -c docker/php/php.ini -S 127.0.0.1:8081 -t apps/api/public apps/api/public/index.php
 
 cd apps/web
 npm install

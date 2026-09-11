@@ -245,23 +245,74 @@ function updateTheme(PDO $pdo, array $input): array
     return $theme;
 }
 
+/** Limity z php.ini zapisane jako 32M albo 512K przeliczamy na bajty. */
+function iniBytes(string $directive): int
+{
+    $value = trim((string) ini_get($directive));
+    if ($value === '') {
+        return 0;
+    }
+    $unit = strtolower(substr($value, -1));
+    $number = (int) $value;
+    return match ($unit) {
+        'g' => $number * 1024 * 1024 * 1024,
+        'm' => $number * 1024 * 1024,
+        'k' => $number * 1024,
+        default => $number,
+    };
+}
+
+function formatMegabytes(int $bytes): string
+{
+    return number_format($bytes / (1024 * 1024), 1, ',', ' ') . ' MB';
+}
+
 function uploadAdminMedia(PDO $pdo): array
 {
-    if (!isset($_FILES['file']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
+    // PHP odrzuca zbyt duże żądanie jeszcze przed wejściem tutaj: $_FILES
+    // i $_POST są wtedy puste. Bez tego sprawdzenia panel pokazywał
+    // "Wybierz plik obrazu" przy poprawnie wybranym zdjęciu z telefonu.
+    $postLimit = iniBytes('post_max_size');
+    $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+    if ($_FILES === [] && $postLimit > 0 && $contentLength > $postLimit) {
+        throw new InvalidArgumentException(sprintf(
+            'Plik ma %s, a serwer przyjmuje wysyłki do %s. Zmniejsz zdjęcie albo podnieś post_max_size.',
+            formatMegabytes($contentLength),
+            formatMegabytes($postLimit)
+        ));
+    }
+    if (!isset($_FILES['file'])) {
         throw new InvalidArgumentException('Wybierz plik obrazu.');
     }
     $file = $_FILES['file'];
-    if ($file['error'] !== UPLOAD_ERR_OK || $file['size'] > 8 * 1024 * 1024) {
-        throw new InvalidArgumentException('Obraz jest za duży albo nie został poprawnie przesłany.');
+    $uploadLimit = iniBytes('upload_max_filesize');
+    if ((int) $file['error'] === UPLOAD_ERR_INI_SIZE) {
+        throw new InvalidArgumentException(sprintf(
+            'Zdjęcie jest większe niż limit pojedynczego pliku (%s). Zmniejsz je albo podnieś upload_max_filesize.',
+            formatMegabytes($uploadLimit)
+        ));
+    }
+    if ((int) $file['error'] === UPLOAD_ERR_PARTIAL || (int) $file['error'] === UPLOAD_ERR_NO_FILE) {
+        throw new InvalidArgumentException('Plik nie został przesłany w całości. Spróbuj ponownie.');
+    }
+    if ((int) $file['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
+        throw new InvalidArgumentException('Nie udało się odebrać pliku.');
+    }
+    // Limit aplikacji trzyma się limitu serwera, żeby komunikat nie obiecywał
+    // więcej, niż PHP w ogóle przyjmie.
+    $maxSize = $uploadLimit > 0 ? min($uploadLimit, 32 * 1024 * 1024) : 32 * 1024 * 1024;
+    if ((int) $file['size'] > $maxSize) {
+        throw new InvalidArgumentException(sprintf('Zdjęcie ma %s, a limit to %s.', formatMegabytes((int) $file['size']), formatMegabytes($maxSize)));
     }
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
     $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/avif' => 'avif'];
     if (!isset($extensions[$mime])) {
         throw new InvalidArgumentException('Dozwolone formaty: JPG, PNG, WebP i AVIF.');
     }
+    // 12000 px mieści zdjęcia z aparatów 48 Mpix (np. 8064x6048).
     $dimensions = getimagesize($file['tmp_name']);
-    if (!$dimensions || $dimensions[0] > 8000 || $dimensions[1] > 8000) {
-        throw new InvalidArgumentException('Nieprawidłowe wymiary obrazu.');
+    if (!$dimensions || $dimensions[0] > 12000 || $dimensions[1] > 12000) {
+        throw new InvalidArgumentException('Nieprawidłowe wymiary obrazu. Maksimum to 12000 px na krawędź.');
     }
 
     $relativeDirectory = gmdate('Y/m');
