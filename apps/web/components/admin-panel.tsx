@@ -5,6 +5,8 @@ import {
   Bike,
   Bold,
   Calculator,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   ExternalLink,
   HelpCircle,
@@ -36,7 +38,7 @@ import { cn } from '@/lib/utils';
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
 type Row = Record<string, string | number | boolean | null> & { id: number };
-type MediaRow = { model_id: number; media_id: number; role: string; storage_path: string; alt_text: string };
+type MediaRow = { model_id: number; media_id: number; role: string; sort_order: number; storage_path: string; alt_text: string };
 type ModelPartRow = { model_id: number; part_id: number; group_id: number; group_slug: string; is_default: number | boolean; is_customer_configurable: number | boolean; customer_supplied_allowed: number | boolean; customer_supplied_gross_price: string | number; gross_price_override: string | number | null; sort_order: number; notes: string | null };
 type GroupSettingsRow = { model_id: number; group_id: number; group_slug: string; selection_mode: string; customer_part_allowed: number | boolean; customer_part_gross_price: string | number; customer_part_label: string; helper_text: string | null };
 type PricingLine = { groupSlug: string; groupName: string; name: string; grossPrice: number };
@@ -85,7 +87,7 @@ export function AdminPanel() {
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="categories"><SimpleEditor resource="categories" rows={catalog.categories} patch={patch} fields={[['name', 'Nazwa'], ['short_description', 'Krótki opis']]} /></TabsContent>
       <TabsContent value="equipment"><ModelEquipmentEditor catalog={catalog} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
-      <TabsContent value="parts"><PartsEditor rows={catalog.parts} partGroups={catalog.partGroups} models={catalog.models} modelParts={catalog.modelParts} patch={patch} /></TabsContent>
+      <TabsContent value="parts"><PartsEditor rows={catalog.parts} partGroups={catalog.partGroups} models={catalog.models} modelParts={catalog.modelParts} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="batteries"><BatteriesEditor batteries={catalog.batteries ?? []} models={catalog.models} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="service"><PageEditor page={catalog.pages.find((page) => page.slug === 'serwis')} patch={patch} request={request} /></TabsContent>
       <TabsContent value="theme"><ThemeEditor theme={catalog.theme} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
@@ -124,20 +126,51 @@ function PartsEditor({
   models,
   modelParts,
   patch,
+  request,
+  reload,
+  setMessage,
 }: {
   rows: Row[];
   partGroups: Row[];
   models: Row[];
   modelParts: ModelPartRow[];
   patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>;
+  request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
 }) {
   const [drafts, setDrafts] = useState<Record<number, Row>>(() => Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
   const [search, setSearch] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('all');
+  const [newPart, setNewPart] = useState<{ name: string; group_id: string; gross_price: string }>({ name: '', group_id: String(partGroups[0]?.id ?? ''), gross_price: '' });
 
   useEffect(() => {
     setDrafts(Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
   }, [rows]);
+
+  async function addPart() {
+    if (!newPart.name.trim() || !newPart.group_id) { setMessage('Podaj nazwę i kategorię nowej części.'); return; }
+    setMessage('Dodaję część…');
+    try {
+      await request('/admin/parts', { method: 'POST', body: JSON.stringify({ name: newPart.name.trim(), group_id: Number(newPart.group_id), gross_price: newPart.gross_price || null }) });
+      setNewPart({ name: '', group_id: newPart.group_id, gross_price: '' });
+      await reload();
+      setMessage('Część dodana do katalogu.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się dodać części.');
+    }
+  }
+
+  async function toggleModelPart(model: Row, part: Row, assigned: boolean) {
+    setMessage('Zapisuję przypisanie…');
+    try {
+      await request('/admin/model-parts', { method: 'POST', body: JSON.stringify({ model_id: model.id, part_id: part.id, assigned }) });
+      await reload();
+      setMessage(assigned ? 'Część przypisana do modelu.' : 'Część odpięta od modelu.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać przypisania.');
+    }
+  }
 
   const groupOrder = new Map(partGroups.map((g, idx) => [Number(g.id), idx]));
 
@@ -184,6 +217,19 @@ function PartsEditor({
             <strong className="block text-ink mb-1">Różnica względem „Osprzęt i cena modelu”:</strong>
             Tutaj ustalasz globalne ceny części i ich kategorie. W zakładce <strong>Osprzęt i cena modelu</strong> decydujesz, które części wchodzą w skład danego roweru i która z nich jest pozycją bazową (wyznaczającą cenę „od”).
           </div>
+        </div>
+      </div>
+
+      {/* 1b. ADD NEW PART */}
+      <div className="rounded-3xl border border-line bg-white p-5 sm:p-6 shadow-xs">
+        <h3 className="text-sm font-semibold tracking-tight text-ink">Dodaj nową część</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_1fr_0.8fr_auto]">
+          <Input placeholder="Nazwa części" value={newPart.name} onChange={(e) => setNewPart({ ...newPart, name: e.target.value })} className="h-9 text-sm" />
+          <NativeSelect value={newPart.group_id} onChange={(e) => setNewPart({ ...newPart, group_id: e.target.value })} className="h-9 text-xs">
+            {partGroups.map((g) => <NativeSelectOption key={g.id} value={g.id}>{String(g.name)}</NativeSelectOption>)}
+          </NativeSelect>
+          <Input type="number" step="0.01" placeholder="Cena brutto" value={newPart.gross_price} onChange={(e) => setNewPart({ ...newPart, gross_price: e.target.value })} className="h-9 text-sm tabular-nums" />
+          <Button size="sm" onClick={addPart}><Save /> Dodaj</Button>
         </div>
       </div>
 
@@ -335,20 +381,28 @@ function PartsEditor({
                       />
                     </TableCell>
                     <TableCell>
-                      {assigned.length === 0 ? (
-                        <span className="inline-flex items-center rounded-md bg-ink-wash px-2 py-0.5 text-[0.7rem] text-ink-subtle">
-                          Brak przypisania
-                        </span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {assigned.map((m) => (
-                            <span key={m.id} className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[0.7rem] font-medium text-emerald-800 border border-emerald-200">
+                      <div className="flex flex-wrap gap-1">
+                        {models.map((m) => {
+                          const isAssigned = assigned.some((a) => Number(a.id) === Number(m.id));
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => toggleModelPart(m, row, !isAssigned)}
+                              title={isAssigned ? 'Kliknij, aby odpiąć od modelu' : 'Kliknij, aby przypisać do modelu'}
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[0.7rem] font-medium transition-colors cursor-pointer border',
+                                isAssigned
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                                  : 'bg-ink-wash text-ink-subtle border-transparent hover:bg-black/10 hover:text-ink'
+                              )}
+                            >
                               <Bike className="size-3" />
                               {String(m.name).replace('Rexor ', '')}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -478,8 +532,23 @@ function ModelsEditor({ rows, media, categories, patch, request, reload, setMess
 
   async function upload(model: Row, file?: File) { if (!file) return; const form = new FormData(); form.append('file', file); form.append('ownerType', 'model'); form.append('ownerId', String(model.id)); form.append('role', 'gallery'); form.append('altText', String(model.name)); setMessage('Wysyłam zdjęcie…'); try { const result = await request('/admin/media', { method: 'POST', body: form }); if (!model.default_image_path) await patch('models', model.id, { default_image_path: `${API_BASE}${result.url}` }); await reload(); setMessage('Zdjęcie dodane do galerii.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się dodać zdjęcia.'); } }
   async function removePhoto(model: Row, mediaId: number) { if (!window.confirm('Usunąć to zdjęcie z galerii modelu?')) return; setMessage('Usuwam zdjęcie…'); try { await request(`/admin/models/${model.id}/media/${mediaId}`, { method: 'DELETE' }); await reload(); setMessage('Zdjęcie usunięte.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się usunąć zdjęcia.'); } }
+  async function moveMedia(model: Row, orderedIds: number[], mediaId: number, direction: -1 | 1) {
+    const index = orderedIds.indexOf(mediaId);
+    const targetIndex = index + direction;
+    if (index === -1 || targetIndex < 0 || targetIndex >= orderedIds.length) return;
+    const reordered = [...orderedIds];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    setMessage('Zapisuję kolejność…');
+    try {
+      await request(`/admin/models/${model.id}/media/reorder`, { method: 'PATCH', body: JSON.stringify({ mediaIds: reordered }) });
+      await reload();
+      setMessage('Kolejność zdjęć zapisana.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać kolejności.');
+    }
+  }
   function imageSrc(path: string) { return path.startsWith('http') ? path : `${API_BASE}${path}`; }
-  return <Panel title="Modele i galerie" description="Zdjęcia są wieloelementową galerią. Kliknij zdjęcie, aby zobaczyć je w pełnym rozmiarze w nowej karcie, albo usuń je krzyżykiem."><div className="grid gap-6">{rows.map((row) => { const modelMedia = media.filter((item) => item.model_id === row.id); return <article key={row.id} className="min-w-0 rounded-2xl border border-line p-5 sm:p-6"><div className="flex gap-3 overflow-x-auto pb-3">{modelMedia.length === 0 && <img src={String(row.default_image_path || '/models/e82/01.jpg')} alt="" className="h-28 w-40 shrink-0 rounded-xl bg-[var(--muted)] object-contain" />}{modelMedia.map((item) => <div key={item.media_id} className="group/photo relative h-28 w-40 shrink-0"><a href={imageSrc(item.storage_path)} target="_blank" rel="noopener noreferrer"><img src={imageSrc(item.storage_path)} alt={item.alt_text} className="size-full rounded-xl bg-[var(--muted)] object-contain" /></a><button type="button" onClick={() => removePhoto(row, item.media_id)} aria-label="Usuń zdjęcie" className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 shadow transition-opacity group-hover/photo:opacity-100 hover:bg-white"><Trash2 className="size-3.5" /></button></div>)}</div><div className="mt-4 grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-name-${row.id}`}>Nazwa modelu</Label><Input id={`model-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-cat-${row.id}`}>Kategoria</Label><NativeSelect id={`model-cat-${row.id}`} value={String(drafts[row.id]?.category_id ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], category_id: event.target.value } })} className="w-full">{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{String(category.name)}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid gap-2 sm:grid-cols-3">{([['frame_price_gross', 'Cena ramy brutto'], ['assembly_price_gross', 'Cena składania brutto'], ['margin_percent', 'Narzut %']] as const).map(([field, label]) => <div key={field} className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`${field}-${row.id}`}>{label}</Label><Input id={`${field}-${row.id}`} type="number" step="0.01" value={String(drafts[row.id]?.[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], [field]: event.target.value } })} /></div>)}</div><p className="rounded-xl bg-ink-wash px-3 py-2 text-sm text-ink-muted">Cena „od” {row.computed_base_price_gross ? <strong className="tabular-nums text-ink">{String(row.computed_base_price_gross)} zł</strong> : <strong>wymaga wyceny</strong>} — wyliczona z ramy, baterii, części domyślnych i składania. Nie wpisuje się jej ręcznie.</p><details className="rounded-xl border border-line p-3" open><summary className="cursor-pointer text-sm font-semibold text-ink">Opis modelu (edytor WYSIWYG / strona produktu)</summary><div className="mt-3"><WysiwygEditor value={String(drafts[row.id]?.description_html ?? '')} onRef={(el) => { editorRefs.current[row.id] = el; }} onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', `Zdjęcie w opisie ${row.name}`); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} minHeight="min-h-56" /></div></details><div className="flex flex-wrap gap-2"><Button size="sm" onClick={async () => { const currentHtml = editorRefs.current[row.id]?.innerHTML ?? String(drafts[row.id]?.description_html ?? ''); await patch('models', row.id, { name: drafts[row.id]?.name ?? row.name, category_id: drafts[row.id]?.category_id ?? row.category_id, frame_price_gross: drafts[row.id]?.frame_price_gross ?? row.frame_price_gross, assembly_price_gross: drafts[row.id]?.assembly_price_gross ?? row.assembly_price_gross, margin_percent: drafts[row.id]?.margin_percent ?? row.margin_percent, description_html: currentHtml }); }}><Save /> Zapisz model</Button><Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie do galerii<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0])} /></Label></div></div></article>; })}</div></Panel>;
+  return <Panel title="Modele i galerie" description="Zdjęcia są wieloelementową galerią. Kliknij zdjęcie, aby zobaczyć je w pełnym rozmiarze w nowej karcie, albo usuń je krzyżykiem."><div className="grid gap-6">{rows.map((row) => { const modelMedia = media.filter((item) => item.model_id === row.id); return <article key={row.id} className="min-w-0 rounded-2xl border border-line p-5 sm:p-6"><div className="flex gap-3 overflow-x-auto pb-3">{modelMedia.length === 0 && <img src={String(row.default_image_path || '/models/e82/01.jpg')} alt="" className="h-28 w-40 shrink-0 rounded-xl bg-[var(--muted)] object-contain" />}{modelMedia.map((item, itemIdx) => { const orderedIds = modelMedia.map((m) => m.media_id); return <div key={item.media_id} className="group/photo relative h-28 w-40 shrink-0"><a href={imageSrc(item.storage_path)} target="_blank" rel="noopener noreferrer"><img src={imageSrc(item.storage_path)} alt={item.alt_text} className="size-full rounded-xl bg-[var(--muted)] object-contain" /></a><button type="button" onClick={() => removePhoto(row, item.media_id)} aria-label="Usuń zdjęcie" className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 shadow transition-opacity group-hover/photo:opacity-100 hover:bg-white"><Trash2 className="size-3.5" /></button><div className="absolute inset-x-1 bottom-1 flex items-center justify-between opacity-0 transition-opacity group-hover/photo:opacity-100"><button type="button" onClick={() => moveMedia(row, orderedIds, item.media_id, -1)} disabled={itemIdx === 0} aria-label="Przesuń zdjęcie w lewo" className="grid size-6 place-items-center rounded-full bg-white/90 text-ink shadow hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronLeft className="size-3.5" /></button><button type="button" onClick={() => moveMedia(row, orderedIds, item.media_id, 1)} disabled={itemIdx === modelMedia.length - 1} aria-label="Przesuń zdjęcie w prawo" className="grid size-6 place-items-center rounded-full bg-white/90 text-ink shadow hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronRight className="size-3.5" /></button></div></div>; })}</div><div className="mt-4 grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-name-${row.id}`}>Nazwa modelu</Label><Input id={`model-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-cat-${row.id}`}>Kategoria</Label><NativeSelect id={`model-cat-${row.id}`} value={String(drafts[row.id]?.category_id ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], category_id: event.target.value } })} className="w-full">{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{String(category.name)}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid gap-2 sm:grid-cols-3">{([['frame_price_gross', 'Cena ramy brutto'], ['assembly_price_gross', 'Cena składania brutto'], ['margin_percent', 'Narzut %']] as const).map(([field, label]) => <div key={field} className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`${field}-${row.id}`}>{label}</Label><Input id={`${field}-${row.id}`} type="number" step="0.01" value={String(drafts[row.id]?.[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], [field]: event.target.value } })} /></div>)}</div><p className="rounded-xl bg-ink-wash px-3 py-2 text-sm text-ink-muted">Cena „od” {row.computed_base_price_gross ? <strong className="tabular-nums text-ink">{String(row.computed_base_price_gross)} zł</strong> : <strong>wymaga wyceny</strong>} — wyliczona z ramy, baterii, części domyślnych i składania. Nie wpisuje się jej ręcznie.</p><details className="rounded-xl border border-line p-3" open><summary className="cursor-pointer text-sm font-semibold text-ink">Opis modelu (edytor WYSIWYG / strona produktu)</summary><div className="mt-3"><WysiwygEditor value={String(drafts[row.id]?.description_html ?? '')} onRef={(el) => { editorRefs.current[row.id] = el; }} onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', `Zdjęcie w opisie ${row.name}`); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} minHeight="min-h-56" /></div></details><div className="flex flex-wrap gap-2"><Button size="sm" onClick={async () => { const currentHtml = editorRefs.current[row.id]?.innerHTML ?? String(drafts[row.id]?.description_html ?? ''); await patch('models', row.id, { name: drafts[row.id]?.name ?? row.name, category_id: drafts[row.id]?.category_id ?? row.category_id, frame_price_gross: drafts[row.id]?.frame_price_gross ?? row.frame_price_gross, assembly_price_gross: drafts[row.id]?.assembly_price_gross ?? row.assembly_price_gross, margin_percent: drafts[row.id]?.margin_percent ?? row.margin_percent, description_html: currentHtml }); }}><Save /> Zapisz model</Button><Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie do galerii<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0])} /></Label></div></div></article>; })}</div></Panel>;
 }
 
 const batteryFields: Array<[string, string, string, string]> = [

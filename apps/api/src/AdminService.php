@@ -96,6 +96,62 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
     return ['id' => $id, 'updated' => array_keys(array_diff_key($parameters, ['id' => true])), 'recomputedBasePrices' => $prices];
 }
 
+function slugify(string $value): string
+{
+    $ascii = iconv('UTF-8', 'ASCII//TRANSLIT', $value) ?: $value;
+    $slug = strtolower(trim((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $ascii), '-'));
+    return $slug !== '' ? $slug : 'czesc';
+}
+
+function createAdminPart(PDO $pdo, array $input): array
+{
+    $name = trim((string) ($input['name'] ?? ''));
+    $groupId = (int) ($input['group_id'] ?? 0);
+    if ($name === '' || $groupId <= 0) {
+        throw new InvalidArgumentException('Podaj nazwę i kategorię części.');
+    }
+
+    $group = $pdo->prepare('SELECT id FROM part_groups WHERE id = :id');
+    $group->execute(['id' => $groupId]);
+    if (!$group->fetch()) {
+        throw new InvalidArgumentException('Nieznana kategoria części.');
+    }
+
+    $sku = trim((string) ($input['sku'] ?? ''));
+    if ($sku === '') {
+        $sku = slugify($name);
+    }
+    $baseSku = $sku;
+    $suffix = 2;
+    $exists = $pdo->prepare('SELECT COUNT(*) FROM parts WHERE sku = :sku');
+    while (true) {
+        $exists->execute(['sku' => $sku]);
+        if ((int) $exists->fetchColumn() === 0) {
+            break;
+        }
+        $sku = "{$baseSku}-{$suffix}";
+        $suffix++;
+    }
+
+    $grossPrice = $input['gross_price'] ?? null;
+    $statement = $pdo->prepare(
+        'INSERT INTO parts (group_id, sku, name, manufacturer, model, description, price_status, gross_price, is_active) ' .
+        'VALUES (:group_id, :sku, :name, :manufacturer, :model, :description, :price_status, :gross_price, TRUE)'
+    );
+    $statement->execute([
+        'group_id' => $groupId,
+        'sku' => $sku,
+        'name' => $name,
+        'manufacturer' => ($manufacturer = trim((string) ($input['manufacturer'] ?? ''))) !== '' ? $manufacturer : null,
+        'model' => ($model = trim((string) ($input['model'] ?? ''))) !== '' ? $model : null,
+        'description' => ($description = trim((string) ($input['description'] ?? ''))) !== '' ? $description : null,
+        'price_status' => in_array($input['price_status'] ?? 'fixed', ['fixed', 'quote'], true) ? $input['price_status'] : 'fixed',
+        'gross_price' => $grossPrice === null || $grossPrice === '' ? null : (float) $grossPrice,
+    ]);
+
+    return ['id' => (int) $pdo->lastInsertId(), 'sku' => $sku];
+}
+
 /**
  * Bateria ma pola wyliczalne: pojemność pakietu wynika z liczby gałęzi
  * równoległych i pojemności ogniwa, a energia z pojemności i napięcia
@@ -422,6 +478,36 @@ function deleteModelMedia(PDO $pdo, int $modelId, int $mediaId): array
     }
 
     return ['modelId' => $modelId, 'mediaId' => $mediaId, 'deleted' => true];
+}
+
+function reorderModelMedia(PDO $pdo, int $modelId, array $mediaIds): array
+{
+    $mediaIds = array_values(array_map('intval', $mediaIds));
+    if ($mediaIds === []) {
+        throw new InvalidArgumentException('Brak listy zdjęć do uporządkowania.');
+    }
+
+    $placeholders = implode(',', array_fill(0, count($mediaIds), '?'));
+    $statement = $pdo->prepare("SELECT media_id FROM model_media WHERE model_id = ? AND media_id IN ({$placeholders})");
+    $statement->execute(array_merge([$modelId], $mediaIds));
+    $linked = array_map('intval', $statement->fetchAll(PDO::FETCH_COLUMN));
+    if (count($linked) !== count($mediaIds) || array_diff($mediaIds, $linked) !== []) {
+        throw new InvalidArgumentException('Lista zdjęć nie zgadza się z galerią tego modelu.');
+    }
+
+    $update = $pdo->prepare('UPDATE model_media SET sort_order = :sort WHERE model_id = :model AND media_id = :media');
+    $pdo->beginTransaction();
+    try {
+        foreach ($mediaIds as $index => $mediaId) {
+            $update->execute(['sort' => $index, 'model' => $modelId, 'media' => $mediaId]);
+        }
+        $pdo->commit();
+    } catch (Throwable $error) {
+        $pdo->rollBack();
+        throw $error;
+    }
+
+    return ['modelId' => $modelId, 'mediaIds' => $mediaIds];
 }
 
 /**

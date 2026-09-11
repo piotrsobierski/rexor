@@ -93,6 +93,11 @@ if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts|sizes)/
 
 // Osprzęt modelu: przypisanie części, pozycja domyślna i tryb grupy.
 // Cena nie jest tu przesyłana — wynika z cennika części.
+if ($method === 'POST' && $path === '/admin/parts') {
+    requireAdmin($pdo);
+    jsonResponse(createAdminPart($pdo, requestJson()), 201);
+}
+
 if ($method === 'POST' && $path === '/admin/model-parts') {
     requireAdmin($pdo);
     jsonResponse(saveModelPart($pdo, requestJson()));
@@ -142,6 +147,12 @@ if ($method === 'POST' && $path === '/admin/media') {
 if ($method === 'DELETE' && preg_match('~^/admin/models/(\d+)/media/(\d+)$~', $path, $matches)) {
     requireAdmin($pdo);
     jsonResponse(deleteModelMedia($pdo, (int) $matches[1], (int) $matches[2]));
+}
+
+if ($method === 'PATCH' && preg_match('~^/admin/models/(\d+)/media/reorder$~', $path, $matches)) {
+    requireAdmin($pdo);
+    $payload = requestJson();
+    jsonResponse(reorderModelMedia($pdo, (int) $matches[1], (array) ($payload['mediaIds'] ?? [])));
 }
 
 if ($method === 'GET' && preg_match('~^/admin/configurations/([A-Za-z0-9]{20,32})$~', $path, $matches)) {
