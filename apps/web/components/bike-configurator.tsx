@@ -58,6 +58,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'error'>('idle');
   const [submitError, setSubmitError] = useState('');
   const [contact, setContact] = useState<ContactForm>({ customerName: '', customerEmail: '', customerPhone: '', notes: '', privacyAccepted: false });
@@ -365,7 +366,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                   {choices.map((choice) => { const selected = selections[group.slug] === choice.sku; const delta = choice.price === null ? null : choice.price - defaultPrice; return <label key={choice.sku} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}>
                     <RadioGroupItem value={choice.sku} className="choice-input" />
                     <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>
-                    {choice.imagePath && <img src={choice.imagePath} alt="" className="size-10 shrink-0 rounded-lg border border-line bg-white object-contain" />}
+                    {choice.imagePath && <img src={choice.imagePath} alt="" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setZoomedImage(choice.imagePath); }} className="size-10 shrink-0 cursor-zoom-in rounded-lg border border-line bg-white object-contain transition-transform hover:scale-110" />}
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2 font-semibold">{choice.name}{choice.customerSupplied && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-muted">Twoja część</span>}</span>
                       <span className="mt-0.5 block text-sm text-ink-muted">{choice.detail}</span>
@@ -397,6 +398,13 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           {submitError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>}
           <Button type="submit" disabled={submitState === 'saving'} className="h-12 rounded-full bg-ink text-white font-semibold transition-colors hover:bg-black">{submitState === 'saving' ? 'Zapisuję…' : 'Utwórz prywatny link'} <ArrowRight data-icon="inline-end" /></Button>
         </form>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={zoomedImage !== null} onOpenChange={(open) => !open && setZoomedImage(null)}>
+      <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] items-center justify-center rounded-3xl bg-white p-4 shadow-2xl sm:max-w-xl">
+        <DialogTitle className="sr-only">Powiększone zdjęcie części</DialogTitle>
+        {zoomedImage && <img src={zoomedImage} alt="" className="max-h-[70vh] w-full object-contain" />}
       </DialogContent>
     </Dialog>
   </div>;

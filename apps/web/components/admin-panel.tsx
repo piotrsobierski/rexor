@@ -343,8 +343,8 @@ function PartsEditor({
                 </TableHead>
                 <TableHead>
                   <span className="inline-flex items-center gap-1">
-                    Nazwa części
-                    <InfoTooltip text="Oficjalna nazwa komponentu wyświetlana w sklepie i konfiguratorze." />
+                    Nazwa i opis
+                    <InfoTooltip text="Nazwa i opis wyświetlane przy tej opcji w konfiguratorze (opis to np. 'Cztery tłoczki, klamka 2-palcowa')." />
                   </span>
                 </TableHead>
                 <TableHead className="w-32">SKU</TableHead>
@@ -360,13 +360,14 @@ function PartsEditor({
                     <InfoTooltip text="Rowery, w których ta część jest aktualnie przypisana i dostępna w konfiguratorze." />
                   </span>
                 </TableHead>
+                <TableHead className="w-20 text-center">Aktywna</TableHead>
                 <TableHead className="w-24 text-right">Akcja</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-12 text-center text-sm text-ink-muted">
+                  <TableCell colSpan={8} className="py-12 text-center text-sm text-ink-muted">
                     Nie znaleziono części w wybranej kategorii.
                   </TableCell>
                 </TableRow>
@@ -425,6 +426,12 @@ function PartsEditor({
                         onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })}
                         className="h-9 text-sm"
                       />
+                      <Input
+                        placeholder="Opis widoczny w konfiguratorze (opcjonalny)"
+                        value={String(drafts[row.id]?.description ?? '')}
+                        onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], description: event.target.value } })}
+                        className="mt-1.5 h-8 text-xs text-ink-muted"
+                      />
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-subtle">
                       {String(row.sku ?? '—')}
@@ -462,6 +469,12 @@ function PartsEditor({
                         })}
                       </div>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Switch
+                        checked={Boolean(Number(drafts[row.id]?.is_active ?? row.is_active ?? 1))}
+                        onCheckedChange={(checked) => { setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], is_active: checked } }); void patch('parts', row.id, { is_active: checked }); }}
+                      />
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         size="sm"
@@ -469,6 +482,7 @@ function PartsEditor({
                         onClick={() => patch('parts', row.id, {
                           name: drafts[row.id]?.name,
                           group_id: drafts[row.id]?.group_id ? Number(drafts[row.id]?.group_id) : row.group_id,
+                          description: drafts[row.id]?.description ?? '',
                           gross_price: drafts[row.id]?.gross_price,
                         })}
                       >
@@ -1355,6 +1369,13 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
             </Label>
             {Boolean(Number(settings?.customer_part_allowed ?? 0)) && <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`customer-price-${group.id}`}>Wartość rozliczeniowa (zł)</Label><Input id={`customer-price-${group.id}`} type="number" step="0.01" defaultValue={String(settings?.customer_part_gross_price ?? 0)} onBlur={(event) => void saveGroup(groupId, { customer_part_gross_price: Number(event.target.value) })} className="w-32" /></div>}
           </div>
+          {mode !== 'fixed' && <div className="grid gap-1 sm:col-span-2">
+            <Label className="flex items-center gap-1.5 text-xs text-ink-muted" htmlFor={`helper-${group.id}`}>
+              Tekst pomocniczy pod nagłówkiem grupy (widoczny w konfiguratorze)
+              <InfoTooltip text="Krótkie zdanie wyświetlane klientowi pod nazwą grupy, np. 'Dostępne wyświetlacze zależą od silnika'. Puste pole ukrywa ten wiersz." />
+            </Label>
+            <Input key={`${groupId}-${settings?.helper_text ?? ''}`} id={`helper-${group.id}`} defaultValue={String(settings?.helper_text ?? '')} onBlur={(event) => void saveGroup(groupId, { helper_text: event.target.value })} placeholder="np. Dostępne wyświetlacze zależą od silnika i instalacji ramy." />
+          </div>}
         </div>
 
         {mode === 'fixed' && (
