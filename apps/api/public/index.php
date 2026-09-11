@@ -152,7 +152,7 @@ if ($method === 'PATCH' && $path === '/admin/settings/theme') {
 
 if ($method === 'POST' && $path === '/admin/ai/rich-content') {
     requireAdmin($pdo);
-    jsonResponse(aiEditRichContent(requestJson()));
+    jsonResponse(aiEditRichContent($pdo, requestJson()));
 }
 
 if ($method === 'POST' && $path === '/admin/media') {

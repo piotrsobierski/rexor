@@ -204,6 +204,10 @@ function handleChatRequest(PDO $pdo, array $payload): array
         throw new InvalidArgumentException('Brak wiadomości do przetworzenia.');
     }
 
+    // Publiczny endpoint bez logowania - limit chroni budżet OpenRouter przed
+    // jednym klientem zapętlającym żądania.
+    enforceAiRateLimit($pdo, 'chat', 8);
+
     $apiKey = envValue('OPENROUTER_API_KEY');
     if ($apiKey === '') {
         throw new RuntimeException('Brak skonfigurowanego klucza OPENROUTER_API_KEY na serwerze.');

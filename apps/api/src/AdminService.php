@@ -2,16 +2,43 @@
 
 declare(strict_types=1);
 
+/**
+ * Limit prób logowania per e-mail: bez tego /admin/login przyjmował dowolną
+ * liczbę żądań z różnymi hasłami. Okno i próg są celowo szerokie (10 prób /
+ * 15 minut) - to ochrona przed brute-force, nie normalna pomyłka w haśle.
+ */
+function assertLoginNotLocked(PDO $pdo, string $email): void
+{
+    $pdo->prepare('DELETE FROM admin_login_attempts WHERE created_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)')->execute();
+
+    $count = $pdo->prepare(
+        'SELECT COUNT(*) FROM admin_login_attempts WHERE email = :email AND created_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 15 MINUTE)'
+    );
+    $count->execute(['email' => $email]);
+    if ((int) $count->fetchColumn() >= 10) {
+        throw new RuntimeException('Zbyt wiele nieudanych prób logowania. Spróbuj ponownie za 15 minut.', 429);
+    }
+}
+
+function recordFailedLogin(PDO $pdo, string $email): void
+{
+    $pdo->prepare('INSERT INTO admin_login_attempts (email, ip_address) VALUES (:email, :ip)')
+        ->execute(['email' => $email, 'ip' => clientIp()]);
+}
+
 function loginAdmin(PDO $pdo, array $input): array
 {
     $email = strtolower(trim((string) ($input['email'] ?? '')));
     $password = (string) ($input['password'] ?? '');
+    assertLoginNotLocked($pdo, $email);
     $statement = $pdo->prepare('SELECT * FROM admin_users WHERE email = :email AND is_active = TRUE');
     $statement->execute(['email' => $email]);
     $user = $statement->fetch();
     if (!$user || !password_verify($password, $user['password_hash'])) {
+        recordFailedLogin($pdo, $email);
         throw new RuntimeException('Nieprawidłowy e-mail lub hasło.', 401);
     }
+    $pdo->prepare('DELETE FROM admin_login_attempts WHERE email = :email')->execute(['email' => $email]);
     $token = randomToken();
     $pdo->prepare('DELETE FROM admin_sessions WHERE expires_at <= UTC_TIMESTAMP()')->execute();
     $pdo->prepare('INSERT INTO admin_sessions (admin_user_id, token_hash, expires_at) VALUES (:user, :hash, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 12 HOUR))')->execute([

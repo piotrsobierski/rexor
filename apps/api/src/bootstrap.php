@@ -159,6 +159,42 @@ function sanitizeRichHtml(string $html): string
     return $result;
 }
 
+/**
+ * Adres klienta zza Cloudflare/proxy: CF-Connecting-IP jest ustawiany przez
+ * Cloudflare i nie da się go podrobić w żądaniu, które faktycznie przez nie
+ * przechodzi, więc traktujemy go jako pierwszeństwo przed REMOTE_ADDR.
+ */
+function clientIp(): string
+{
+    $forwarded = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? '';
+    if (is_string($forwarded) && $forwarded !== '') {
+        return substr($forwarded, 0, 45);
+    }
+    return substr((string) ($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
+}
+
+/**
+ * Limit żądań do zewnętrznego API AI (OpenRouter), per IP i per "bucket"
+ * (nazwa endpointu). Każde wywołanie kosztuje - bez limitu jeden klient mógł
+ * zapętlić /chat albo /admin/ai/rich-content i wyczerpać budżet OpenRouter.
+ */
+function enforceAiRateLimit(PDO $pdo, string $bucket, int $maxPerMinute): void
+{
+    $pdo->prepare('DELETE FROM ai_rate_limit_hits WHERE created_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 MINUTE)')->execute();
+
+    $ip = clientIp();
+    $count = $pdo->prepare(
+        'SELECT COUNT(*) FROM ai_rate_limit_hits WHERE bucket = :bucket AND ip_address = :ip AND created_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 MINUTE)'
+    );
+    $count->execute(['bucket' => $bucket, 'ip' => $ip]);
+    if ((int) $count->fetchColumn() >= $maxPerMinute) {
+        jsonResponse(['error' => 'Zbyt wiele żądań do asystenta AI. Spróbuj ponownie za chwilę.'], 429);
+    }
+
+    $pdo->prepare('INSERT INTO ai_rate_limit_hits (bucket, ip_address) VALUES (:bucket, :ip)')
+        ->execute(['bucket' => $bucket, 'ip' => $ip]);
+}
+
 function bearerToken(): string
 {
     $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';

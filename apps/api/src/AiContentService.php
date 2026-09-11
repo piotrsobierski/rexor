@@ -12,10 +12,14 @@ declare(strict_types=1);
  * admina i tak pokazuje wynik jako propozycję do zatwierdzenia, a zapis do
  * bazy nadal wymaga osobnego kliknięcia „Zapisz”.
  */
-function aiEditRichContent(array $input): array
+function aiEditRichContent(PDO $pdo, array $input): array
 {
     $currentHtml = trim((string) ($input['html'] ?? ''));
     $instruction = trim((string) ($input['instruction'] ?? ''));
+
+    // Endpoint wymaga już zalogowanego admina, ale limit i tak chroni budżet
+    // OpenRouter przed jednym skryptem odpalonym w pętli z jednego IP.
+    enforceAiRateLimit($pdo, 'ai-rich-content', 20);
 
     if ($instruction === '') {
         throw new InvalidArgumentException('Podaj polecenie dla asystenta AI.');
