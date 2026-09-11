@@ -6,19 +6,15 @@ Na maszynie developerskiej działają PHP 8.5.10 i MySQL 8.0.46. Baza `rexor_con
 
 ```bash
 brew services start mysql@8.0
-php scripts/startup.php
-php -c docker/php/php.ini -S 127.0.0.1:8081 -t apps/api/public apps/api/public/index.php
-```
-
-W drugim terminalu:
-
-```bash
-cd apps/web
-npm install
+npm --prefix apps/web install
 npm run dev
 ```
 
 Adresy: frontend `http://localhost:3000`, API `http://localhost:8081/api`, panel `http://localhost:3000/admin`.
+
+Skrypt developerski sprawdza migracje i uruchamia API PHP z kilkoma workerami,
+aby oczekujące zapytanie czatbota nie blokowało katalogu. Backend czatu działa
+wyłącznie w PHP; frontend nie zawiera zapasowego endpointu AI.
 
 Wbudowany serwer PHP startuje z domyślnymi limitami wysyłki (2 MB na plik,
 8 MB na żądanie), przy których zdjęcie z telefonu nie przejdzie: PHP odrzuca

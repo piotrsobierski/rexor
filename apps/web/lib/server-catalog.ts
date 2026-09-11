@@ -17,6 +17,10 @@ import { mergeCatalog, type ApiModel, type PublicCatalogData, type PublicCategor
 const SERVER_API_BASE = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
 async function fetchJson<T>(path: string): Promise<T | null> {
+  // Na hostingu PHP frontend jest eksportowany statycznie. Aktualne dane
+  // pobierają wtedy komponenty klienckie bezpośrednio z /api.
+  if (process.env.STATIC_EXPORT === '1') return null;
+
   try {
     const response = await fetch(`${SERVER_API_BASE}${path}`, { cache: 'no-store' });
     if (!response.ok) return null;

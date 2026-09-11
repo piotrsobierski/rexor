@@ -2,6 +2,10 @@
   "name": "rexor-bike-configurator",
   "private": true,
   "scripts": {
+    "dev": "scripts/dev.sh",
+    "deploy:package": "scripts/package-release.sh",
+    "deploy:dry-run": "scripts/deploy-ftp.sh --dry-run",
+    "deploy": "scripts/deploy-ftp.sh --apply",
     "prepare": "husky"
   },
   "devDependencies": {

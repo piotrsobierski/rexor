@@ -31,6 +31,7 @@ Taki zestaw technologii pasuje do ograniczeń widocznych w panelu i wystarczy dl
 - [Środowisko lokalne i konfiguracja](docs/SRODOWISKO.md)
 - [Backup bazy i mediów](docs/BACKUPY.md)
 - [Gotowość do implementacji i produkcji](docs/GOTOWOSC_DO_WDROZENIA.md)
+- [Wdrożenie przez FTP](docs/WDROZENIE_FTP.md)
 - [Materiały marki](assets/brand/README.md)
 
 ## Dane startowe
@@ -43,13 +44,12 @@ Taki zestaw technologii pasuje do ograniczeń widocznych w panelu i wystarczy dl
 
 ```bash
 brew services start mysql@8.0
-php scripts/startup.php
-php -c docker/php/php.ini -S 127.0.0.1:8081 -t apps/api/public apps/api/public/index.php
-
-cd apps/web
-npm install
+npm --prefix apps/web install
 npm run dev
 ```
+
+Polecenie `npm run dev` sprawdza migracje, uruchamia wieloworkerowe API PHP
+na porcie 8081 i frontend na porcie 3000. Backend czatu działa wyłącznie w PHP.
 
 Frontend działa pod `http://localhost:3000`, API pod `http://localhost:8081/api`, a panel pod `http://localhost:3000/admin`. Lokalne konto demonstracyjne: `admin@rexor.local`; hasło ustawia się poleceniem `php apps/api/scripts/create-admin.php EMAIL HASŁO`.
 

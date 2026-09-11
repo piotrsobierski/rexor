@@ -284,8 +284,3 @@ SET reference_market_price_gross = 399.00,
     reference_price_checked_on = '2026-09-11',
     reference_price_notes = 'Wyświetlacz DPC 245 CAN z Bluetooth.'
 WHERE sku = 'display-dpc245';
-
-INSERT INTO model_price_adjustments
-    (model_id, code, name, adjustment_type, amount, currency, description)
-VALUES
-    ((SELECT id FROM bike_models WHERE slug='e82-wielichowo'), 'e82-production-setup', 'Ustawienie produkcji ramy E82', 'quote', NULL, NULL, 'Historycznie wskazano +100 USD. W produkcie nie mieszamy walut; dopłata pozostaje indywidualną wyceną.');

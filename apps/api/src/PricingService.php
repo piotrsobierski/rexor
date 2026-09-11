@@ -60,7 +60,7 @@ function modelOptionGroups(PDO $pdo, int $modelId): array
 
     $optionStatement = $pdo->prepare(
         'SELECT pg.slug AS group_slug, p.id AS part_id, p.sku, p.name AS part_name, p.description AS part_description, ' .
-        'p.price_status, p.fit_attributes, p.image_path, ' .
+        'p.price_status, p.image_path, ' .
         'COALESCE(mp.gross_price_override, p.gross_price) AS effective_price, ' .
         'mp.is_default, mp.is_customer_configurable, mp.customer_supplied_allowed, mp.customer_supplied_gross_price ' .
         'FROM model_parts mp ' .
@@ -90,7 +90,6 @@ function modelOptionGroups(PDO $pdo, int $modelId): array
             'customerSuppliedAllowed' => (bool) $row['customer_supplied_allowed'],
             'customerSuppliedGrossPrice' => (float) $row['customer_supplied_gross_price'],
             'imagePath' => $row['image_path'],
-            'fitAttributes' => $row['fit_attributes'] !== null ? json_decode((string) $row['fit_attributes'], true, 16, JSON_THROW_ON_ERROR) : null,
         ];
         $groups[$slug]['options'][$option['sku']] = $option;
         if ($option['isDefault']) {
@@ -305,56 +304,4 @@ function recomputeAllModelBasePrices(PDO $pdo): array
         $prices[(string) $model['slug']] = recomputeModelBasePrice($pdo, (int) $model['id']);
     }
     return $prices;
-}
-
-/**
- * Zgodność części z modelem. Zasada jest zachowawcza: część jest zgodna,
- * dopóki nie deklaruje atrybutu, który model deklaruje inaczej. Brak atrybutu
- * albo wartość NULL znaczy „do potwierdzenia” i nie blokuje przypisania —
- * panel pokazuje taką pozycję z ostrzeżeniem, nie ukrywa jej.
- *
- * Dzięki temu nie utrzymujemy tabeli par część-część, która rośnie
- * kwadratowo i wymaga wpisu przy każdej nowej części.
- */
-function partFitStatus(?array $fitAttributes, ?array $requirements): array
-{
-    if ($requirements === null || $requirements === [] || $fitAttributes === null || $fitAttributes === []) {
-        return ['status' => 'unknown', 'conflicts' => []];
-    }
-
-    $conflicts = [];
-    $matched = 0;
-    foreach ($fitAttributes as $key => $partValue) {
-        if (!array_key_exists($key, $requirements) || $partValue === null || $requirements[$key] === null) {
-            continue;
-        }
-        $allowed = is_array($requirements[$key]) ? $requirements[$key] : [$requirements[$key]];
-        $fits = false;
-        foreach ($allowed as $candidate) {
-            if (is_numeric($candidate) && is_numeric($partValue)) {
-                $fits = $fits || abs((float) $candidate - (float) $partValue) < 0.0001;
-                continue;
-            }
-            $fits = $fits || (string) $candidate === (string) $partValue;
-        }
-        if ($fits) {
-            $matched++;
-            continue;
-        }
-        $conflicts[] = ['attribute' => (string) $key, 'required' => $requirements[$key], 'part' => $partValue];
-    }
-
-    if ($conflicts !== []) {
-        return ['status' => 'conflict', 'conflicts' => $conflicts];
-    }
-    return ['status' => $matched > 0 ? 'fits' : 'unknown', 'conflicts' => []];
-}
-
-/** Wymagania techniczne modelu zapisane w bike_models.fit_requirements. */
-function modelFitRequirements(array $model): ?array
-{
-    if (($model['fit_requirements'] ?? null) === null) {
-        return null;
-    }
-    return json_decode((string) $model['fit_requirements'], true, 16, JSON_THROW_ON_ERROR);
 }

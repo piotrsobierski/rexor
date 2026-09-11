@@ -3,6 +3,16 @@ import { fetchCatalog } from '@/lib/server-catalog';
 
 const knownModelSlugs = ['e82', 'e55', 'cfr707', 'e82-wielichowo', 'e55-reference'];
 
+export function generateStaticParams() {
+  return [
+    'szosa',
+    'gravel',
+    'mtb',
+    'miejski-turystyczny',
+    ...knownModelSlugs,
+  ].map((category) => ({ category }));
+}
+
 export default async function Page({ params }: { params: Promise<{ category: string }> }) {
   const { category } = await params;
   const catalog = await fetchCatalog();
@@ -14,4 +24,3 @@ export default async function Page({ params }: { params: Promise<{ category: str
 
   return <CategoryPage catalog={catalog ?? undefined} categorySlug={category} />;
 }
-

@@ -12,7 +12,7 @@ function publicCatalog(PDO $pdo): array
     $categories = $pdo->query('SELECT slug, name, short_description, description_html, default_image_path FROM bike_categories WHERE is_published = TRUE ORDER BY sort_order')->fetchAll();
     $models = $pdo->query(
         "SELECT m.id, m.category_id, bc.slug AS category_slug, m.slug, m.name, m.short_description, m.description_html, m.computed_base_price_gross, " .
-        "m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.fit_requirements, m.default_image_path, m.specifications " .
+        "m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.default_image_path, m.specifications " .
         "FROM bike_models m JOIN bike_categories bc ON bc.id = m.category_id WHERE m.status <> 'archived' ORDER BY m.sort_order"
     )->fetchAll();
 
@@ -79,7 +79,7 @@ function publicCatalog(PDO $pdo): array
         $model['marginPercent'] = (float) $model['margin_percent'];
         $model['base_price'] = $model['computed_base_price_gross'] !== null ? (float) $model['computed_base_price_gross'] : null;
         $model['specifications'] = $model['specifications'] ? json_decode((string) $model['specifications'], true, 64, JSON_THROW_ON_ERROR) : [];
-        unset($model['computed_base_price_gross'], $model['frame_price_gross'], $model['assembly_price_gross'], $model['margin_percent'], $model['fit_requirements']);
+        unset($model['computed_base_price_gross'], $model['frame_price_gross'], $model['assembly_price_gross'], $model['margin_percent']);
     }
     unset($model);
 

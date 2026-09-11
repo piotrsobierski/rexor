@@ -1,0 +1,34 @@
+Options -Indexes
+
+RewriteEngine On
+
+# Za Cloudflare/proxy respektujemy nagłówek oryginalnego protokołu.
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Jedyny publiczny backend aplikacji to router PHP.
+RewriteRule ^api(?:/.*)?$ apps/api/public/index.php [QSA,L]
+
+# Kod aplikacji, SQL, sekrety i backupy nie mogą być pobierane przez WWW.
+RewriteCond %{THE_REQUEST} \s/+(.*/)?(?:apps|database|scripts|storage/backups)(?:[/\s?]) [NC]
+RewriteCond %{REQUEST_URI} !^/scripts/remote-migrate\.php$ [NC]
+RewriteRule ^ - [F,L]
+
+<FilesMatch "(^\.|\.env|\.(sql|log|ini|sh)$)">
+  Require all denied
+</FilesMatch>
+
+# Dynamiczne tokeny korzystają z jednego statycznie wyeksportowanego shella.
+RewriteRule ^konfiguracja/[^/]+/?$ konfiguracja/_.html [L]
+RewriteRule ^admin/konfiguracje/[^/]+/?$ admin/konfiguracje/_.html [L]
+
+# Trasy eksportu statycznego są zapisane jako nazwa.html.
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+?)/?$ $1.html [L]
+
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^ index.html [L]

@@ -8,6 +8,7 @@ require dirname(__DIR__) . '/src/ConfigurationService.php';
 require dirname(__DIR__) . '/src/AdminService.php';
 require dirname(__DIR__) . '/src/CatalogService.php';
 require dirname(__DIR__) . '/src/ChatService.php';
+require dirname(__DIR__) . '/src/AiContentService.php';
 
 $allowedOrigin = envValue('CORS_ORIGIN', 'http://localhost:3000');
 if (($_SERVER['HTTP_ORIGIN'] ?? '') === $allowedOrigin) {
@@ -147,6 +148,11 @@ if ($method === 'PATCH' && preg_match('~^/admin/pages/(\d+)$~', $path, $matches)
 if ($method === 'PATCH' && $path === '/admin/settings/theme') {
     requireAdmin($pdo);
     jsonResponse(['theme' => updateTheme($pdo, requestJson())]);
+}
+
+if ($method === 'POST' && $path === '/admin/ai/rich-content') {
+    requireAdmin($pdo);
+    jsonResponse(aiEditRichContent(requestJson()));
 }
 
 if ($method === 'POST' && $path === '/admin/media') {

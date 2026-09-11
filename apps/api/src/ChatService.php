@@ -33,6 +33,13 @@ ZASADY:
 - Używaj czytelnego formatowania Markdown (pogrubienia, punktorowe listy, tabelki porównawcze).
 - Zawsze możesz wskazać linki do konfiguratora: [Konfigurator](/konfigurator) oraz [Modele](/rowery).
 - Informuj klientów o możliwości dostarczenia własnych części (np. widelca czy hamulców), jeśli baza na to zezwala.
+- Rowery Rexor są konfigurowalne. Przy porównywaniu modeli oddzielaj STAŁE CECHY PLATFORMY (np. geometria ramy, skok ramy, kompatybilność, dostępne rozmiary i przeznaczenie) od OPCJI KONFIGURACYJNYCH (np. bateria, hamulce, napęd i inne podzespoły wymienione w grupach opcji).
+- Nie przedstawiaj domyślnej baterii, hamulców, napędu ani innej domyślnej części jako trwałej przewagi lub wady modelu. Oznacz ją jako konfigurację domyślną/przykładową i zaznacz, że klient może wybrać inne opcje dostępne dla danego modelu.
+- Cenę bazową opisuj jako cenę aktualnej konfiguracji domyślnej lub cenę „od”; cena końcowa zależy od wybranych opcji. Nie porównuj samych cen domyślnych tak, jakby dotyczyły identycznego wyposażenia.
+- Gdy klient pyta „który model wybrać”, rekomenduj przede wszystkim platformę do stylu jazdy, terenu, wzrostu/rozmiaru i oczekiwanego charakteru roweru. Podzespoły porównuj dopiero w ramach konkretnej konfiguracji; w razie braku danych zadaj krótkie pytanie doprecyzowujące.
+- Przy ogólnym pytaniu typu „E82 vs E55” NIE umieszczaj w głównym porównaniu ani rekomendacji cen, baterii, zasięgów, hamulców, silnika, napędu ani innych części konfigurowalnych. Porównaj wyłącznie stałe cechy ramy/platformy i krótko wyjaśnij, że wyposażenie dobiera się osobno. Szczegóły części podaj dopiero, gdy klient o nie zapyta lub wskaże konkretne wymaganie.
+- Pole `selected_motor`/silnik referencyjny nie oznacza automatycznie stałej cechy platformy. Jeśli grupa silnika zawiera kilka opcji, traktuj silnik jako konfigurowalny i nie używaj wariantu domyślnego do rozstrzygania między modelami.
+- Odpowiadaj zwięźle (standardowo maksymalnie 450 słów) i doprowadzaj każdą odpowiedź do pełnego zakończenia. Nie zaczynaj rozbudowanej tabeli ani listy, jeśli nie zmieści się wraz z rekomendacją; nigdy nie kończ w połowie zdania, punktu, tabeli ani linku.
 PROMPT;
 
     // 1. KATEGORIE Z BAZY
@@ -52,7 +59,7 @@ PROMPT;
         $basePrice = $model['base_price'] !== null ? number_format((float)$model['base_price'], 0, ',', ' ') . ' zł brutto' : 'Wycena indywidualna / w przygotowaniu';
         $lines[] = "\n#### MODEL: {$model['name']} (slug: {$model['slug']})";
         $lines[] = "- Kategoria: {$model['category_slug']}";
-        $lines[] = "- Aktualna cena bazowa w systemie: {$basePrice}";
+        $lines[] = "- Cena aktualnej konfiguracji domyślnej („od”): {$basePrice}";
         if (!empty($model['short_description'])) {
             $lines[] = "- Opis: {$model['short_description']}";
         }
@@ -66,7 +73,7 @@ PROMPT;
         // Specyfikacja z bazy
         if (!empty($model['specifications']) && is_array($model['specifications'])) {
             $spec = $model['specifications'];
-            if (!empty($spec['selected_motor'])) $lines[] = "- Silnik platformy: {$spec['selected_motor']}";
+            if (!empty($spec['selected_motor'])) $lines[] = "- Silnik zapisany w konfiguracji referencyjnej (sprawdź opcje poniżej): {$spec['selected_motor']}";
             if (!empty($spec['frame_travel_mm'])) $lines[] = "- Skok zawieszenia ramy: {$spec['frame_travel_mm']} mm";
             if (!empty($spec['rear_shock_size'])) $lines[] = "- Rozmiar dampera: {$spec['rear_shock_size']}";
             if (!empty($spec['frame_material'])) $lines[] = "- Materiał ramy: {$spec['frame_material']}";
@@ -186,6 +193,12 @@ RULES;
 
 function handleChatRequest(PDO $pdo, array $payload): array
 {
+    // Hosting może narzucać 30 s domyślnego czasu wykonania, podczas gdy
+    // odpowiedź OpenRouter bywa wolniejsza. Zostawiamy zapas ponad timeout cURL.
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(60);
+    }
+
     $messages = $payload['messages'] ?? [];
     if (!is_array($messages) || empty($messages)) {
         throw new InvalidArgumentException('Brak wiadomości do przetworzenia.');
@@ -221,7 +234,15 @@ function handleChatRequest(PDO $pdo, array $payload): array
             $sanitizedHistory
         ),
         'temperature' => 0.6,
-        'max_tokens' => 1500,
+        // Większy zapas odpowiedzi chroni przed urwaniem rozbudowanych porównań.
+        // Prompt nadal wymaga zwięzłości, więc nie powinno to niepotrzebnie wydłużać zwykłych odpowiedzi.
+        // Limit obejmuje także niewidoczne tokeny rozumowania. Niski wysiłek
+        // zostawia większość budżetu na kompletną odpowiedź dla klienta.
+        'max_completion_tokens' => 4000,
+        'reasoning' => [
+            'effort' => 'low',
+            'exclude' => true,
+        ],
         'include_reasoning' => false,
     ];
 
@@ -249,7 +270,6 @@ function handleChatRequest(PDO $pdo, array $payload): array
     $rawResponse = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlError = curl_error($ch);
-    curl_close($ch);
 
     if ($rawResponse === false) {
         throw new RuntimeException('Błąd połączenia z OpenRouter API: ' . $curlError);

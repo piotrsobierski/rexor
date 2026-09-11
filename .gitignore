@@ -4,6 +4,8 @@
 !.env.example
 !.env.local.example
 !.env.production.example
+.deploy.env
+.deploy/
 node_modules/
 vendor/
 dist/

@@ -555,6 +555,7 @@ function WysiwygEditor({
   initialHtml,
   onChange,
   onUploadImage,
+  onAiEdit,
   onRef,
   minHeight = 'min-h-48',
 }: {
@@ -562,11 +563,18 @@ function WysiwygEditor({
   initialHtml?: string;
   onChange?: (html: string) => void;
   onUploadImage?: (file: File) => Promise<string | null>;
+  /** Wysyła (instrukcja, aktualny HTML) do backendu AI i zwraca zaproponowany HTML całego pola. */
+  onAiEdit?: (instruction: string, currentHtml: string) => Promise<string>;
   onRef?: (el: HTMLDivElement | null) => void;
   minHeight?: string;
 }) {
   const localRef = useRef<HTMLDivElement | null>(null);
   const content = value ?? initialHtml ?? '';
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiInstruction, setAiInstruction] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiProposal, setAiProposal] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -601,6 +609,34 @@ function WysiwygEditor({
     }
   }
 
+  async function generateAiProposal() {
+    if (!onAiEdit || !aiInstruction.trim()) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const currentHtml = localRef.current?.innerHTML ?? content;
+      const proposal = await onAiEdit(aiInstruction.trim(), currentHtml);
+      setAiProposal(proposal);
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : 'Nie udało się wygenerować propozycji AI.');
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function applyAiProposal() {
+    if (aiProposal === null || !localRef.current) return;
+    localRef.current.innerHTML = aiProposal;
+    onChange?.(aiProposal);
+    setAiProposal(null);
+    setAiInstruction('');
+    setAiPanelOpen(false);
+  }
+
+  function discardAiProposal() {
+    setAiProposal(null);
+  }
+
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-[var(--muted)] p-1.5">
@@ -615,7 +651,68 @@ function WysiwygEditor({
             <input type="file" accept="image/*" className="sr-only" onChange={(e) => void handleImage(e.target.files?.[0])} />
           </Label>
         )}
+        {onAiEdit && (
+          <Button
+            size="sm"
+            type="button"
+            variant={aiPanelOpen ? 'default' : 'outline'}
+            className={cn(
+              'ml-auto h-8 gap-1.5 px-3 text-xs font-semibold',
+              !aiPanelOpen && 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100'
+            )}
+            onClick={() => setAiPanelOpen((open) => !open)}
+          >
+            <Sparkles className="size-3.5" /> Edytuj promptem AI
+          </Button>
+        )}
       </div>
+
+      {onAiEdit && aiPanelOpen && (
+        <div className="grid gap-2 rounded-2xl border border-violet-200 bg-violet-50/60 p-3">
+          <Label className="flex items-center gap-1.5 text-xs font-semibold text-violet-900">
+            <Sparkles className="size-3.5" /> Co ma zrobić asystent z treścią tego pola?
+          </Label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={aiInstruction}
+              onChange={(event) => setAiInstruction(event.target.value)}
+              placeholder='np. „zrób z tych punktów tabelę” albo „dodaj wiersz z szacowaną prędkością”'
+              className="bg-white"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  void generateAiProposal();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="shrink-0 gap-1.5 bg-violet-600 hover:bg-violet-700"
+              disabled={aiLoading || !aiInstruction.trim()}
+              onClick={() => void generateAiProposal()}
+            >
+              <Sparkles className="size-3.5" /> {aiLoading ? 'Generuję…' : 'Generuj'}
+            </Button>
+          </div>
+          {aiError && <p className="text-xs font-medium text-red-700">{aiError}</p>}
+          <p className="text-xs text-violet-800/80">Asystent zaproponuje nową treść pola — nic nie zmieni się w edytorze, dopóki nie zatwierdzisz propozycji poniżej, i nic nie zapisze się na serwerze, dopóki nie klikniesz „Zapisz”.</p>
+        </div>
+      )}
+
+      {aiProposal !== null && (
+        <div className="grid gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-1.5 text-xs font-semibold text-violet-900"><Sparkles className="size-3.5" /> Propozycja AI — sprawdź przed zastosowaniem</Label>
+          </div>
+          <div className="rich-content max-h-72 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/40 p-3 text-sm" dangerouslySetInnerHTML={{ __html: aiProposal }} />
+          <div className="flex gap-2">
+            <Button type="button" size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={applyAiProposal}>Zastosuj do edytora</Button>
+            <Button type="button" size="sm" variant="outline" onClick={discardAiProposal}>Odrzuć</Button>
+          </div>
+        </div>
+      )}
+
       <div
         ref={setRef}
         contentEditable
@@ -685,7 +782,7 @@ function ModelsEditor({ rows, media, categories, patch, request, reload, setMess
       <Input placeholder="Krótki opis (widoczny na liście rowerów)" value={newModel.short_description} onChange={(e) => setNewModel({ ...newModel, short_description: e.target.value })} className="mt-3 h-9 text-sm" />
       <Button size="sm" className="mt-3" onClick={addModel}><Save /> Dodaj model</Button>
     </div>
-    <div className="grid gap-6">{rows.map((row) => { const modelMedia = media.filter((item) => item.model_id === row.id); return <article key={row.id} className="min-w-0 rounded-2xl border border-line p-5 sm:p-6"><div className="flex gap-3 overflow-x-auto pb-3">{modelMedia.length === 0 && <img src={String(row.default_image_path || '/models/e82/01.jpg')} alt="" className="h-28 w-40 shrink-0 rounded-xl bg-[var(--muted)] object-contain" />}{modelMedia.map((item, itemIdx) => { const orderedIds = modelMedia.map((m) => m.media_id); return <div key={item.media_id} className="group/photo relative h-28 w-40 shrink-0"><a href={imageSrc(item.storage_path)} target="_blank" rel="noopener noreferrer"><img src={imageSrc(item.storage_path)} alt={item.alt_text} className="size-full rounded-xl bg-[var(--muted)] object-contain" /></a><button type="button" onClick={() => removePhoto(row, item.media_id)} aria-label="Usuń zdjęcie" className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 shadow transition-opacity group-hover/photo:opacity-100 hover:bg-white"><Trash2 className="size-3.5" /></button><div className="absolute inset-x-1 bottom-1 flex items-center justify-between opacity-0 transition-opacity group-hover/photo:opacity-100"><button type="button" onClick={() => moveMedia(row, orderedIds, item.media_id, -1)} disabled={itemIdx === 0} aria-label="Przesuń zdjęcie w lewo" className="grid size-6 place-items-center rounded-full bg-white/90 text-ink shadow hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronLeft className="size-3.5" /></button><button type="button" onClick={() => moveMedia(row, orderedIds, item.media_id, 1)} disabled={itemIdx === modelMedia.length - 1} aria-label="Przesuń zdjęcie w prawo" className="grid size-6 place-items-center rounded-full bg-white/90 text-ink shadow hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronRight className="size-3.5" /></button></div></div>; })}</div><div className="mt-4 grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-name-${row.id}`}>Nazwa modelu</Label><Input id={`model-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-cat-${row.id}`}>Kategoria</Label><NativeSelect id={`model-cat-${row.id}`} value={String(drafts[row.id]?.category_id ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], category_id: event.target.value } })} className="w-full">{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{String(category.name)}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-short-${row.id}`}>Krótki opis (widoczny na liście rowerów i karcie modelu)</Label><Input id={`model-short-${row.id}`} value={String(drafts[row.id]?.short_description ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], short_description: event.target.value } })} /></div><div className="grid gap-2 sm:grid-cols-3">{([['frame_price_gross', 'Cena ramy brutto'], ['assembly_price_gross', 'Cena składania brutto'], ['margin_percent', 'Narzut %']] as const).map(([field, label]) => <div key={field} className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`${field}-${row.id}`}>{label}</Label><Input id={`${field}-${row.id}`} type="number" step="0.01" value={String(drafts[row.id]?.[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], [field]: event.target.value } })} /></div>)}</div><p className="rounded-xl bg-ink-wash px-3 py-2 text-sm text-ink-muted">Cena „od” {row.computed_base_price_gross ? <strong className="tabular-nums text-ink">{String(row.computed_base_price_gross)} zł</strong> : <strong>wymaga wyceny</strong>} — wyliczona z ramy, baterii, części domyślnych i składania. Nie wpisuje się jej ręcznie.</p><details className="rounded-xl border border-line p-3" open><summary className="cursor-pointer text-sm font-semibold text-ink">Opis modelu (edytor WYSIWYG / strona produktu)</summary><div className="mt-3"><WysiwygEditor value={String(drafts[row.id]?.description_html ?? '')} onRef={(el) => { editorRefs.current[row.id] = el; }} onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', `Zdjęcie w opisie ${row.name}`); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} minHeight="min-h-56" /></div></details><div className="flex flex-wrap gap-2"><Button size="sm" onClick={async () => { const currentHtml = editorRefs.current[row.id]?.innerHTML ?? String(drafts[row.id]?.description_html ?? ''); await patch('models', row.id, { name: drafts[row.id]?.name ?? row.name, category_id: drafts[row.id]?.category_id ?? row.category_id, short_description: drafts[row.id]?.short_description ?? row.short_description, frame_price_gross: drafts[row.id]?.frame_price_gross ?? row.frame_price_gross, assembly_price_gross: drafts[row.id]?.assembly_price_gross ?? row.assembly_price_gross, margin_percent: drafts[row.id]?.margin_percent ?? row.margin_percent, description_html: currentHtml }); }}><Save /> Zapisz model</Button><Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie do galerii<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0])} /></Label></div></div></article>; })}</div></Panel>;
+    <div className="grid gap-6">{rows.map((row) => { const modelMedia = media.filter((item) => item.model_id === row.id); return <article key={row.id} className="min-w-0 rounded-2xl border border-line p-5 sm:p-6"><div className="flex gap-3 overflow-x-auto pb-3">{modelMedia.length === 0 && <img src={String(row.default_image_path || '/models/e82/01.jpg')} alt="" className="h-28 w-40 shrink-0 rounded-xl bg-[var(--muted)] object-contain" />}{modelMedia.map((item, itemIdx) => { const orderedIds = modelMedia.map((m) => m.media_id); return <div key={item.media_id} className="group/photo relative h-28 w-40 shrink-0"><a href={imageSrc(item.storage_path)} target="_blank" rel="noopener noreferrer"><img src={imageSrc(item.storage_path)} alt={item.alt_text} className="size-full rounded-xl bg-[var(--muted)] object-contain" /></a><button type="button" onClick={() => removePhoto(row, item.media_id)} aria-label="Usuń zdjęcie" className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 shadow transition-opacity group-hover/photo:opacity-100 hover:bg-white"><Trash2 className="size-3.5" /></button><div className="absolute inset-x-1 bottom-1 flex items-center justify-between opacity-0 transition-opacity group-hover/photo:opacity-100"><button type="button" onClick={() => moveMedia(row, orderedIds, item.media_id, -1)} disabled={itemIdx === 0} aria-label="Przesuń zdjęcie w lewo" className="grid size-6 place-items-center rounded-full bg-white/90 text-ink shadow hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronLeft className="size-3.5" /></button><button type="button" onClick={() => moveMedia(row, orderedIds, item.media_id, 1)} disabled={itemIdx === modelMedia.length - 1} aria-label="Przesuń zdjęcie w prawo" className="grid size-6 place-items-center rounded-full bg-white/90 text-ink shadow hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronRight className="size-3.5" /></button></div></div>; })}</div><div className="mt-4 grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-name-${row.id}`}>Nazwa modelu</Label><Input id={`model-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-cat-${row.id}`}>Kategoria</Label><NativeSelect id={`model-cat-${row.id}`} value={String(drafts[row.id]?.category_id ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], category_id: event.target.value } })} className="w-full">{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{String(category.name)}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`model-short-${row.id}`}>Krótki opis (widoczny na liście rowerów i karcie modelu)</Label><Input id={`model-short-${row.id}`} value={String(drafts[row.id]?.short_description ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], short_description: event.target.value } })} /></div><div className="grid gap-2 sm:grid-cols-3">{([['frame_price_gross', 'Cena ramy brutto'], ['assembly_price_gross', 'Cena składania brutto'], ['margin_percent', 'Narzut %']] as const).map(([field, label]) => <div key={field} className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`${field}-${row.id}`}>{label}</Label><Input id={`${field}-${row.id}`} type="number" step="0.01" value={String(drafts[row.id]?.[field] ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], [field]: event.target.value } })} /></div>)}</div><p className="rounded-xl bg-ink-wash px-3 py-2 text-sm text-ink-muted">Cena „od” {row.computed_base_price_gross ? <strong className="tabular-nums text-ink">{String(row.computed_base_price_gross)} zł</strong> : <strong>wymaga wyceny</strong>} — wyliczona z ramy, baterii, części domyślnych i składania. Nie wpisuje się jej ręcznie.</p><details className="rounded-xl border border-line p-3" open><summary className="cursor-pointer text-sm font-semibold text-ink">Opis modelu (edytor WYSIWYG / strona produktu)</summary><div className="mt-3"><WysiwygEditor value={String(drafts[row.id]?.description_html ?? '')} onRef={(el) => { editorRefs.current[row.id] = el; }} onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', `Zdjęcie w opisie ${row.name}`); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} onAiEdit={async (instruction, html) => { const result = await request('/admin/ai/rich-content', { method: 'POST', body: JSON.stringify({ html, instruction }) }); return String(result.html ?? ''); }} minHeight="min-h-56" /></div></details><div className="flex flex-wrap gap-2"><Button size="sm" onClick={async () => { const currentHtml = editorRefs.current[row.id]?.innerHTML ?? String(drafts[row.id]?.description_html ?? ''); await patch('models', row.id, { name: drafts[row.id]?.name ?? row.name, category_id: drafts[row.id]?.category_id ?? row.category_id, short_description: drafts[row.id]?.short_description ?? row.short_description, frame_price_gross: drafts[row.id]?.frame_price_gross ?? row.frame_price_gross, assembly_price_gross: drafts[row.id]?.assembly_price_gross ?? row.assembly_price_gross, margin_percent: drafts[row.id]?.margin_percent ?? row.margin_percent, description_html: currentHtml }); }}><Save /> Zapisz model</Button><Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie do galerii<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0])} /></Label></div></div></article>; })}</div></Panel>;
 }
 
 const batteryFields: Array<[string, string, string, string]> = [
@@ -1069,7 +1166,7 @@ function PageEditor({ page, patch, request }: { page?: Row; patch: (resource: st
 
   if (!page) return <Panel title="Serwis" description="Brak strony w bazie."><p>Uruchom preseed danych.</p></Panel>;
 
-  return <Panel title="Strona Serwis" description="Edytor WYSIWYG zapisuje formatowanie oraz obrazy w treści."><div className="grid gap-4"><div className="grid gap-1.5"><Label>Tytuł</Label><Input className="h-11" value={title} onChange={(event) => setTitle(event.target.value)} /></div><div className="grid gap-1.5"><Label>Treść</Label><WysiwygEditor value={contentHtml} onChange={setContentHtml} minHeight="min-h-80" onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', 'Zdjęcie w treści serwisu'); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} /></div><div className="flex items-center justify-between"><label className="flex items-center gap-2 text-sm"><Switch checked={published} onCheckedChange={setPublished} /> Opublikowana</label><Button onClick={() => patch('pages', page.id, { title, content_html: contentHtml, is_published: published })}><Save /> Zapisz stronę</Button></div></div></Panel>;
+  return <Panel title="Strona Serwis" description="Edytor WYSIWYG zapisuje formatowanie oraz obrazy w treści."><div className="grid gap-4"><div className="grid gap-1.5"><Label>Tytuł</Label><Input className="h-11" value={title} onChange={(event) => setTitle(event.target.value)} /></div><div className="grid gap-1.5"><Label>Treść</Label><WysiwygEditor value={contentHtml} onChange={setContentHtml} minHeight="min-h-80" onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', 'Zdjęcie w treści serwisu'); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} onAiEdit={async (instruction, html) => { const result = await request('/admin/ai/rich-content', { method: 'POST', body: JSON.stringify({ html, instruction }) }); return String(result.html ?? ''); }} /></div><div className="flex items-center justify-between"><label className="flex items-center gap-2 text-sm"><Switch checked={published} onCheckedChange={setPublished} /> Opublikowana</label><Button onClick={() => patch('pages', page.id, { title, content_html: contentHtml, is_published: published })}><Save /> Zapisz stronę</Button></div></div></Panel>;
 }
 
 function ThemeEditor({ theme, request, reload, setMessage }: { theme: Record<string, string>; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
@@ -1095,35 +1192,6 @@ const selectionModeLabels: Array<[string, string]> = [
   ['optional', 'Dodatek opcjonalny'],
 ];
 
-const parseJson = (value: unknown): Record<string, unknown> | null => {
-  if (typeof value !== 'string' || value === '') return null;
-  try { return JSON.parse(value) as Record<string, unknown>; } catch { return null; }
-};
-
-/**
- * Zgodność części z modelem liczona tak samo jak w API: część jest zgodna,
- * dopóki nie deklaruje atrybutu, który model deklaruje inaczej. Brak atrybutu
- * znaczy „do potwierdzenia” i nie blokuje przypisania.
- */
-function fitStatus(partAttributes: unknown, requirements: Record<string, unknown> | null): 'fits' | 'unknown' | 'conflict' {
-  const attributes = parseJson(partAttributes);
-  if (!attributes || !requirements) return 'unknown';
-  let matched = 0;
-  for (const [key, partValue] of Object.entries(attributes)) {
-    if (!(key in requirements) || partValue === null || requirements[key] === null) continue;
-    const allowed = Array.isArray(requirements[key]) ? (requirements[key] as unknown[]) : [requirements[key]];
-    if (allowed.some((candidate) => String(candidate) === String(partValue) || Number(candidate) === Number(partValue))) matched += 1;
-    else return 'conflict';
-  }
-  return matched > 0 ? 'fits' : 'unknown';
-}
-
-const fitBadges: Record<string, [string, string]> = {
-  fits: ['Zgodna', 'bg-emerald-50 text-emerald-700'],
-  unknown: ['Do potwierdzenia', 'bg-ink-wash text-ink-muted'],
-  conflict: ['Niezgodna z wymaganiami', 'bg-red-50 text-red-700'],
-};
-
 /**
  * Osprzęt definiujemy na poziomie modelu, bo zgodność wynika z ramy i silnika,
  * a nie z kategorii. Żeby to nie było żmudne, lista kandydatów jest zawężona
@@ -1132,10 +1200,8 @@ const fitBadges: Record<string, [string, string]> = {
  */
 function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: { catalog: Catalog; patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
   const [modelId, setModelId] = useState<number>(Number(catalog.models[0]?.id ?? 0));
-  const [showIncompatible, setShowIncompatible] = useState(false);
   const [copySource, setCopySource] = useState('');
   const model = catalog.models.find((row) => Number(row.id) === modelId) ?? catalog.models[0];
-  const requirements = parseJson(model?.fit_requirements);
   const pricing = catalog.modelPricing?.[String(modelId)];
   const assigned = catalog.modelParts.filter((row) => Number(row.model_id) === modelId);
   const assignedByPart = new Map(assigned.map((row) => [Number(row.part_id), row]));
@@ -1265,10 +1331,6 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-xs text-white/80 cursor-pointer">
-            <Switch checked={showIncompatible} onCheckedChange={setShowIncompatible} />
-            Pokaż wszystkie części z katalogu (w tym niezgodne)
-          </label>
           <span className="text-white/60 text-xs">Przypisanych części w tym modelu: <strong className="text-white font-semibold">{assigned.length}</strong></span>
         </div>
       </div>
@@ -1362,9 +1424,7 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
       const settings = settingsByGroup.get(groupId);
       const mode = settings?.selection_mode ?? 'select_one';
       const allInGroup = catalog.parts.filter((part) => Number(part.group_id) === groupId);
-      const candidates = allInGroup
-        .map((part) => ({ part, status: fitStatus(part.fit_attributes, requirements), row: assignedByPart.get(Number(part.id)) }))
-        .filter((item) => showIncompatible || item.status !== 'conflict' || item.row);
+      const candidates = allInGroup.map((part) => ({ part, row: assignedByPart.get(Number(part.id)) }));
 
       return <Panel key={group.id} title={String(group.name)} description={mode === 'fixed' ? 'Element stały: montowany fabrycznie jeden element wliczony w cenę bazową (niewidoczny dla klienta jako wybór w konfiguratorze).' : 'Zaznacz części oferowane w tym modelu i wskaż pozycję domyślną — to ona wyznacza cenę „od” i punkt odniesienia dla różnic.'}>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
@@ -1433,19 +1493,6 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
           </div>
         )}
 
-        {allInGroup.length > candidates.length && (
-          <div className="mt-2.5 flex items-center justify-between rounded-xl bg-amber-50/70 border border-amber-200/60 px-3 py-1.5 text-xs text-amber-900">
-            <span>Ukryto {allInGroup.length - candidates.length} części z katalogu oznaczonych jako niezgodne z ramą/silnikiem.</span>
-            <button
-              type="button"
-              onClick={() => setShowIncompatible(true)}
-              className="font-semibold underline hover:text-amber-950"
-            >
-              Pokaż wszystkie ({allInGroup.length})
-            </button>
-          </div>
-        )}
-
         <Table className="mt-4">
           <TableHeader>
             <TableRow>
@@ -1458,7 +1505,7 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
               <TableHead>
                 <span className="inline-flex items-center gap-1">
                   Część
-                  <InfoTooltip text="Nazwa części, SKU oraz informacja o zgodności wymiarowej z ramą i silnikiem modelu." />
+                  <InfoTooltip text="Nazwa i SKU części." />
                 </span>
               </TableHead>
               <TableHead className="w-36">
@@ -1483,11 +1530,10 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
           </TableHeader>
           <TableBody>
             {candidates.length === 0 && <TableRow><TableCell colSpan={5} className="text-sm text-ink-muted">Brak części w tej grupie.</TableCell></TableRow>}
-            {candidates.map(({ part, status, row }) => {
-              const [badge, badgeClass] = fitBadges[status];
+            {candidates.map(({ part, row }) => {
               return <TableRow key={part.id}>
                 <TableCell><Switch checked={Boolean(row)} onCheckedChange={(checked) => void saveModelPart({ part_id: Number(part.id), assigned: checked })} /></TableCell>
-                <TableCell className="min-w-64"><span className="font-medium">{String(part.name)}</span><span className={`ml-2 rounded px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide ${badgeClass}`}>{badge}</span><span className="mt-0.5 block font-mono text-xs text-ink-subtle">{String(part.sku)}</span></TableCell>
+                <TableCell className="min-w-64"><span className="font-medium">{String(part.name)}</span><span className="mt-0.5 block font-mono text-xs text-ink-subtle">{String(part.sku)}</span></TableCell>
                 <TableCell className="tabular-nums text-sm">{part.price_status === 'quote' ? 'wycena' : `${String(part.gross_price ?? '—')} zł`}</TableCell>
                 <TableCell>{row ? <Input type="number" step="0.01" placeholder="jak w katalogu" defaultValue={row.gross_price_override === null ? '' : String(row.gross_price_override)} onBlur={(event) => void saveModelPart({ part_id: Number(part.id), gross_price_override: event.target.value })} /> : <span className="text-sm text-ink-subtle">—</span>}</TableCell>
                 <TableCell>{row ? <Switch checked={Boolean(Number(row.is_default))} onCheckedChange={(checked) => void saveModelPart({ part_id: Number(part.id), is_default: checked, is_customer_configurable: Boolean(Number(row.is_customer_configurable)) })} /> : <span className="text-sm text-ink-subtle">—</span>}</TableCell>
@@ -1504,15 +1550,6 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
         {catalog.modelSizes.filter((row) => Number(row.model_id) === modelId).map((row) => <SizeRow key={row.id} row={row} patch={patch} />)}
       </TableBody></Table>
     </Panel>
-
-    {/* Compatibility Switcher */}
-    <div className="flex items-center justify-between rounded-2xl border border-line bg-white p-4">
-      <Label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
-        <Switch checked={showIncompatible} onCheckedChange={setShowIncompatible} />
-        <span>Pokaż też części niezgodne z wymaganiami technicznymi modelu</span>
-      </Label>
-      <span className="text-xs text-ink-muted">Zgodność sprawdzana wg wymiarów ramy i silnika</span>
-    </div>
   </div>;
 }
 
