@@ -13,25 +13,37 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
-import { bikeModels, formatPrice, type BikeModel } from '@/lib/catalog';
+import { CUSTOMER_SUPPLIED_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
+import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/pricing';
 import { usePublicCatalog } from '@/lib/use-public-catalog';
-
-type Selections = Record<string, string>;
 type ContactForm = { customerName: string; customerEmail: string; customerPhone: string; notes: string; privacyAccepted: boolean };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 const defaultBatteryCode = (model: BikeModel): string => (model.batteries.find((item) => item.isDefault) ?? model.batteries[0])?.code ?? '';
 const formatEnergy = (wh: number) => `${new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 1 }).format(wh)} Wh`;
-const initialSelections = (model: BikeModel): Selections => Object.fromEntries(model.groups.map((group) => [group.id, group.defaultOptionId]));
+const initialSelections = (model: BikeModel): Selections =>
+  Object.fromEntries(model.groups.filter((group) => group.defaultSku !== null).map((group) => [group.slug, group.defaultSku as string]));
 const modelSlugs: Record<BikeModel['id'], string> = { e82: 'e82-wielichowo', e55: 'e55-reference', cfr707: 'cfr707' };
-const optionSkus: Record<string, string> = {
-  dpc245: 'display-dpc245', dpc030: 'display-dpc030', dpc010: 'display-dpc010', dpc080: 'display-dpc080',
-  rockshox35: 'fork-rs-35-silver-150', fox36: 'fork-fox-36-performance-160',
-  'rs-deluxe': 'shock-rs-deluxe-230x60', 'fox-float': 'shock-fox-float-x-pe-230x60', 'super-deluxe': 'shock-rs-super-deluxe',
-  shimano: 'brakes-shimano-4p', magura: 'brakes-magura-mt5', deore: 'drivetrain-deore-m5100-11', cues: 'drivetrain-cues-u6000-10',
-  'johnny-watts': 'tires-schwalbe-johnny-watts-29', maxxis: 'tires-maxxis-2-6', raw: 'paint-standard', single: 'paint-single-color', custom: 'paint-custom-two-color',
-};
-const optionIdsBySku = Object.fromEntries(Object.entries(optionSkus).map(([optionId, sku]) => [sku, optionId]));
+const defaultSizeCode = (model: BikeModel): string =>
+  (model.sizes.find((item) => item.code === 'M') ?? model.sizes[0])?.code ?? '';
+
+/**
+ * Lista wyborów w grupie. Pozycja „własna część” nie jest produktem w katalogu:
+ * jest trybem grupy z własną wartością rozliczeniową.
+ */
+function groupChoices(group: OptionGroup) {
+  const catalogChoices = group.options
+    .filter((option) => option.configurable || option.isDefault)
+    .map((option) => ({ sku: option.sku, name: option.name, detail: option.detail, price: option.price, customerSupplied: false }));
+  if (!group.customerPartAllowed) return catalogChoices;
+  return [...catalogChoices, {
+    sku: CUSTOMER_SUPPLIED_SKU,
+    name: group.customerPartLabel,
+    detail: 'Zgodność potwierdzi Rexor',
+    price: group.customerPartGrossPrice,
+    customerSupplied: true,
+  }];
+}
 
 export function BikeConfigurator() {
   const { models } = usePublicCatalog();
@@ -44,25 +56,55 @@ export function BikeConfigurator() {
   const [submitError, setSubmitError] = useState('');
   const [contact, setContact] = useState<ContactForm>({ customerName: '', customerEmail: '', customerPhone: '', notes: '', privacyAccepted: false });
   const [selectionsByModel, setSelectionsByModel] = useState<Record<string, Selections>>(() => Object.fromEntries(bikeModels.map((model) => [model.id, initialSelections(model)])));
+  const [touchedModels, setTouchedModels] = useState<Record<string, true>>({});
   const [batteryByModel, setBatteryByModel] = useState<Record<string, string>>(() => Object.fromEntries(bikeModels.map((model) => [model.id, defaultBatteryCode(model)])));
   const model = models.find((item) => item.id === modelId) ?? models[0];
-  const selections = selectionsByModel[model.id];
+  const selections = selectionsByModel[model.id] ?? {};
   // Pakiet domyślny wyznacza cenę bazową modelu, więc każdy inny wybór liczy się
   // jako różnica względem niego.
   const defaultBattery = model.batteries.find((item) => item.isDefault) ?? model.batteries[0];
   const battery = model.batteries.find((item) => item.code === batteryByModel[model.id]) ?? defaultBattery;
   const batteryLabel = battery ? `${battery.name} · ${formatEnergy(battery.energyWh)}` : model.battery;
 
+  const selectedSize = model.sizes.find((item) => item.code === size) ?? model.sizes[0] ?? null;
+  // Cena liczona z tej samej formuły co API: rama, rozmiar, bateria, części,
+  // składanie i narzut. Różnica względem ceny "od" jest tylko informacją.
   const pricing = useMemo(() => {
-    if (model.basePrice === null) return { total: null, delta: 0 };
-    const delta = model.groups.reduce((sum, group) => {
-      const selected = group.options.find((option) => option.id === selections[group.id]);
-      const base = group.options.find((option) => option.id === group.defaultOptionId);
-      return sum + (selected?.price ?? 0) - (base?.price ?? 0);
-    }, 0);
-    const batteryDelta = battery && defaultBattery ? battery.grossPrice - defaultBattery.grossPrice : 0;
-    return { total: model.basePrice + delta + batteryDelta, delta: delta + batteryDelta };
-  }, [battery, defaultBattery, model, selections]);
+    const result = configurationPricing(model, selections, battery ?? null, selectedSize);
+    const delta = result.total !== null && model.basePrice !== null ? Math.round((result.total - model.basePrice) * 100) / 100 : 0;
+    return { total: result.total, delta };
+  }, [battery, model, selectedSize, selections]);
+
+  // Grupy opcji przychodzą z API, więc domyślne wybory ustawiamy po ich
+  // wczytaniu — ale tylko dla modeli, których klient jeszcze nie ruszył.
+  useEffect(() => {
+    setSelectionsByModel((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const item of models) {
+        if (touchedModels[item.id] || item.groups.length === 0) continue;
+        const defaults = initialSelections(item);
+        if (JSON.stringify(next[item.id] ?? {}) === JSON.stringify(defaults)) continue;
+        next[item.id] = defaults;
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+    setBatteryByModel((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const item of models) {
+        if (next[item.id] || item.batteries.length === 0) continue;
+        next[item.id] = defaultBatteryCode(item);
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [models, touchedModels]);
+
+  useEffect(() => {
+    if (size === '' && model.sizes.length > 0) setSize(defaultSizeCode(model));
+  }, [model, size]);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -75,13 +117,11 @@ export function BikeConfigurator() {
           if (!nextModel) return;
           const restored = initialSelections(nextModel);
           for (const item of configuration.items as Array<{ groupSlug: string; sku: string }>) {
-            const group = nextModel.groups.find((candidate) => candidate.id === item.groupSlug);
+            const group = nextModel.groups.find((candidate) => candidate.slug === item.groupSlug);
             if (!group) continue;
-            const optionId = item.sku === '__customer_supplied__'
-              ? group.options.find((option) => option.customerSupplied)?.id
-              : optionIdsBySku[item.sku];
-            if (optionId && group.options.some((option) => option.id === optionId)) restored[group.id] = optionId;
+            if (groupChoices(group).some((choice) => choice.sku === item.sku)) restored[group.slug] = item.sku;
           }
+          setTouchedModels((current) => ({ ...current, [nextModel.id]: true }));
           setModelId(nextModel.id);
           setSize(configuration.size.code);
           const restoredBattery = configuration.battery?.code as string | undefined;
@@ -123,10 +163,13 @@ export function BikeConfigurator() {
           const next = models.find((item) => item.id === value.model && item.available);
           if (!next) throw new Error('Nieobsługiwany model. Dostępne: e82, e55.');
           selectModel(next.id);
-          if (value.size && next.sizes.includes(value.size)) setSize(value.size);
+          if (value.size && next.sizes.some((item) => item.code === value.size)) setSize(value.size);
           if (value.battery && next.batteries.some((item) => item.code === value.battery)) setBatteryByModel((current) => ({ ...current, [next.id]: value.battery! }));
-          if (value.options) setSelectionsByModel((current) => ({ ...current, [next.id]: { ...current[next.id], ...value.options } }));
-          return { status: 'staged', model: next.id, size: value.size ?? (next.sizes.includes('M') ? 'M' : next.sizes[0]) };
+          if (value.options) {
+            setTouchedModels((current) => ({ ...current, [next.id]: true }));
+            setSelectionsByModel((current) => ({ ...current, [next.id]: { ...current[next.id], ...value.options } }));
+          }
+          return { status: 'staged', model: next.id, size: value.size ?? defaultSizeCode(next) };
         },
       }, { signal: lifecycle.signal })).catch(report);
       void Promise.resolve(context.registerTool({
@@ -141,13 +184,14 @@ export function BikeConfigurator() {
   function selectModel(nextId: BikeModel['id']) {
     const next = models.find((item) => item.id === nextId) ?? models[0];
     setModelId(nextId);
-    setSize(next.sizes.includes('M') ? 'M' : next.sizes[0]);
+    setSize(defaultSizeCode(next));
     setGalleryIndex(0);
     carouselApi?.scrollTo(0, true);
   }
 
-  function choose(groupId: string, optionId: string) {
-    setSelectionsByModel((current) => ({ ...current, [model.id]: { ...current[model.id], [groupId]: optionId } }));
+  function choose(groupSlug: string, sku: string) {
+    setTouchedModels((current) => ({ ...current, [model.id]: true }));
+    setSelectionsByModel((current) => ({ ...current, [model.id]: { ...current[model.id], [groupSlug]: sku } }));
   }
 
   async function submitConfiguration(event: FormEvent<HTMLFormElement>) {
@@ -155,10 +199,11 @@ export function BikeConfigurator() {
     if (!contact.privacyAccepted) { setSubmitError('Zaznacz zgodę na kontakt i przetwarzanie danych.'); setSubmitState('error'); return; }
     setSubmitState('saving'); setSubmitError('');
     try {
-      const selectionsPayload = Object.fromEntries(model.groups.map((group) => {
-        const optionId = selections[group.id];
-        return [group.id, optionId.startsWith('own-') ? '__customer_supplied__' : optionSkus[optionId]];
-      }));
+      // Wysyłamy tylko wybory klienta. Elementy stałe i cena wynikają z bazy,
+      // więc konfigurator nie przekazuje żadnej kwoty.
+      const selectionsPayload = Object.fromEntries(model.groups
+        .filter((group) => group.selectionMode !== 'fixed' && selections[group.slug])
+        .map((group) => [group.slug, selections[group.slug]]));
       const response = await fetch(`${API_BASE}/configurations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -224,7 +269,7 @@ export function BikeConfigurator() {
           <div className="flex items-start justify-between gap-5"><div><p className="eyebrow">Twój projekt</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Konfiguracja {model.name.replace('Rexor ', '')}</h2></div><span className="rounded-full bg-[var(--accent-brand)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em]">Brutto</span></div>
           <Progress value={model.available ? 72 : 12} className="mt-5 h-1.5 bg-ink-wash [&>div]:bg-ink" />
           {!model.available ? <div className="mt-8 rounded-3xl bg-ink p-6 text-white"><Bike className="size-8 text-[var(--accent-brand)]" /><h3 className="mt-8 text-2xl font-semibold">Konfiguracja w przygotowaniu</h3><p className="mt-3 leading-relaxed text-white/64">Geometria i zdjęcia CFR707 są już gotowe. Uzupełniamy konkretne komponenty oraz cenę modelu.</p><Button render={<a href="/serwis" />} className="mt-6 w-full rounded-full bg-white text-ink hover:bg-white/90">Zapytaj o CFR707 <ArrowRight data-icon="inline-end" /></Button></div> : <>
-            <section className="config-section"><div className="section-heading"><div><span>01</span><h3>Rozmiar ramy</h3></div><p>Dopasowanie potwierdzimy przed zamówieniem.</p></div><RadioGroup value={size} onValueChange={setSize} className="grid grid-cols-3 gap-2">{model.sizes.map((item) => <label key={item} className={`size-choice focus-ring ${size === item ? 'size-choice-active' : ''}`}><RadioGroupItem value={item} className="choice-input" /><span>{item}</span></label>)}</RadioGroup></section>
+            <section className="config-section"><div className="section-heading"><div><span>01</span><h3>Rozmiar ramy</h3></div><p>Dopasowanie potwierdzimy przed zamówieniem.</p></div><RadioGroup value={size} onValueChange={setSize} className="grid grid-cols-3 gap-2">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>
             {model.batteries.length > 0 && <section className="config-section">
               <div className="section-heading"><div><span>02</span><h3>Bateria</h3></div><p>Pakiet dobrany do ramy i silnika. Pojemność zmienia zasięg i masę roweru.</p></div>
               <RadioGroup value={battery?.code ?? ''} onValueChange={(value) => setBatteryByModel((current) => ({ ...current, [model.id]: value }))} className="gap-2">
@@ -239,8 +284,25 @@ export function BikeConfigurator() {
                 </label>; })}
               </RadioGroup>
             </section>}
-            {model.groups.map((group, groupIndex) => { const defaultOption = group.options.find((option) => option.id === group.defaultOptionId)!; return <section className="config-section" key={group.id}><div className="section-heading"><div><span>{String(groupIndex + (model.batteries.length > 0 ? 3 : 2)).padStart(2, '0')}</span><h3>{group.name}</h3></div><p>{group.helper}</p></div><RadioGroup value={selections[group.id]} onValueChange={(value) => choose(group.id, value)} className="gap-2">{group.options.map((option) => { const selected = selections[group.id] === option.id; const delta = option.price - defaultOption.price; return <label key={option.id} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}><RadioGroupItem value={option.id} className="choice-input" /><span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2 font-semibold">{option.name}{option.customerSupplied && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-muted">Twoja część</span>}</span><span className="mt-0.5 block text-sm text-ink-muted">{option.detail}</span></span><span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{delta === 0 ? 'w cenie' : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span></label>; })}</RadioGroup></section>; })}
-            <div className="mt-7 rounded-3xl bg-ink p-5 text-white sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-white/54">Cena Twojej konfiguracji</p><p className="mt-1 text-3xl font-semibold tracking-[-0.04em] tabular-nums">{formatPrice(pricing.total ?? 0)}</p></div>{pricing.delta !== 0 && <span className="rounded-full bg-white/10 px-3 py-1.5 text-sm tabular-nums">{pricing.delta > 0 ? '+' : '−'}{formatPrice(Math.abs(pricing.delta))}</span>}</div><Button onClick={() => setDialogOpen(true)} className="mt-6 h-12 w-full rounded-full bg-[var(--accent-brand)] font-semibold text-[var(--accent-brand-foreground)] hover:brightness-95">Zapisz i przejdź do podsumowania <ArrowRight data-icon="inline-end" className="shrink-0" /></Button><p className="mt-3 flex items-center justify-center gap-2 text-center text-xs text-white/48"><ShieldCheck className="size-3.5" /> Cena brutto · zgodność potwierdzi Rexor</p></div>
+            {model.groups.filter((group) => group.selectionMode !== 'fixed').map((group, groupIndex) => {
+              const choices = groupChoices(group);
+              const defaultPrice = groupDefaultPrice(group);
+              return <section className="config-section" key={group.slug}>
+                <div className="section-heading"><div><span>{String(groupIndex + (model.batteries.length > 0 ? 3 : 2)).padStart(2, '0')}</span><h3>{group.name}</h3></div><p>{group.helper}</p></div>
+                <RadioGroup value={selections[group.slug] ?? ''} onValueChange={(value) => choose(group.slug, value)} className="gap-2">
+                  {choices.map((choice) => { const selected = selections[group.slug] === choice.sku; const delta = choice.price === null ? null : choice.price - defaultPrice; return <label key={choice.sku} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}>
+                    <RadioGroupItem value={choice.sku} className="choice-input" />
+                    <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2 font-semibold">{choice.name}{choice.customerSupplied && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-muted">Twoja część</span>}</span>
+                      <span className="mt-0.5 block text-sm text-ink-muted">{choice.detail}</span>
+                    </span>
+                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{delta === null ? 'wycena' : delta === 0 ? 'w cenie' : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span>
+                  </label>; })}
+                </RadioGroup>
+              </section>;
+            })}
+            <div className="mt-7 rounded-3xl bg-ink p-5 text-white sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-white/54">Cena Twojej konfiguracji</p><p className="mt-1 text-3xl font-semibold tracking-[-0.04em] tabular-nums">{pricing.total === null ? 'wycena indywidualna' : formatPrice(pricing.total)}</p></div>{pricing.delta !== 0 && <span className="rounded-full bg-white/10 px-3 py-1.5 text-sm tabular-nums">{pricing.delta > 0 ? '+' : '−'}{formatPrice(Math.abs(pricing.delta))}</span>}</div><Button onClick={() => setDialogOpen(true)} className="mt-6 h-12 w-full rounded-full bg-[var(--accent-brand)] font-semibold text-[var(--accent-brand-foreground)] hover:brightness-95">Zapisz i przejdź do podsumowania <ArrowRight data-icon="inline-end" className="shrink-0" /></Button><p className="mt-3 flex items-center justify-center gap-2 text-center text-xs text-white/48"><ShieldCheck className="size-3.5" /> Cena brutto · zgodność potwierdzi Rexor</p></div>
           </>}
         </aside>
       </section>
