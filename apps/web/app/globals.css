@@ -6,13 +6,13 @@
 
 @theme inline {
   --color-background: var(--background); --color-foreground: var(--foreground); --font-sans: var(--font-geist-sans); --font-mono: var(--font-geist-mono); --font-heading: var(--font-geist-sans);
-  --color-ring: var(--ring); --color-input: var(--input); --color-border: var(--border); --color-destructive: var(--destructive); --color-muted-foreground: var(--muted-foreground); --color-muted: var(--muted); --color-primary-foreground: var(--primary-foreground); --color-primary: var(--primary); --color-card-foreground: var(--card-foreground); --color-card: var(--card);
+  --color-ring: var(--ring); --color-input: var(--input); --color-border: var(--border); --color-destructive: var(--destructive); --color-muted-foreground: var(--muted-foreground); --color-muted: var(--muted); --color-primary-foreground: var(--primary-foreground); --color-primary: var(--primary); --color-card-foreground: var(--card-foreground); --color-card: var(--card); --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
   --color-ink: var(--ink); --color-ink-muted: var(--ink-muted); --color-ink-subtle: var(--ink-subtle); --color-ink-wash: var(--ink-wash); --color-line: var(--line); --color-line-strong: var(--line-strong); --color-surface: var(--surface); --color-stage: var(--stage); --color-brand: var(--accent-brand); --color-brand-foreground: var(--accent-brand-foreground);
   --radius-sm: calc(var(--radius) * 0.6); --radius-md: calc(var(--radius) * 0.8); --radius-lg: var(--radius); --radius-xl: calc(var(--radius) * 1.4); --radius-2xl: calc(var(--radius) * 1.8); --radius-3xl: calc(var(--radius) * 2.2);
 }
 
 :root {
-  --background: #f8f9f6; --foreground: #171817; --card: #ffffff; --card-foreground: #171817; --primary: #171817; --primary-foreground: #ffffff; --muted: #eff1ed; --muted-foreground: #5d625c;
+  --background: #f8f9f6; --foreground: #171817; --card: #ffffff; --card-foreground: #171817; --popover: #ffffff; --popover-foreground: #171817; --primary: #171817; --primary-foreground: #ffffff; --muted: #eff1ed; --muted-foreground: #5d625c;
   --accent-brand: #d9ff43; --accent-brand-foreground: #111111; --destructive: oklch(0.58 0.22 27); --border: #dfe2dc; --input: #dfe2dc; --ring: #8fae13; --radius: 0.75rem;
 
   /* Tekst: trzy poziomy, wszystkie z kontrastem co najmniej 4.5:1 na jasnym tle. */

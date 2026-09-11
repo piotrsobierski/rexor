@@ -202,7 +202,8 @@ export function BikeModelPage({ catalog, modelSlug }: { catalog?: PublicCatalogD
             </div>
             <Button
               render={<a href={configHref} />}
-              className="h-12 rounded-full bg-[var(--accent-brand)] px-8 font-semibold text-[var(--accent-brand-foreground)] hover:brightness-95"
+              variant="brand"
+              className="h-12 rounded-full px-8 font-semibold transition-all hover:brightness-95"
             >
               {ctaLabel} <ArrowRight data-icon="inline-end" />
             </Button>
