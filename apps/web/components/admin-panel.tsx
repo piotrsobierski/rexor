@@ -24,11 +24,12 @@ import {
   Upload,
   Zap,
 } from 'lucide-react';
-import { computeBatteryEstimates, formatWeightKg, formatWh } from '@/lib/battery';
+import { computeBatteryEstimates, detectCellSpec, formatWeightKg, formatWh } from '@/lib/battery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Toaster, toast } from '@/components/ui/toast';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -55,9 +56,21 @@ export function AdminPanel() {
   useEffect(() => { const saved = sessionStorage.getItem('rexor_admin_token'); if (saved) { setToken(saved); void loadCatalog(saved); } }, []);
 
   async function request(path: string, options: RequestInit = {}, authToken = token) {
+    const method = (options.method ?? 'GET').toUpperCase();
+    // Toast pokazujemy dla każdego zapisu (POST/PATCH/DELETE), z wyjątkiem
+    // logowania - to nie jest "zapis" z perspektywy admina.
+    const isMutation = method !== 'GET' && path !== '/admin/login';
     const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}), ...options.headers } });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error ?? 'Operacja nie powiodła się.');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (isMutation) {
+        toast.add({ title: 'Nie zapisano', description: `${data.error ?? 'Operacja nie powiodła się.'} (HTTP ${response.status})`, type: 'error' });
+      }
+      throw new Error(data.error ?? 'Operacja nie powiodła się.');
+    }
+    if (isMutation) {
+      toast.add({ title: 'Zapisano', description: `HTTP ${response.status}`, type: 'success' });
+    }
     return data;
   }
 
@@ -80,9 +93,9 @@ export function AdminPanel() {
     catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać.'); }
   }
 
-  if (!token || !catalog) return <main className="grid min-h-screen place-items-center bg-[#111] px-4"><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-7"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" /><p className="eyebrow mt-10">Panel administracyjny</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Zaloguj się</h1><div className="mt-6 grid gap-4"><div className="grid gap-1.5"><Label htmlFor="admin-email">E-mail</Label><Input id="admin-email" type="email" required className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} /></div><div className="grid gap-1.5"><Label htmlFor="admin-password">Hasło</Label><Input id="admin-password" type="password" required className="h-11" value={password} onChange={(event) => setPassword(event.target.value)} /></div><Button type="submit" className="h-11 rounded-full bg-ink text-white">Zaloguj</Button>{message && <p className="text-center text-sm text-ink-muted">{message}</p>}</div></form></main>;
+  if (!token || !catalog) return <main className="grid min-h-screen place-items-center bg-[#111] px-4"><Toaster /><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-7"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" /><p className="eyebrow mt-10">Panel administracyjny</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Zaloguj się</h1><div className="mt-6 grid gap-4"><div className="grid gap-1.5"><Label htmlFor="admin-email">E-mail</Label><Input id="admin-email" type="email" required className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} /></div><div className="grid gap-1.5"><Label htmlFor="admin-password">Hasło</Label><Input id="admin-password" type="password" required className="h-11" value={password} onChange={(event) => setPassword(event.target.value)} /></div><Button type="submit" className="h-11 rounded-full bg-ink text-white">Zaloguj</Button>{message && <p className="text-center text-sm text-ink-muted">{message}</p>}</div></form></main>;
 
-  return <div className="min-h-screen bg-[#f4f5f2]"><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => loadCatalog()}><RefreshCw /> Odśwież</Button><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
+  return <div className="min-h-screen bg-[#f4f5f2]"><Toaster /><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => loadCatalog()}><RefreshCw /> Odśwież</Button><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
     <Tabs defaultValue="models"><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Serwis</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger></TabsList>
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="categories"><SimpleEditor resource="categories" rows={catalog.categories} patch={patch} fields={[['name', 'Nazwa'], ['short_description', 'Krótki opis']]} /></TabsContent>
@@ -331,7 +344,7 @@ function PartsEditor({
 
         {/* 3. PARTS TABLE WITH CATEGORY HEADERS */}
         <div className="mt-6 overflow-x-auto">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow className="border-b border-line bg-ink-wash/40">
                 <TableHead className="w-20">Zdjęcie</TableHead>
@@ -420,18 +433,20 @@ function PartsEditor({
                         ))}
                       </NativeSelect>
                     </TableCell>
-                    <TableCell className="min-w-56 font-medium">
-                      <Input
-                        value={String(drafts[row.id]?.name ?? '')}
-                        onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })}
-                        className="h-9 text-sm"
-                      />
-                      <Input
-                        placeholder="Opis widoczny w konfiguratorze (opcjonalny)"
-                        value={String(drafts[row.id]?.description ?? '')}
-                        onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], description: event.target.value } })}
-                        className="mt-1.5 h-8 text-xs text-ink-muted"
-                      />
+                    <TableCell className="max-w-0 min-w-0 whitespace-normal font-medium">
+                      <div className="grid gap-1.5">
+                        <Input
+                          value={String(drafts[row.id]?.name ?? '')}
+                          onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })}
+                          className="h-9 text-sm"
+                        />
+                        <Input
+                          placeholder="Opis widoczny w konfiguratorze (opcjonalny)"
+                          value={String(drafts[row.id]?.description ?? '')}
+                          onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], description: event.target.value } })}
+                          className="h-8 text-xs text-ink-muted"
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-subtle">
                       {String(row.sku ?? '—')}
@@ -662,8 +677,6 @@ const batteryFields: Array<[string, string, string, string]> = [
   ['series_count', 'Ogniwa szeregowo (S)', 'number', 'np. 14'],
   ['parallel_count', 'Gałęzie równolegle (P)', 'number', 'np. 4'],
   ['cell_capacity_ah', 'Pojemność ogniwa (Ah)', 'text', 'np. 3.5'],
-  ['nominal_voltage_v', 'Napięcie nominalne (V)', 'text', 'np. 50.4 lub 50,4'],
-  ['charge_voltage_v', 'Napięcie ładowania (V)', 'text', 'np. 58.8 lub 58,8'],
   ['gross_price', 'Cena brutto (zł)', 'text', '0 = w cenie bazowej'],
 ];
 
@@ -675,8 +688,6 @@ const emptyBattery: Row = {
   series_count: 14,
   parallel_count: 4,
   cell_capacity_ah: 3.5,
-  nominal_voltage_v: 50.4,
-  charge_voltage_v: 58.8,
   gross_price: 0,
   sort_order: 10,
   is_default: false,
@@ -690,13 +701,19 @@ function cleanBatteryPayload(draft: Row): Record<string, unknown> {
     const n = parseFloat(s);
     return Number.isFinite(n) ? n : 0;
   };
+  const seriesCount = Math.max(1, Math.round(parseNum(draft.series_count)));
+  // Napięcie ogniwa (nominalne i ładowania) jest stałą chemii/formatu ogniwa,
+  // nie osobną wartością do wpisania - pakiet ma tyle woltów, ile wynika z
+  // liczby ogniw połączonych szeregowo. Liczymy je zawsze na nowo z (S) i
+  // formatu, żeby nie dało się zapisać niespójnej kombinacji.
+  const cellSpec = detectCellSpec(draft.cell_format);
   return {
     ...draft,
-    series_count: Math.max(1, Math.round(parseNum(draft.series_count))),
+    series_count: seriesCount,
     parallel_count: Math.max(1, Math.round(parseNum(draft.parallel_count))),
     cell_capacity_ah: parseNum(draft.cell_capacity_ah),
-    nominal_voltage_v: parseNum(draft.nominal_voltage_v),
-    charge_voltage_v: parseNum(draft.charge_voltage_v),
+    nominal_voltage_v: Math.round(seriesCount * cellSpec.nominalCellVoltage * 100) / 100,
+    charge_voltage_v: Math.round(seriesCount * cellSpec.maxCellVoltage * 100) / 100,
     gross_price: parseNum(draft.gross_price),
     is_default: Boolean(draft.is_default),
     is_active: draft.is_active !== undefined ? Boolean(draft.is_active) : true,
@@ -760,20 +777,6 @@ function BatteryLiveMetrics({
               Popraw na <strong>{est.cellSpec.suggestedFormat}</strong>
             </button>
           )}
-
-          {onApplyUpdate && est.series > 0 && (!draft.nominal_voltage_v || Math.abs(Number(String(draft.nominal_voltage_v).replace(',', '.')) - est.suggestedNominalV) > 1.5) && (
-            <button
-              type="button"
-              onClick={() => onApplyUpdate({
-                nominal_voltage_v: est.suggestedNominalV,
-                charge_voltage_v: est.suggestedChargeV,
-              })}
-              className="inline-flex items-center gap-1 rounded-lg border border-line bg-ink-wash px-2.5 py-1 text-ink-muted transition hover:border-ink/40 hover:bg-white"
-              title={`Ustaw standardowe napięcia Li-ion: ${est.suggestedNominalV} V nom. / ${est.suggestedChargeV} V max`}
-            >
-              Napięcia {est.series}S ({est.suggestedNominalV} V / {est.suggestedChargeV} V)
-            </button>
-          )}
         </div>
       </div>
 
@@ -822,7 +825,7 @@ function BatteryLiveMetrics({
       {est.series > 0 && est.nominalVoltageV > 0 && (
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-2 text-[11px] text-ink-muted">
           <span>
-            Napięcie na ogniwo: <strong className="font-semibold text-ink">{est.cellNominalV.toFixed(2)} V</strong> nom. · <strong className="font-semibold text-ink">{est.cellChargeV.toFixed(2)} V</strong> max
+            Napięcie na ogniwo (stałe dla formatu {est.cellSpec.format}): <strong className="font-semibold text-ink">{est.cellNominalV.toFixed(2)} V</strong> nom. · <strong className="font-semibold text-ink">{est.cellChargeV.toFixed(2)} V</strong> max
           </span>
           <span className="text-ink-subtle">
             {est.cellSpec.note}
@@ -1014,8 +1017,6 @@ function BatteriesEditor({ batteries, models, request, reload, setMessage }: { b
                         series_count: 14,
                         parallel_count: 4,
                         cell_capacity_ah: 3.5,
-                        nominal_voltage_v: 50.4,
-                        charge_voltage_v: 58.8,
                         gross_price: 1950,
                         is_active: true,
                         is_default: false,

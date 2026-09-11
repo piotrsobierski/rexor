@@ -31,10 +31,7 @@ export type BatteryEstimates = {
   packWeightMaxKg: number;
   cellNominalV: number;
   cellChargeV: number;
-  suggestedNominalV: number;
-  suggestedChargeV: number;
   suggestedCode: string;
-  isVoltageRealistic: boolean;
 };
 
 /**
@@ -124,24 +121,24 @@ export function computeBatteryEstimates(battery: {
   parallelCount?: unknown;
   cell_capacity_ah?: unknown;
   cellCapacityAh?: unknown;
-  nominal_voltage_v?: unknown;
-  nominalVoltageV?: unknown;
-  charge_voltage_v?: unknown;
-  chargeVoltageV?: unknown;
   code?: unknown;
 }, modelSlug = 'e82'): BatteryEstimates {
   const formatRaw = battery.cell_format ?? battery.cellFormat ?? '18650';
   const series = Math.max(0, Math.round(parseBatteryNumber(battery.series_count ?? battery.seriesCount)));
   const parallel = Math.max(0, Math.round(parseBatteryNumber(battery.parallel_count ?? battery.parallelCount)));
   const cellCapacityAh = parseBatteryNumber(battery.cell_capacity_ah ?? battery.cellCapacityAh);
-  const nominalVoltageV = parseBatteryNumber(battery.nominal_voltage_v ?? battery.nominalVoltageV);
-  const chargeVoltageV = parseBatteryNumber(battery.charge_voltage_v ?? battery.chargeVoltageV);
+
+  const cellSpec = detectCellSpec(formatRaw);
+  // Napięcie pakietu nie jest wartością wpisywaną osobno - to stała chemii
+  // ogniwa (np. 3.6 V nom. / 4.2 V max dla 18650/21700) pomnożona przez
+  // liczbę ogniw połączonych szeregowo (S). Admin wybiera tylko S i format.
+  const nominalVoltageV = series * cellSpec.nominalCellVoltage;
+  const chargeVoltageV = series * cellSpec.maxCellVoltage;
 
   const cellCount = series * parallel;
   const packCapacityAh = parallel * cellCapacityAh;
   const energyWh = packCapacityAh * nominalVoltageV;
 
-  const cellSpec = detectCellSpec(formatRaw);
   const cellsWeightKg = (cellCount * cellSpec.cellWeightGrams) / 1000;
 
   // Masa osprzętu pakietu:
@@ -156,19 +153,14 @@ export function computeBatteryEstimates(battery: {
   const packWeightMinKg = cellCount > 0 ? cellsWeightKg * 1.12 + 0.18 : 0;
   const packWeightMaxKg = cellCount > 0 ? cellsWeightKg * 1.22 + 0.35 : 0;
 
-  const cellNominalV = series > 0 ? nominalVoltageV / series : 0;
-  const cellChargeV = series > 0 ? chargeVoltageV / series : 0;
-
-  const suggestedNominalV = series > 0 ? Math.round(series * cellSpec.nominalCellVoltage * 10) / 10 : 0;
-  const suggestedChargeV = series > 0 ? Math.round(series * cellSpec.maxCellVoltage * 10) / 10 : 0;
+  // Napięcie ogniwa jest zawsze równe stałej danego formatu - nie ma już
+  // osobnej wartości "wpisanej", więc nie może z nią rozjechać się.
+  const cellNominalV = cellSpec.nominalCellVoltage;
+  const cellChargeV = cellSpec.maxCellVoltage;
 
   const roundedWh = Math.round(energyWh);
   const cleanSlug = String(modelSlug).replace(/[^a-z0-9]/gi, '').toLowerCase() || 'pack';
   const suggestedCode = `${cleanSlug}-${roundedWh > 0 ? roundedWh : 0}wh`;
-
-  const isVoltageRealistic = series > 0
-    ? cellNominalV >= 3.2 && cellNominalV <= 3.85 && cellChargeV >= 3.9 && cellChargeV <= 4.35
-    : true;
 
   return {
     series,
@@ -187,10 +179,7 @@ export function computeBatteryEstimates(battery: {
     packWeightMaxKg,
     cellNominalV,
     cellChargeV,
-    suggestedNominalV,
-    suggestedChargeV,
     suggestedCode,
-    isVoltageRealistic,
   };
 }
 

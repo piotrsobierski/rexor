@@ -206,6 +206,30 @@ function createAdminPart(PDO $pdo, array $input): array
  * nominalnego. Liczymy je po stronie serwera, żeby panel nie mógł zapisać
  * pakietu, którego parametry nie trzymają się razem.
  */
+/**
+ * Napięcie nominalne/ładowania ogniwa jest stałą chemii/formatu, nie polem
+ * do wpisania - lustrzane odbicie detectCellSpec() z apps/web/lib/battery.ts.
+ */
+function cellVoltageSpec(string $formatRaw): array
+{
+    $lower = strtolower(str_replace(' ', '', $formatRaw));
+
+    if (str_contains($lower, '21700') || str_contains($lower, '2170')) {
+        return ['nominal' => 3.6, 'max' => 4.2];
+    }
+    if (str_contains($lower, '18650') || str_contains($lower, '16850') || str_contains($lower, '1865')) {
+        return ['nominal' => 3.6, 'max' => 4.2];
+    }
+    if (str_contains($lower, '26650')) {
+        return ['nominal' => 3.6, 'max' => 4.2];
+    }
+    if (str_contains($lower, '32700') || str_contains($lower, '32650')) {
+        return ['nominal' => 3.2, 'max' => 3.65];
+    }
+
+    return ['nominal' => 3.6, 'max' => 4.2];
+}
+
 function batteryPayload(array $input, array $current = []): array
 {
     $value = static fn (string $field, mixed $fallback): mixed => array_key_exists($field, $input) ? $input[$field] : $fallback;
@@ -237,8 +261,6 @@ function batteryPayload(array $input, array $current = []): array
     $series = $toInt($value('series_count', $current['series_count'] ?? 0));
     $parallel = $toInt($value('parallel_count', $current['parallel_count'] ?? 0));
     $cellCapacity = $toFloat($value('cell_capacity_ah', $current['cell_capacity_ah'] ?? 0));
-    $nominalVoltage = $toFloat($value('nominal_voltage_v', $current['nominal_voltage_v'] ?? 0));
-    $chargeVoltage = $toFloat($value('charge_voltage_v', $current['charge_voltage_v'] ?? 0));
     $grossPrice = $toFloat($value('gross_price', $current['gross_price'] ?? 0));
 
     if ($name === '' || mb_strlen($name) > 200) {
@@ -250,12 +272,16 @@ function batteryPayload(array $input, array $current = []): array
     if ($series < 1 || $parallel < 1) {
         throw new InvalidArgumentException('Liczba ogniw szeregowo i równolegle musi być większa od zera.');
     }
-    if ($cellCapacity <= 0 || $nominalVoltage <= 0 || $chargeVoltage <= 0) {
-        throw new InvalidArgumentException('Pojemność ogniwa oraz napięcia muszą być większe od zera.');
+    if ($cellCapacity <= 0) {
+        throw new InvalidArgumentException('Pojemność ogniwa musi być większa od zera.');
     }
-    if ($chargeVoltage < $nominalVoltage) {
-        throw new InvalidArgumentException('Napięcie ładowania nie może być niższe od nominalnego.');
-    }
+
+    // Napięcie pakietu wynika wyłącznie z liczby ogniw szeregowo i stałej
+    // napięcia dla danego formatu ogniwa - nigdy z wartości przysłanej z klienta.
+    $voltageSpec = cellVoltageSpec($cellFormat);
+    $nominalVoltage = round($series * $voltageSpec['nominal'], 2);
+    $chargeVoltage = round($series * $voltageSpec['max'], 2);
+
     if ($grossPrice < 0) {
         throw new InvalidArgumentException('Cena brutto nie może być ujemna.');
     }
