@@ -7,6 +7,7 @@ require dirname(__DIR__) . '/src/PricingService.php';
 require dirname(__DIR__) . '/src/ConfigurationService.php';
 require dirname(__DIR__) . '/src/AdminService.php';
 require dirname(__DIR__) . '/src/CatalogService.php';
+require dirname(__DIR__) . '/src/ChatService.php';
 
 $allowedOrigin = envValue('CORS_ORIGIN', 'http://localhost:3000');
 if (($_SERVER['HTTP_ORIGIN'] ?? '') === $allowedOrigin) {
@@ -47,6 +48,10 @@ if ($method === 'GET' && $path === '/health') {
 
 if ($method === 'GET' && $path === '/catalog') {
     jsonResponse(publicCatalog($pdo));
+}
+
+if ($method === 'POST' && $path === '/chat') {
+    jsonResponse(handleChatRequest($pdo, requestJson()));
 }
 
 if ($method === 'GET' && $path === '/settings/theme') {
