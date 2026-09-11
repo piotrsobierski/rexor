@@ -1,7 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Bold, ExternalLink, ImagePlus, Italic, List, LogOut, RefreshCw, Save, Trash2, Upload } from 'lucide-react';
+import {
+  Bike,
+  Bold,
+  Calculator,
+  Copy,
+  ExternalLink,
+  HelpCircle,
+  ImagePlus,
+  Info,
+  Italic,
+  Layers,
+  List,
+  LogOut,
+  RefreshCw,
+  Save,
+  Search,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +27,8 @@ import { Switch } from '@/components/ui/switch';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
@@ -62,7 +82,7 @@ export function AdminPanel() {
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="categories"><SimpleEditor resource="categories" rows={catalog.categories} patch={patch} fields={[['name', 'Nazwa'], ['short_description', 'Krótki opis']]} /></TabsContent>
       <TabsContent value="equipment"><ModelEquipmentEditor catalog={catalog} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
-      <TabsContent value="parts"><SimpleEditor resource="parts" rows={catalog.parts} patch={patch} fields={[['name', 'Nazwa części'], ['gross_price', 'Cena brutto']]} /></TabsContent>
+      <TabsContent value="parts"><PartsEditor rows={catalog.parts} partGroups={catalog.partGroups} models={catalog.models} modelParts={catalog.modelParts} patch={patch} /></TabsContent>
       <TabsContent value="batteries"><BatteriesEditor batteries={catalog.batteries ?? []} models={catalog.models} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="service"><PageEditor page={catalog.pages.find((page) => page.slug === 'serwis')} patch={patch} request={request} /></TabsContent>
       <TabsContent value="theme"><ThemeEditor theme={catalog.theme} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
@@ -71,7 +91,285 @@ export function AdminPanel() {
   </main></div>;
 }
 
+function InfoTooltip({ text, side = 'top' }: { text: string; side?: 'top' | 'right' | 'bottom' | 'left' }) {
+  return (
+    <TooltipProvider delay={100}>
+      <Tooltip>
+        <TooltipTrigger
+          type="button"
+          aria-label={text}
+          className="inline-flex size-4 items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-black/5 transition-colors cursor-help shrink-0"
+        >
+          <Info className="size-3.5" />
+        </TooltipTrigger>
+        <TooltipContent
+          side={side}
+          className="z-50 max-w-xs rounded-xl border border-line bg-ink px-3 py-2 text-left text-xs font-normal leading-relaxed text-white shadow-xl"
+        >
+          {text}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function Panel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <section className="rounded-3xl border border-line bg-white p-5 sm:p-7"><h2 className="text-2xl font-semibold tracking-tight">{title}</h2><p className="mt-1 text-sm text-ink-muted">{description}</p><div className="mt-6">{children}</div></section>; }
+
+function PartsEditor({
+  rows,
+  partGroups,
+  models,
+  modelParts,
+  patch,
+}: {
+  rows: Row[];
+  partGroups: Row[];
+  models: Row[];
+  modelParts: ModelPartRow[];
+  patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>;
+}) {
+  const [drafts, setDrafts] = useState<Record<number, Row>>(() => Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+  const [search, setSearch] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState('all');
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+  }, [rows]);
+
+  const groupOrder = new Map(partGroups.map((g, idx) => [Number(g.id), idx]));
+
+  const filtered = rows.filter((row) => {
+    if (selectedGroup !== 'all' && String(row.group_id) !== selectedGroup) return false;
+    if (search.trim() !== '') {
+      const q = search.toLowerCase();
+      const name = String(row.name ?? '').toLowerCase();
+      const sku = String(row.sku ?? '').toLowerCase();
+      const groupName = String(row.group_name ?? '').toLowerCase();
+      if (!name.includes(q) && !sku.includes(q) && !groupName.includes(q)) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const orderA = groupOrder.get(Number(a.group_id)) ?? 999;
+    const orderB = groupOrder.get(Number(b.group_id)) ?? 999;
+    if (orderA !== orderB) return orderA - orderB;
+    return String(a.name ?? '').localeCompare(String(b.name ?? ''));
+  });
+
+  return (
+    <div className="grid min-w-0 gap-6">
+      {/* 1. EDUCATIONAL CALLOUT */}
+      <div className="rounded-3xl border border-line bg-white p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3.5">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-amber-500/10 text-amber-600">
+              <Layers className="size-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[0.7rem] font-semibold text-amber-700">
+                  Katalog komponentów
+                </span>
+                <span className="text-xs text-ink-muted">Cennik bazowy i kategorie części</span>
+              </div>
+              <h2 className="mt-1 text-xl font-bold tracking-tight text-ink">Części pogrupowane według kategorii</h2>
+              <p className="mt-1 text-sm text-ink-muted max-w-3xl leading-relaxed">
+                Każda część należy do określonej <strong>Kategorii części</strong> (np. <em>Hamulce, Amortyzator, Napęd, Koła</em>) i posiada globalną cenę brutto. Poniżej możesz przeglądać części wg kategorii, zmieniać ich kategorię lub cenę oraz sprawdzać, w których modelach rowerów są aktualnie używane.
+              </p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-line/60 bg-ink-wash p-3.5 text-xs text-ink-muted lg:max-w-sm">
+            <strong className="block text-ink mb-1">Różnica względem „Osprzęt i cena modelu”:</strong>
+            Tutaj ustalasz globalne ceny części i ich kategorie. W zakładce <strong>Osprzęt i cena modelu</strong> decydujesz, które części wchodzą w skład danego roweru i która z nich jest pozycją bazową (wyznaczającą cenę „od”).
+          </div>
+        </div>
+      </div>
+
+      {/* 2. CATEGORY SWITCHER BAR */}
+      <div className="rounded-3xl border border-line bg-white p-5 sm:p-7 shadow-xs">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold tracking-tight text-ink">Kategorie części</h3>
+            <p className="text-xs text-ink-muted">Kliknij kategorię, aby szybko zawęzić listę ({partGroups.length} zdefiniowanych kategorii)</p>
+          </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-muted" />
+            <Input
+              placeholder="Szukaj części lub SKU…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-9 text-xs"
+            />
+          </div>
+        </div>
+
+        <div className="no-scrollbar flex flex-wrap items-center gap-2 overflow-x-auto pb-2">
+          <button
+            type="button"
+            onClick={() => setSelectedGroup('all')}
+            className={cn(
+              "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer",
+              selectedGroup === 'all'
+                ? "bg-ink text-white shadow-xs font-semibold"
+                : "bg-ink-wash text-ink-muted hover:bg-black/10 hover:text-ink"
+            )}
+          >
+            <span>Wszystkie kategorie</span>
+            <span className={cn(
+              "rounded-full px-1.5 py-0.2 text-[0.65rem] tabular-nums",
+              selectedGroup === 'all' ? "bg-white/20 text-white" : "bg-white text-ink-muted shadow-2xs"
+            )}>
+              {rows.length}
+            </span>
+          </button>
+          {partGroups.map((g) => {
+            const count = rows.filter((r) => Number(r.group_id) === Number(g.id)).length;
+            if (count === 0) return null;
+            const isSel = selectedGroup === String(g.id);
+            return (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setSelectedGroup(String(g.id))}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer",
+                  isSel
+                    ? "bg-ink text-white shadow-xs font-semibold"
+                    : "bg-ink-wash text-ink-muted hover:bg-black/10 hover:text-ink"
+                )}
+              >
+                <span>{String(g.name)}</span>
+                <span className={cn(
+                  "rounded-full px-1.5 py-0.2 text-[0.65rem] tabular-nums",
+                  isSel ? "bg-white/20 text-white" : "bg-white text-ink-muted shadow-2xs"
+                )}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 3. PARTS TABLE WITH CATEGORY HEADERS */}
+        <div className="mt-6 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-line bg-ink-wash/40">
+                <TableHead className="w-48">
+                  <span className="inline-flex items-center gap-1">
+                    Kategoria części
+                    <InfoTooltip text="Grupa komponentu (np. Hamulce, Damper, Napęd). Możesz ją zmienić z listy, aby przenieść część do innej kategorii." />
+                  </span>
+                </TableHead>
+                <TableHead>
+                  <span className="inline-flex items-center gap-1">
+                    Nazwa części
+                    <InfoTooltip text="Oficjalna nazwa komponentu wyświetlana w sklepie i konfiguratorze." />
+                  </span>
+                </TableHead>
+                <TableHead className="w-32">SKU</TableHead>
+                <TableHead className="w-40">
+                  <span className="inline-flex items-center gap-1">
+                    Cena brutto (zł)
+                    <InfoTooltip text="Globalna cena katalogowa brutto. Zmiana tutaj przelicza ceny 'od' wszystkich modeli rowerów, w których ta część jest domyślna." />
+                  </span>
+                </TableHead>
+                <TableHead className="w-48">
+                  <span className="inline-flex items-center gap-1">
+                    W modelach rowerów
+                    <InfoTooltip text="Rowery, w których ta część jest aktualnie przypisana i dostępna w konfiguratorze." />
+                  </span>
+                </TableHead>
+                <TableHead className="w-24 text-right">Akcja</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-12 text-center text-sm text-ink-muted">
+                    Nie znaleziono części w wybranej kategorii.
+                  </TableCell>
+                </TableRow>
+              )}
+              {filtered.map((row, index) => {
+                const prevRow = filtered[index - 1];
+                const showGroupHeader = selectedGroup === 'all' && (!prevRow || prevRow.group_id !== row.group_id);
+                const assigned = models.filter((m) =>
+                  modelParts.some((mp) => Number(mp.part_id) === Number(row.id) && Number(mp.model_id) === Number(m.id))
+                );
+
+                return (
+                  <TableRow key={row.id} className="transition-colors hover:bg-black/[0.02]">
+                    <TableCell className="w-48">
+                      <NativeSelect
+                        value={String(drafts[row.id]?.group_id ?? row.group_id ?? '')}
+                        onChange={(e) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], group_id: e.target.value } })}
+                        className="h-9 text-xs"
+                      >
+                        {partGroups.map((g) => (
+                          <NativeSelectOption key={g.id} value={g.id}>
+                            {String(g.name)}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    </TableCell>
+                    <TableCell className="min-w-56 font-medium">
+                      <Input
+                        value={String(drafts[row.id]?.name ?? '')}
+                        onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })}
+                        className="h-9 text-sm"
+                      />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-ink-subtle">
+                      {String(row.sku ?? '—')}
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={String(drafts[row.id]?.gross_price ?? '')}
+                        onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], gross_price: event.target.value } })}
+                        className="h-9 text-sm tabular-nums"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {assigned.length === 0 ? (
+                        <span className="inline-flex items-center rounded-md bg-ink-wash px-2 py-0.5 text-[0.7rem] text-ink-subtle">
+                          Brak przypisania
+                        </span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {assigned.map((m) => (
+                            <span key={m.id} className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[0.7rem] font-medium text-emerald-800 border border-emerald-200">
+                              <Bike className="size-3" />
+                              {String(m.name).replace('Rexor ', '')}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => patch('parts', row.id, {
+                          name: drafts[row.id]?.name,
+                          group_id: drafts[row.id]?.group_id ? Number(drafts[row.id]?.group_id) : row.group_id,
+                          gross_price: drafts[row.id]?.gross_price,
+                        })}
+                      >
+                        <Save /> Zapisz
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SimpleEditor({ resource, rows, patch, fields }: { resource: string; rows: Row[]; patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>; fields: string[][] }) {
   const [drafts, setDrafts] = useState<Record<number, Row>>(() => Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
@@ -381,22 +679,185 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
     catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się skopiować osprzętu.'); }
   }
 
-  return <div className="grid min-w-0 gap-5">
-    <Panel title="Osprzęt modelu i składniki ceny" description="Cena roweru jest sumą: rama, rozmiar, bateria, wybrane części, składanie i narzut. Nie ma pola z ceną końcową — zmieniasz składniki, cena przelicza się sama.">
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
-        <div className="grid gap-1"><Label htmlFor="equipment-model">Model</Label><NativeSelect id="equipment-model" value={String(modelId)} onChange={(event) => setModelId(Number(event.target.value))}>{catalog.models.map((row) => <NativeSelectOption key={row.id} value={row.id}>{String(row.name)}</NativeSelectOption>)}</NativeSelect></div>
-        <div className="grid gap-1"><Label htmlFor="copy-source">Skopiuj osprzęt z modelu</Label><NativeSelect id="copy-source" value={copySource} onChange={(event) => setCopySource(event.target.value)}><NativeSelectOption value="">wybierz…</NativeSelectOption>{catalog.models.filter((row) => Number(row.id) !== modelId).map((row) => <NativeSelectOption key={row.id} value={row.id}>{String(row.name)}</NativeSelectOption>)}</NativeSelect></div>
-        <Button variant="outline" size="sm" disabled={copySource === ''} onClick={() => void copyParts()}>Skopiuj</Button>
+  return <div className="grid min-w-0 gap-6">
+    {/* 1. MASTER MODEL SELECTOR - Command Header Bar */}
+    <div className="rounded-3xl border border-line bg-gradient-to-br from-[#1b1c19] via-[#141513] to-[#0c0d0b] p-6 text-white shadow-md">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Edytujesz model
+            </span>
+            <span className="text-xs text-white/60">Wybierz rower, aby dostosować jego specyfikację i ceny</span>
+          </div>
+          <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            <Bike className="size-7 text-emerald-400 shrink-0" />
+            <span>{String(model?.name ?? 'Model')}</span>
+          </h2>
+        </div>
+
+        {/* Quick Model Selector Pills */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {catalog.models.map((m) => {
+            const isSelected = Number(m.id) === modelId;
+            const mPricing = catalog.modelPricing?.[String(m.id)];
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  setModelId(Number(m.id));
+                  setCopySource('');
+                }}
+                className={cn(
+                  "group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all cursor-pointer",
+                  isSelected
+                    ? "bg-white text-ink shadow-lg ring-2 ring-white/30"
+                    : "bg-white/10 text-white/80 hover:bg-white/15 hover:text-white border border-white/10"
+                )}
+              >
+                <div className={cn(
+                  "grid size-8 shrink-0 place-items-center rounded-xl transition-colors",
+                  isSelected ? "bg-ink text-white" : "bg-white/10 text-white/70 group-hover:text-white"
+                )}>
+                  <Bike className="size-4" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold leading-tight">{String(m.name)}</div>
+                  <div className={cn("text-xs font-medium mt-0.5", isSelected ? "text-ink-muted" : "text-white/50")}>
+                    {mPricing && mPricing.issues.length === 0 ? `od ${mPricing.grossTotal.toFixed(0)} zł` : 'Wycena'}
+                  </div>
+                </div>
+                {isSelected && (
+                  <span className="ml-1 size-2 rounded-full bg-emerald-500" />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {pricing && <div className="mt-6 grid gap-3 rounded-2xl bg-ink-wash p-4 sm:grid-cols-2 lg:grid-cols-3">
-        {([['Rama', pricing.framePriceGross], ['Bateria domyślna', pricing.batteryPriceGross], ['Części domyślne', pricing.componentsPriceGross], ['Składanie', pricing.assemblyPriceGross], [`Narzut ${pricing.marginPercent}%`, pricing.marginAmountGross]] as Array<[string, number]>).map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"><span className="text-ink-muted">{label}</span><strong className="tabular-nums">{value.toFixed(2)} zł</strong></div>)}
-        <div className="flex items-baseline justify-between gap-3 rounded-xl bg-ink px-3 py-2 text-sm text-white"><span>Cena „od”</span><strong className="tabular-nums">{pricing.issues.length > 0 ? 'wycena' : `${pricing.grossTotal.toFixed(2)} zł`}</strong></div>
-        {pricing.issues.length > 0 && <p className="sm:col-span-2 lg:col-span-3 text-sm text-red-700">{pricing.issues.join(' ')}</p>}
-        {pricing.notes.length > 0 && <p className="sm:col-span-2 lg:col-span-3 text-sm text-ink-muted">{pricing.notes.join(' ')}</p>}
-      </div>}
-    </Panel>
+      {/* Model Action Toolbar: Copy Parts & Quick Context */}
+      <div className="mt-6 flex flex-col gap-3 pt-5 border-t border-white/10 sm:flex-row sm:items-center sm:justify-between text-xs text-white/70">
+        <div className="flex flex-wrap items-center gap-2">
+          <InfoTooltip text="Skopiowanie osprzętu z innego modelu przenosi kompletną konfigurację części, wybory domyślne oraz ewentualne nadpisania cen. Przydatne przy tworzeniu nowego wariantu roweru." />
+          <span>Skopiuj bazowy osprzęt z innego modelu:</span>
+          <div className="flex items-center gap-2">
+            <NativeSelect
+              id="copy-source"
+              value={copySource}
+              onChange={(event) => setCopySource(event.target.value)}
+              className="h-8 bg-white/10 border-white/20 text-white text-xs w-48"
+            >
+              <NativeSelectOption value="" className="text-ink">wybierz model źródłowy…</NativeSelectOption>
+              {catalog.models.filter((row) => Number(row.id) !== modelId).map((row) => (
+                <NativeSelectOption key={row.id} value={row.id} className="text-ink">
+                  {String(row.name)}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={copySource === ''}
+              onClick={() => void copyParts()}
+              className="h-8 border-white/20 bg-white/10 text-white hover:bg-white hover:text-ink text-xs"
+            >
+              <Copy className="size-3.5" /> Skopiuj
+            </Button>
+          </div>
+        </div>
 
+        <div className="flex items-center gap-3">
+          <span className="text-white/60">Przypisanych części w tym modelu: <strong className="text-white font-semibold">{assigned.length}</strong></span>
+        </div>
+      </div>
+    </div>
+
+    {/* 2. PRICING BREAKDOWN CALCULATOR */}
+    {pricing && (
+      <section className="rounded-3xl border border-line bg-white p-5 sm:p-7 shadow-xs">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Calculator className="size-5 text-ink-muted" />
+              <h3 className="text-xl font-semibold tracking-tight text-ink">Kalkulator ceny bazowej („od”)</h3>
+            </div>
+            <p className="mt-1 text-sm text-ink-muted leading-relaxed">
+              Cena roweru nie jest wpisywana ręcznie — wynika bezpośrednio ze składników: <strong>Rama + Bateria domyślna + Części domyślne + Składanie + Narzut</strong>.
+            </p>
+          </div>
+          <span className="text-xs text-ink-muted">Model: <strong>{String(model?.name)}</strong></span>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="flex flex-col justify-between rounded-2xl border border-line/70 bg-[#fafbfa] p-4 text-sm">
+            <div className="flex items-center justify-between text-ink-muted">
+              <span>Rama</span>
+              <InfoTooltip text="Cena surowej ramy zdefiniowana dla tego modelu w zakładce 'Modele i zdjęcia'." />
+            </div>
+            <div className="mt-2 text-lg font-semibold tabular-nums text-ink">{pricing.framePriceGross.toFixed(2)} zł</div>
+          </div>
+
+          <div className="flex flex-col justify-between rounded-2xl border border-line/70 bg-[#fafbfa] p-4 text-sm">
+            <div className="flex items-center justify-between text-ink-muted">
+              <span>Bateria domyślna</span>
+              <InfoTooltip text="Koszt pakietu baterii oznaczonego jako domyślny dla tego modelu w zakładce 'Baterie'." />
+            </div>
+            <div className="mt-2 text-lg font-semibold tabular-nums text-ink">{pricing.batteryPriceGross.toFixed(2)} zł</div>
+          </div>
+
+          <div className="flex flex-col justify-between rounded-2xl border border-line/70 bg-[#fafbfa] p-4 text-sm">
+            <div className="flex items-center justify-between text-ink-muted">
+              <span>Części domyślne</span>
+              <InfoTooltip text="Suma cen wszystkich części oznaczonych jako 'Domyślna' w grupach osprzętu poniżej." />
+            </div>
+            <div className="mt-2 text-lg font-semibold tabular-nums text-ink">{pricing.componentsPriceGross.toFixed(2)} zł</div>
+          </div>
+
+          <div className="flex flex-col justify-between rounded-2xl border border-line/70 bg-[#fafbfa] p-4 text-sm">
+            <div className="flex items-center justify-between text-ink-muted">
+              <span>Składanie</span>
+              <InfoTooltip text="Koszt montażu roweru zdefiniowany dla tego modelu w zakładce 'Modele i zdjęcia'." />
+            </div>
+            <div className="mt-2 text-lg font-semibold tabular-nums text-ink">{pricing.assemblyPriceGross.toFixed(2)} zł</div>
+          </div>
+
+          <div className="flex flex-col justify-between rounded-2xl border border-line/70 bg-[#fafbfa] p-4 text-sm">
+            <div className="flex items-center justify-between text-ink-muted">
+              <span>Narzut {pricing.marginPercent}%</span>
+              <InfoTooltip text="Procentowa marża handlowa wyliczana od sumy składników bazowych." />
+            </div>
+            <div className="mt-2 text-lg font-semibold tabular-nums text-ink">{pricing.marginAmountGross.toFixed(2)} zł</div>
+          </div>
+
+          <div className="flex flex-col justify-between rounded-2xl bg-ink p-4 text-sm text-white shadow-sm">
+            <div className="flex items-center justify-between text-white/80">
+              <span className="font-medium">Cena „od”</span>
+              <InfoTooltip text="Końcowa cena bazowa pokazywana w ofercie i konfiguratorze przed zmianami klienta." />
+            </div>
+            <div className="mt-2 text-xl font-bold tabular-nums text-white">
+              {pricing.issues.length > 0 ? 'Wycena' : `${pricing.grossTotal.toFixed(2)} zł`}
+            </div>
+          </div>
+        </div>
+
+        {pricing.issues.length > 0 && (
+          <div className="mt-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-800 flex items-center gap-2">
+            <Info className="size-4 shrink-0 text-red-600" />
+            <span>{pricing.issues.join(' ')}</span>
+          </div>
+        )}
+        {pricing.notes.length > 0 && (
+          <p className="mt-3 text-xs text-ink-muted">
+            {pricing.notes.join(' ')}
+          </p>
+        )}
+      </section>
+    )}
+
+    {/* 3. PART GROUPS CONFIGURATION */}
     {catalog.partGroups.map((group) => {
       const groupId = Number(group.id);
       const settings = settingsByGroup.get(groupId);
@@ -406,17 +867,64 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
         .map((part) => ({ part, status: fitStatus(part.fit_attributes, requirements), row: assignedByPart.get(Number(part.id)) }))
         .filter((item) => showIncompatible || item.status !== 'conflict' || item.row);
 
-      return <Panel key={group.id} title={String(group.name)} description={mode === 'fixed' ? 'Element stały: nie pokazujemy go jako wyboru, ale jego cena wchodzi do sumy.' : 'Zaznacz części oferowane w tym modelu i wskaż pozycję domyślną — to ona wyznacza cenę „od” i punkt odniesienia dla różnic.'}>
+      return <Panel key={group.id} title={String(group.name)} description={mode === 'fixed' ? 'Element stały: nie jest pokazywany jako wybór dla klienta, ale jego cena wchodzi do sumy.' : 'Zaznacz części oferowane w tym modelu i wskaż pozycję domyślną — to ona wyznacza cenę „od” i punkt odniesienia dla różnic.'}>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
-          <div className="grid gap-1"><Label htmlFor={`mode-${group.id}`}>Tryb grupy</Label><NativeSelect id={`mode-${group.id}`} value={mode} onChange={(event) => void saveGroup(groupId, { selection_mode: event.target.value })}>{selectionModeLabels.map(([value, label]) => <NativeSelectOption key={value} value={value}>{label}</NativeSelectOption>)}</NativeSelect></div>
+          <div className="grid gap-1">
+            <Label htmlFor={`mode-${group.id}`} className="flex items-center gap-1.5 text-xs text-ink-muted">
+              Tryb grupy
+              <InfoTooltip text="Element stały: montowany zawsze (niewidoczny w konfiguratorze jako wybór, ale jego koszt wchodzi w sumę 'od'). Wybór jednej pozycji: klient wybiera jedną z zaznaczonych opcji. Dodatek opcjonalny: klient może wybrać tę część lub z niej zrezygnować." />
+            </Label>
+            <NativeSelect id={`mode-${group.id}`} value={mode} onChange={(event) => void saveGroup(groupId, { selection_mode: event.target.value })}>
+              {selectionModeLabels.map(([value, label]) => <NativeSelectOption key={value} value={value}>{label}</NativeSelectOption>)}
+            </NativeSelect>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Label className="flex items-center gap-2 text-sm"><Switch checked={Boolean(Number(settings?.customer_part_allowed ?? 0))} onCheckedChange={(checked) => void saveGroup(groupId, { customer_part_allowed: checked })} /> Klient może dostarczyć własną część</Label>
-            {Boolean(Number(settings?.customer_part_allowed ?? 0)) && <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`customer-price-${group.id}`}>Wartość rozliczeniowa</Label><Input id={`customer-price-${group.id}`} type="number" step="0.01" defaultValue={String(settings?.customer_part_gross_price ?? 0)} onBlur={(event) => void saveGroup(groupId, { customer_part_gross_price: Number(event.target.value) })} className="w-32" /></div>}
+            <Label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Switch checked={Boolean(Number(settings?.customer_part_allowed ?? 0))} onCheckedChange={(checked) => void saveGroup(groupId, { customer_part_allowed: checked })} />
+              <span className="flex items-center gap-1">
+                Klient może dostarczyć własną część
+                <InfoTooltip text="Włącza w konfiguratorze opcję 'Dostarczam własną część' z określoną wartością rozliczeniową." />
+              </span>
+            </Label>
+            {Boolean(Number(settings?.customer_part_allowed ?? 0)) && <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`customer-price-${group.id}`}>Wartość rozliczeniowa (zł)</Label><Input id={`customer-price-${group.id}`} type="number" step="0.01" defaultValue={String(settings?.customer_part_gross_price ?? 0)} onBlur={(event) => void saveGroup(groupId, { customer_part_gross_price: Number(event.target.value) })} className="w-32" /></div>}
           </div>
         </div>
 
         <Table className="mt-4">
-          <TableHeader><TableRow><TableHead className="w-24">W modelu</TableHead><TableHead>Część</TableHead><TableHead className="w-36">Cena katalogowa</TableHead><TableHead className="w-40">Cena dla modelu</TableHead><TableHead className="w-28">Domyślna</TableHead></TableRow></TableHeader>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-28">
+                <span className="inline-flex items-center gap-1">
+                  W modelu
+                  <InfoTooltip text="Włącza tę część w ofercie tego modelu. Wyłączone części nie będą widoczne w konfiguratorze tego roweru." />
+                </span>
+              </TableHead>
+              <TableHead>
+                <span className="inline-flex items-center gap-1">
+                  Część
+                  <InfoTooltip text="Nazwa części, SKU oraz informacja o zgodności wymiarowej z ramą i silnikiem modelu." />
+                </span>
+              </TableHead>
+              <TableHead className="w-36">
+                <span className="inline-flex items-center gap-1">
+                  Cena katalogowa
+                  <InfoTooltip text="Standardowa cena z globalnego cennika 'Części i ceny'. Zmiana w cenniku ogólnym zaktualizuje tę pozycję." />
+                </span>
+              </TableHead>
+              <TableHead className="w-44">
+                <span className="inline-flex items-center gap-1">
+                  Cena dla modelu
+                  <InfoTooltip text="Opcjonalne nadpisanie ceny wyłącznie dla tego modelu. Jeśli puste, używana jest cena katalogowa." />
+                </span>
+              </TableHead>
+              <TableHead className="w-28">
+                <span className="inline-flex items-center gap-1">
+                  Domyślna
+                  <InfoTooltip text="Pozycja bazowa wliczona w cenę 'od'. W konfiguratorze inne części pokazują dopłatę (+X zł) lub upust (-X zł) względem tej pozycji." />
+                </span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
           <TableBody>
             {candidates.length === 0 && <TableRow><TableCell colSpan={5} className="text-sm text-ink-muted">Brak części w tej grupie.</TableCell></TableRow>}
             {candidates.map(({ part, status, row }) => {
@@ -434,13 +942,21 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
       </Panel>;
     })}
 
+    {/* 4. SIZES & DISCOUNTS */}
     <Panel title="Rozmiary i dopłaty" description="Rozmiar może mieć własną dopłatę, jeśli rama w danym rozmiarze kosztuje więcej.">
-      <Table><TableHeader><TableRow><TableHead>Rozmiar</TableHead><TableHead className="w-40">Dopłata brutto</TableHead><TableHead className="w-28">Akcja</TableHead></TableRow></TableHeader><TableBody>
+      <Table><TableHeader><TableRow><TableHead>Rozmiar</TableHead><TableHead className="w-40">Dopłata brutto (zł)</TableHead><TableHead className="w-28">Akcja</TableHead></TableRow></TableHeader><TableBody>
         {catalog.modelSizes.filter((row) => Number(row.model_id) === modelId).map((row) => <SizeRow key={row.id} row={row} patch={patch} />)}
       </TableBody></Table>
     </Panel>
 
-    <Label className="flex items-center gap-2 text-sm text-ink-muted"><Switch checked={showIncompatible} onCheckedChange={setShowIncompatible} /> Pokaż też części niezgodne z wymaganiami modelu</Label>
+    {/* Compatibility Switcher */}
+    <div className="flex items-center justify-between rounded-2xl border border-line bg-white p-4">
+      <Label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+        <Switch checked={showIncompatible} onCheckedChange={setShowIncompatible} />
+        <span>Pokaż też części niezgodne z wymaganiami technicznymi modelu</span>
+      </Label>
+      <span className="text-xs text-ink-muted">Zgodność sprawdzana wg wymiarów ramy i silnika</span>
+    </div>
   </div>;
 }
 

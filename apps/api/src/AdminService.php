@@ -47,7 +47,7 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
     $definitions = [
         'categories' => ['table' => 'bike_categories', 'fields' => ['name', 'short_description', 'description_html', 'default_image_path', 'is_published', 'sort_order']],
         'models' => ['table' => 'bike_models', 'fields' => ['category_id', 'name', 'short_description', 'description_html', 'frame_price_gross', 'assembly_price_gross', 'margin_percent', 'default_image_path', 'status', 'sort_order']],
-        'parts' => ['table' => 'parts', 'fields' => ['name', 'description', 'gross_price', 'price_status', 'image_path', 'is_active']],
+        'parts' => ['table' => 'parts', 'fields' => ['name', 'group_id', 'description', 'gross_price', 'price_status', 'image_path', 'is_active']],
         'sizes' => ['table' => 'model_sizes', 'fields' => ['label', 'price_delta_gross', 'sort_order', 'is_active']],
         'pages' => ['table' => 'site_pages', 'fields' => ['title', 'navigation_label', 'excerpt', 'content_html', 'hero_image_path', 'is_published']],
     ];
