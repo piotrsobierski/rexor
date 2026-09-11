@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
-import { CUSTOMER_SUPPLIED_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
+import { CUSTOMER_SUPPLIED_SKU, NONE_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
 import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/pricing';
@@ -26,7 +26,7 @@ const formatEnergy = (wh: number) => `${new Intl.NumberFormat('pl-PL', { maximum
 // Grupa bez pozycji katalogowej, ale z dopuszczoną częścią klienta (np. damper
 // E55 w jedynym zgodnym wymiarze) startuje z wyborem „własna część”.
 const initialSelections = (model: BikeModel): Selections => Object.fromEntries(model.groups
-  .map((group) => [group.slug, group.defaultSku ?? (group.customerPartAllowed ? CUSTOMER_SUPPLIED_SKU : null)] as const)
+  .map((group) => [group.slug, group.defaultSku ?? (group.customerPartAllowed ? CUSTOMER_SUPPLIED_SKU : (group.selectionMode === 'optional' ? NONE_SKU : null))] as const)
   .filter((entry): entry is readonly [string, string] => entry[1] !== null));
 const modelSlugs: Record<BikeModel['id'], string> = { e82: 'e82-wielichowo', e55: 'e55-reference', cfr707: 'cfr707' };
 const defaultSizeCode = (model: BikeModel): string =>
@@ -40,8 +40,11 @@ function groupChoices(group: OptionGroup) {
   const catalogChoices = group.options
     .filter((option) => option.configurable || option.isDefault)
     .map((option) => ({ sku: option.sku, name: option.name, detail: option.detail, price: option.price, imagePath: publicMediaUrl(option.imagePath), customerSupplied: false }));
-  if (!group.customerPartAllowed) return catalogChoices;
-  return [...catalogChoices, {
+  const withNoneChoice = group.selectionMode === 'optional'
+    ? [{ sku: NONE_SKU, name: 'Bez dodatku', detail: 'Nie dodawaj tego elementu.', price: 0, imagePath: '', customerSupplied: false }, ...catalogChoices]
+    : catalogChoices;
+  if (!group.customerPartAllowed) return withNoneChoice;
+  return [...withNoneChoice, {
     sku: CUSTOMER_SUPPLIED_SKU,
     name: group.customerPartLabel,
     detail: 'Zgodność potwierdzi Rexor',
@@ -211,7 +214,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
       // Wysyłamy tylko wybory klienta. Elementy stałe i cena wynikają z bazy,
       // więc konfigurator nie przekazuje żadnej kwoty.
       const selectionsPayload = Object.fromEntries(model.groups
-        .filter((group) => group.selectionMode !== 'fixed' && selections[group.slug])
+        .filter((group) => group.selectionMode !== 'fixed' && selections[group.slug] && selections[group.slug] !== NONE_SKU)
         .map((group) => [group.slug, selections[group.slug]]));
       const response = await fetch(`${API_BASE}/configurations`, {
         method: 'POST',
@@ -371,7 +374,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                       <span className="flex flex-wrap items-center gap-2 font-semibold">{choice.name}{choice.customerSupplied && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-muted">Twoja część</span>}</span>
                       <span className="mt-0.5 block text-sm text-ink-muted">{choice.detail}</span>
                     </span>
-                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{delta === null ? 'wycena' : delta === 0 ? 'w cenie' : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span>
+                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{choice.sku === NONE_SKU ? '—' : delta === null ? 'wycena' : delta === 0 ? 'w cenie' : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span>
                   </label>; })}
                 </RadioGroup>
               </section>;

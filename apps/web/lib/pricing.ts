@@ -1,10 +1,11 @@
-import { CUSTOMER_SUPPLIED_SKU, type BikeBattery, type BikeModel, type BikeSize, type OptionGroup } from '@/lib/catalog';
+import { CUSTOMER_SUPPLIED_SKU, NONE_SKU, type BikeBattery, type BikeModel, type BikeSize, type OptionGroup } from '@/lib/catalog';
 
 export type Selections = Record<string, string>;
 
 /** Pozycja rozliczana w grupie: wybór klienta albo pozycja domyślna. */
 function selectedOption(group: OptionGroup, selections: Selections) {
   const requested = group.selectionMode === 'fixed' ? group.defaultSku : (selections[group.slug] ?? group.defaultSku);
+  if (requested === NONE_SKU) return null;
   if (requested === CUSTOMER_SUPPLIED_SKU) {
     return { name: group.customerPartLabel, price: group.customerPartGrossPrice, customerSupplied: true as const };
   }

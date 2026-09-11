@@ -6,6 +6,8 @@
  */
 
 export const CUSTOMER_SUPPLIED_SKU = '__customer_supplied__';
+/** Wybór "bez dodatku" w grupie opcjonalnej - istnieje tylko w UI, nigdy nie trafia do API. */
+export const NONE_SKU = '__none__';
 
 export type BikeOption = {
   sku: string;
