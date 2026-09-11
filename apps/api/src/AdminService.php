@@ -9,8 +9,7 @@ function loginAdmin(PDO $pdo, array $input): array
     $statement = $pdo->prepare('SELECT * FROM admin_users WHERE email = :email AND is_active = TRUE');
     $statement->execute(['email' => $email]);
     $user = $statement->fetch();
-    // TODO: dev-only bypass — password check disabled, re-enable password_verify() before deploying anywhere reachable.
-    if (!$user) {
+    if (!$user || !password_verify($password, $user['password_hash'])) {
         throw new RuntimeException('Nieprawidłowy e-mail lub hasło.', 401);
     }
     $token = randomToken();
