@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { CUSTOMER_SUPPLIED_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
+import { publicMediaUrl } from '@/lib/catalog-merge';
 import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
 import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/pricing';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
@@ -38,13 +39,14 @@ const defaultSizeCode = (model: BikeModel): string =>
 function groupChoices(group: OptionGroup) {
   const catalogChoices = group.options
     .filter((option) => option.configurable || option.isDefault)
-    .map((option) => ({ sku: option.sku, name: option.name, detail: option.detail, price: option.price, customerSupplied: false }));
+    .map((option) => ({ sku: option.sku, name: option.name, detail: option.detail, price: option.price, imagePath: publicMediaUrl(option.imagePath), customerSupplied: false }));
   if (!group.customerPartAllowed) return catalogChoices;
   return [...catalogChoices, {
     sku: CUSTOMER_SUPPLIED_SKU,
     name: group.customerPartLabel,
     detail: 'Zgodność potwierdzi Rexor',
     price: group.customerPartGrossPrice,
+    imagePath: '',
     customerSupplied: true,
   }];
 }
@@ -363,6 +365,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                   {choices.map((choice) => { const selected = selections[group.slug] === choice.sku; const delta = choice.price === null ? null : choice.price - defaultPrice; return <label key={choice.sku} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}>
                     <RadioGroupItem value={choice.sku} className="choice-input" />
                     <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>
+                    {choice.imagePath && <img src={choice.imagePath} alt="" className="size-10 shrink-0 rounded-lg border border-line bg-white object-contain" />}
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2 font-semibold">{choice.name}{choice.customerSupplied && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-muted">Twoja część</span>}</span>
                       <span className="mt-0.5 block text-sm text-ink-muted">{choice.detail}</span>
