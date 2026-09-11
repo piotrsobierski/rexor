@@ -1,7 +1,7 @@
 import { BikeModelPage, CategoryPage } from '@/components/static-pages';
 import { fetchCatalog } from '@/lib/server-catalog';
 
-const knownModelSlugs = ['e82', 'e55', 'cfr707', 'e82-wielichowo', 'e55-reference'];
+const knownModelSlugs = ['e82', 'e55', 'cfr707'];
 
 export function generateStaticParams() {
   return [

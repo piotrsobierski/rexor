@@ -41,7 +41,7 @@ const formatEnergy = (wh: number) => `${new Intl.NumberFormat('pl-PL', { maximum
 const initialSelections = (model: BikeModel): Selections => Object.fromEntries(model.groups
   .map((group) => [group.slug, group.defaultSku ?? (group.customerPartAllowed ? CUSTOMER_SUPPLIED_SKU : (group.selectionMode === 'optional' ? NONE_SKU : null))] as const)
   .filter((entry): entry is readonly [string, string] => entry[1] !== null));
-const modelSlugs: Record<BikeModel['id'], string> = { e82: 'e82-wielichowo', e55: 'e55-reference', cfr707: 'cfr707' };
+const modelSlugs: Record<BikeModel['id'], string> = { e82: 'e82', e55: 'e55', cfr707: 'cfr707' };
 const defaultSizeCode = (model: BikeModel): string =>
   (model.sizes.find((item) => item.code === 'M') ?? model.sizes[0])?.code ?? '';
 

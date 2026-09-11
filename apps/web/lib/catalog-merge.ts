@@ -1,7 +1,7 @@
 import { bikeModels, type BikeBattery, type BikeModel, type BikeSize, type OptionGroup } from '@/lib/catalog';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
-const idsBySlug: Record<string, BikeModel['id']> = { 'e82-wielichowo': 'e82', 'e55-reference': 'e55', cfr707: 'cfr707' };
+const idsBySlug: Record<string, BikeModel['id']> = { e82: 'e82', e55: 'e55', cfr707: 'cfr707' };
 
 export type PublicCategory = { slug: string; name: string; short_description: string | null; description_html: string | null; default_image_path: string | null };
 
