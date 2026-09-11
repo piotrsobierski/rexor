@@ -9,9 +9,24 @@ declare(strict_types=1);
  * Wykonanie:           php scripts/migrate.php --apply
  */
 
+function output(string $message): void
+{
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDOUT, $message);
+    } else {
+        echo $message;
+    }
+}
+
 function fail(string $message): never
 {
-    fwrite(STDERR, "BŁĄD: {$message}\n");
+    $line = "BŁĄD: {$message}\n";
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, $line);
+    } else {
+        http_response_code(500);
+        echo $line;
+    }
     exit(1);
 }
 
@@ -52,9 +67,12 @@ function loadEnvFile(string $path): void
     }
 }
 
-function migrationFiles(string $root): array
+function migrationFiles(string $root, bool $includeInitialSeed = false): array
 {
     $files = [$root . '/database/schema.sql'];
+    if ($includeInitialSeed) {
+        $files[] = $root . '/database/seed.sql';
+    }
     $additional = glob($root . '/database/migrations/*.sql') ?: [];
     sort($additional, SORT_STRING);
 
@@ -63,14 +81,16 @@ function migrationFiles(string $root): array
 
 function migrationVersion(string $path): string
 {
-    return basename($path) === 'schema.sql'
-        ? '000_base_schema'
-        : pathinfo($path, PATHINFO_FILENAME);
+    return match (basename($path)) {
+        'schema.sql' => '000_base_schema',
+        'seed.sql' => '000_initial_seed',
+        default => pathinfo($path, PATHINFO_FILENAME),
+    };
 }
 
-function main(array $argv): int
+function runMigrations(array $argv, bool $allowHttp = false): int
 {
-    if (PHP_SAPI !== 'cli') {
+    if (PHP_SAPI !== 'cli' && !$allowHttp) {
         fail('Migracje można uruchamiać wyłącznie z CLI.');
     }
 
@@ -78,9 +98,10 @@ function main(array $argv): int
     loadEnvFile($root . '/.env');
 
     $apply = in_array('--apply', $argv, true);
+    $includeInitialSeed = in_array('--bootstrap-seed', $argv, true);
     $unknown = array_values(array_filter(
         array_slice($argv, 1),
-        static fn (string $arg): bool => $arg !== '--apply'
+        static fn (string $arg): bool => !in_array($arg, ['--apply', '--bootstrap-seed'], true)
     ));
     if ($unknown !== []) {
         fail('Nieznane argumenty: ' . implode(', ', $unknown));
@@ -137,7 +158,7 @@ function main(array $argv): int
         }
 
         $pending = [];
-        foreach (migrationFiles($root) as $path) {
+        foreach (migrationFiles($root, $includeInitialSeed) as $path) {
             if (!is_file($path)) {
                 fail("Brak pliku migracji: {$path}");
             }
@@ -159,17 +180,17 @@ function main(array $argv): int
         }
 
         if ($pending === []) {
-            fwrite(STDOUT, "Baza jest aktualna.\n");
+            output("Baza jest aktualna.\n");
             return 0;
         }
 
-        fwrite(STDOUT, ($apply ? 'Migracje do wykonania:' : 'Podgląd migracji:') . "\n");
+        output(($apply ? 'Migracje do wykonania:' : 'Podgląd migracji:') . "\n");
         foreach ($pending as $migration) {
-            fwrite(STDOUT, " - {$migration['version']}\n");
+            output(" - {$migration['version']}\n");
         }
 
         if (!$apply) {
-            fwrite(STDOUT, "Nie zmieniono bazy. Użyj --apply po sprawdzeniu backupu i listy migracji.\n");
+            output("Nie zmieniono bazy. Użyj --apply po sprawdzeniu backupu i listy migracji.\n");
             return 0;
         }
 
@@ -182,7 +203,7 @@ function main(array $argv): int
                 fail("Pusta lub nieczytelna migracja: {$migration['path']}");
             }
 
-            fwrite(STDOUT, "Wykonuję {$migration['version']}...\n");
+            output("Wykonuję {$migration['version']}...\n");
             $pdo->exec($sql);
             $record->execute([
                 'version' => $migration['version'],
@@ -190,7 +211,7 @@ function main(array $argv): int
             ]);
         }
 
-        fwrite(STDOUT, "Migracje zakończone poprawnie.\n");
+        output("Migracje zakończone poprawnie.\n");
         return 0;
     } finally {
         $release = $pdo->prepare('SELECT RELEASE_LOCK(:name)');
@@ -198,4 +219,6 @@ function main(array $argv): int
     }
 }
 
-exit(main($argv));
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    exit(runMigrations($argv));
+}
