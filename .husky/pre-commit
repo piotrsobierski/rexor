@@ -1,0 +1,21 @@
+staged_web_files=$(git diff --cached --name-only --diff-filter=ACM -- apps/web)
+
+if [ -n "$staged_web_files" ]; then
+  lint_output=$(cd apps/web && npm run lint 2>&1 || true)
+
+  # Block only on the "undefined variable/name" class of bug (e.g. TS2304,
+  # TS2552, no-undef). The full rule set (a11y, deprecated APIs, etc.) is
+  # still enforced by `npm run lint` manually / in CI, but is too noisy to
+  # gate every commit on.
+  crashers=$(echo "$lint_output" | grep -E "typescript\(TS2304\)|typescript\(TS2552\)|eslint\(no-undef\)" || true)
+
+  if [ -n "$crashers" ]; then
+    echo "Pre-commit lint found undefined-variable errors in apps/web:"
+    echo "$crashers"
+    echo ""
+    echo "Run 'cd apps/web && npm run lint' for the full report."
+    exit 1
+  fi
+fi
+
+exit 0

@@ -1,0 +1,100 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background); --color-foreground: var(--foreground); --font-sans: var(--font-geist-sans); --font-mono: var(--font-geist-mono); --font-heading: var(--font-geist-sans);
+  --color-ring: var(--ring); --color-input: var(--input); --color-border: var(--border); --color-destructive: var(--destructive); --color-muted-foreground: var(--muted-foreground); --color-muted: var(--muted); --color-primary-foreground: var(--primary-foreground); --color-primary: var(--primary); --color-card-foreground: var(--card-foreground); --color-card: var(--card);
+  --color-ink: var(--ink); --color-ink-muted: var(--ink-muted); --color-ink-subtle: var(--ink-subtle); --color-ink-wash: var(--ink-wash); --color-line: var(--line); --color-line-strong: var(--line-strong); --color-surface: var(--surface); --color-stage: var(--stage); --color-brand: var(--accent-brand); --color-brand-foreground: var(--accent-brand-foreground);
+  --radius-sm: calc(var(--radius) * 0.6); --radius-md: calc(var(--radius) * 0.8); --radius-lg: var(--radius); --radius-xl: calc(var(--radius) * 1.4); --radius-2xl: calc(var(--radius) * 1.8); --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+:root {
+  --background: #f8f9f6; --foreground: #171817; --card: #ffffff; --card-foreground: #171817; --primary: #171817; --primary-foreground: #ffffff; --muted: #eff1ed; --muted-foreground: #5d625c;
+  --accent-brand: #d9ff43; --accent-brand-foreground: #111111; --destructive: oklch(0.58 0.22 27); --border: #dfe2dc; --input: #dfe2dc; --ring: #8fae13; --radius: 0.75rem;
+
+  /* Tekst: trzy poziomy, wszystkie z kontrastem co najmniej 4.5:1 na jasnym tle. */
+  --ink: #171817; --ink-muted: #555a54; --ink-subtle: #6d726b; --ink-wash: #f1f3ef;
+  /* Linie i powierzchnie. */
+  --line: #e2e5df; --line-strong: #c7ccc3; --surface: #ffffff; --stage: #f1f2f0;
+  /* Rytm sceny ze zdjęciem modelu. */
+  --stage-ratio: 3 / 2;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; background: var(--background); color: var(--foreground); }
+button, a, input { -webkit-tap-highlight-color: transparent; }
+
+@layer components {
+  .nav-link { @apply relative py-2 text-ink-muted transition-colors hover:text-ink; }
+  .nav-link::after { content: ''; @apply absolute bottom-0 left-0 h-px w-0 bg-ink transition-all duration-300; }
+  .nav-link:hover::after { @apply w-full; }
+  .eyebrow { @apply text-xs font-bold uppercase tracking-[0.16em] text-ink-subtle; }
+
+  /* Wspólny pierścień focusu dla elementów sterujących budowanych z etykiet. */
+  .focus-ring:has(:focus-visible), .focus-ring:focus-visible { @apply outline-2 outline-offset-2 outline-ring; }
+
+  /* Natywne pole formularza chowane pod własną prezentacją.
+     Świadomie bez @apply i z !important: klasy narzędziowe przegrywały tu
+     z bazowymi klasami komponentu shadcn scalanymi przez tailwind-merge. */
+  .choice-input {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0 !important;
+    background: transparent !important;
+  }
+  .choice-input > * { display: none !important; }
+
+  /* Kafel wyboru: model w konfiguratorze, model na liście, kategoria. */
+  .pick-card { @apply relative flex cursor-pointer flex-col rounded-2xl border border-line bg-surface p-4 text-left transition-all duration-200 hover:border-line-strong hover:shadow-[0_8px_28px_rgba(0,0,0,0.07)]; }
+  .pick-card-active { @apply border-ink shadow-[0_8px_28px_rgba(0,0,0,0.08)]; }
+  /* Powiększa obszar klikalny przycisku na całą powierzchnię kafla,
+     bez zagnieżdżania elementów interaktywnych w sobie. */
+  .pick-card-hit::after { content: ''; @apply absolute inset-0 z-10 rounded-[inherit]; }
+
+  /* Scena zdjęcia modelu. */
+  .stage-card { @apply flex flex-col overflow-hidden rounded-[28px] border border-line bg-stage; }
+  .stage-media { @apply relative grid w-full place-items-center; aspect-ratio: var(--stage-ratio); }
+  .stage-media img { @apply mx-auto max-h-full max-w-full object-contain mix-blend-multiply; }
+  .stage-bar { @apply flex flex-wrap items-center gap-x-4 gap-y-2 bg-surface px-5 py-4 sm:px-7; }
+
+  .spec-pill { @apply flex items-center gap-2 rounded-full border border-line bg-ink-wash px-3 py-2 text-xs font-semibold text-ink; }
+  .spec-pill svg { @apply size-4; }
+
+  .config-section { @apply border-b border-line py-7; }
+  .section-heading { @apply mb-4; }
+  .section-heading > div { @apply flex items-center gap-3; }
+  .section-heading span { @apply font-mono text-xs font-semibold text-ink-subtle; }
+  .section-heading h3 { @apply text-lg font-semibold tracking-tight; }
+  .section-heading p { @apply mt-1.5 text-sm leading-relaxed text-ink-muted; }
+
+  .size-choice { @apply relative flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-line bg-surface text-center text-base font-semibold leading-none transition-all hover:border-line-strong; }
+  .size-choice-active { @apply border-ink bg-ink text-white; }
+  .option-choice { @apply relative flex min-h-[70px] cursor-pointer items-center gap-3 rounded-2xl border border-line px-3.5 py-3 transition-all hover:border-line-strong; }
+  .option-choice-active { @apply border-ink bg-ink-wash; }
+  .choice-indicator { @apply grid size-5 shrink-0 place-items-center rounded-full border border-line-strong; }
+  .choice-indicator-active { @apply border-ink bg-ink text-white; }
+
+  .rich-content { @apply text-base leading-8 text-ink-muted; }
+  .rich-content h2 { @apply mb-5 text-3xl font-semibold leading-tight tracking-[-0.04em] text-ink sm:text-4xl; }
+  .rich-content h3 { @apply mb-3 mt-10 text-xl font-semibold tracking-tight text-ink; }
+  .rich-content p { @apply mb-5; }
+  .rich-content ul, .rich-content ol { @apply my-5 space-y-2 pl-5; }
+  .rich-content li { @apply list-disc pl-2; }
+  .rich-content img { @apply my-8 h-auto max-w-full rounded-3xl; }
+  .rich-content a { @apply font-medium underline underline-offset-4; }
+}
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

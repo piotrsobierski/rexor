@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+!.env.local.example
+!.env.production.example
+node_modules/
+vendor/
+dist/
+coverage/
+*.log
+storage/backups/*
+!storage/backups/.gitkeep
+storage/media/*
+!storage/media/.gitkeep
