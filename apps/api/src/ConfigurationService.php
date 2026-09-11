@@ -114,6 +114,7 @@ function createConfiguration(PDO $pdo, array $input): array
             'marginPercent' => $pricing['marginPercent'],
             'marginAmountGross' => $pricing['marginAmountGross'],
             'adjustments' => $pricing['adjustments'],
+            'notes' => $pricing['notes'],
         ],
         'basePriceGross' => $basePrice,
         'grossTotal' => $grossTotal,

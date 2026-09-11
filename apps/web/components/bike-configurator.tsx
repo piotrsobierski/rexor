@@ -21,8 +21,11 @@ type ContactForm = { customerName: string; customerEmail: string; customerPhone:
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 const defaultBatteryCode = (model: BikeModel): string => (model.batteries.find((item) => item.isDefault) ?? model.batteries[0])?.code ?? '';
 const formatEnergy = (wh: number) => `${new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 1 }).format(wh)} Wh`;
-const initialSelections = (model: BikeModel): Selections =>
-  Object.fromEntries(model.groups.filter((group) => group.defaultSku !== null).map((group) => [group.slug, group.defaultSku as string]));
+// Grupa bez pozycji katalogowej, ale z dopuszczoną częścią klienta (np. damper
+// E55 w jedynym zgodnym wymiarze) startuje z wyborem „własna część”.
+const initialSelections = (model: BikeModel): Selections => Object.fromEntries(model.groups
+  .map((group) => [group.slug, group.defaultSku ?? (group.customerPartAllowed ? CUSTOMER_SUPPLIED_SKU : null)] as const)
+  .filter((entry): entry is readonly [string, string] => entry[1] !== null));
 const modelSlugs: Record<BikeModel['id'], string> = { e82: 'e82-wielichowo', e55: 'e55-reference', cfr707: 'cfr707' };
 const defaultSizeCode = (model: BikeModel): string =>
   (model.sizes.find((item) => item.code === 'M') ?? model.sizes[0])?.code ?? '';

@@ -146,6 +146,7 @@ function priceConfiguration(array $model, array $groups, ?array $size, ?array $b
 {
     $lines = [];
     $issues = [];
+    $notes = [];
     $componentsTotal = 0.0;
 
     $framePrice = (float) $model['frame_price_gross'];
@@ -228,7 +229,10 @@ function priceConfiguration(array $model, array $groups, ?array $size, ?array $b
     $adjustments = [];
     foreach ($model['adjustments'] ?? [] as $adjustment) {
         if ($adjustment['adjustment_type'] === 'quote') {
-            $issues[] = "{$adjustment['name']} wymaga indywidualnej wyceny.";
+            // Warunek do ustalenia nie blokuje wyceny roweru: cena składników
+            // jest znana, a ten punkt obsługa potwierdza z klientem. Wycenę
+            // blokuje tylko brak ceny wybranej pozycji.
+            $notes[] = "{$adjustment['name']} wymaga ustalenia z obsługą.";
             $adjustments[] = ['code' => $adjustment['code'], 'name' => $adjustment['name'], 'type' => 'quote', 'amount' => null];
             continue;
         }
@@ -250,6 +254,7 @@ function priceConfiguration(array $model, array $groups, ?array $size, ?array $b
         'adjustments' => $adjustments,
         'grossTotal' => $total,
         'issues' => $issues,
+        'notes' => $notes,
     ];
 }
 

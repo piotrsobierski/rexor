@@ -17,7 +17,7 @@ type MediaRow = { model_id: number; media_id: number; role: string; storage_path
 type ModelPartRow = { model_id: number; part_id: number; group_id: number; group_slug: string; is_default: number | boolean; is_customer_configurable: number | boolean; customer_supplied_allowed: number | boolean; customer_supplied_gross_price: string | number; gross_price_override: string | number | null; sort_order: number; notes: string | null };
 type GroupSettingsRow = { model_id: number; group_id: number; group_slug: string; selection_mode: string; customer_part_allowed: number | boolean; customer_part_gross_price: string | number; customer_part_label: string; helper_text: string | null };
 type PricingLine = { groupSlug: string; groupName: string; name: string; grossPrice: number };
-type ModelPricing = { modelId: number; framePriceGross: number; batteryPriceGross: number; componentsPriceGross: number; assemblyPriceGross: number; marginPercent: number; marginAmountGross: number; grossTotal: number; issues: string[]; lines: PricingLine[] };
+type ModelPricing = { modelId: number; framePriceGross: number; batteryPriceGross: number; componentsPriceGross: number; assemblyPriceGross: number; marginPercent: number; marginAmountGross: number; grossTotal: number; issues: string[]; notes: string[]; lines: PricingLine[] };
 type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string> };
 
 export function AdminPanel() {
@@ -279,6 +279,7 @@ function ModelEquipmentEditor({ catalog, patch, request, reload, setMessage }: {
         {([['Rama', pricing.framePriceGross], ['Bateria domyślna', pricing.batteryPriceGross], ['Części domyślne', pricing.componentsPriceGross], ['Składanie', pricing.assemblyPriceGross], [`Narzut ${pricing.marginPercent}%`, pricing.marginAmountGross]] as Array<[string, number]>).map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"><span className="text-ink-muted">{label}</span><strong className="tabular-nums">{value.toFixed(2)} zł</strong></div>)}
         <div className="flex items-baseline justify-between gap-3 rounded-xl bg-ink px-3 py-2 text-sm text-white"><span>Cena „od”</span><strong className="tabular-nums">{pricing.issues.length > 0 ? 'wycena' : `${pricing.grossTotal.toFixed(2)} zł`}</strong></div>
         {pricing.issues.length > 0 && <p className="sm:col-span-2 lg:col-span-3 text-sm text-red-700">{pricing.issues.join(' ')}</p>}
+        {pricing.notes.length > 0 && <p className="sm:col-span-2 lg:col-span-3 text-sm text-ink-muted">{pricing.notes.join(' ')}</p>}
       </div>}
     </Panel>
 

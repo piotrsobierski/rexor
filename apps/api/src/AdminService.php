@@ -383,6 +383,7 @@ function adminModelPricing(PDO $pdo): array
             'adjustments' => $result['adjustments'],
             'grossTotal' => $result['grossTotal'],
             'issues' => $result['issues'],
+            'notes' => $result['notes'],
             'lines' => array_map(static fn (array $line): array => [
                 'groupSlug' => $line['groupSlug'],
                 'groupName' => $line['groupName'],
