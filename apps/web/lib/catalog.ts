@@ -33,6 +33,8 @@ export type BikeModel = {
   description: string;
   image: string;
   gallery: string[];
+  /** Zdjęcie ramy na stronie /ramy. Domyślnie gallery[1] nie zawsze pokazuje całą ramę. */
+  frameImage?: string;
   basePrice: number | null;
   motor: string;
   battery: string;
@@ -120,7 +122,7 @@ export const bikeModels: BikeModel[] = [
   {
     id: 'e55', name: 'Rexor E55', category: 'MTB', eyebrow: 'Mocny e-MTB',
     description: 'Karbonowa rama pod M620, duży pakiet 14S4P i konfiguracja przygotowana do cięższych tras.',
-    image: '/models/e55/01.jpg', gallery: ['/models/e55/01.jpg', '/models/e55/02.jpg', '/models/e55/03.jpg', '/models/e55/04.jpg'],
+    image: '/models/e55/01.jpg', gallery: ['/models/e55/01.jpg', '/models/e55/02.jpg', '/models/e55/03.jpg', '/models/e55/04.jpg'], frameImage: '/models/e55/01.jpg',
     basePrice: 16500, motor: 'Bafang M620 · CAN', battery: 'FEB 21700 · 14S4P · 1310,4 Wh', sizes: ['M', 'L'],
     batteries: [
       { code: 'e55-1310wh', name: 'FEB 21700 14S4P', shortLabel: '21700 · 14S4P · 1310,4 Wh', energyWh: 1310.4, capacityAh: 26, grossPrice: 3000, isDefault: true },

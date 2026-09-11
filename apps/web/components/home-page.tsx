@@ -1,4 +1,4 @@
-import { ArrowRight, Bike, CircleGauge, Map, Mountain, Route, Wrench } from 'lucide-react';
+import { ArrowRight, Bike, Map, Mountain, Route, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
@@ -10,7 +10,6 @@ const categories = [
   { slug: 'gravel', name: 'Gravel', description: 'Asfalt, szuter, wyprawa', icon: Map, empty: false },
   { slug: 'mtb', name: 'MTB', description: 'Kontrola poza asfaltem', icon: Mountain, empty: false },
   { slug: 'miejski-turystyczny', name: 'Miejski i turystyczny', description: 'Komfort każdego dnia', icon: Bike, empty: true },
-  { slug: 'rower-elektryczny', name: 'E-bike', description: 'Napęd dopasowany do ramy', icon: CircleGauge, empty: false },
 ];
 
 export function HomePage() {
@@ -19,7 +18,7 @@ export function HomePage() {
     const stored = apiCategories.find((item) => item.slug === fallback.slug);
     return { ...fallback, name: stored?.name ?? fallback.name, description: stored?.short_description ?? fallback.description };
   });
-  return <div className="min-h-screen bg-background text-foreground"><SiteHeader /><main>
+  return <div className="flex min-h-screen flex-col bg-background text-foreground"><SiteHeader /><main className="flex-1">
     <section className="mx-auto max-w-[1480px] px-4 pb-7 pt-10 sm:px-8 sm:pb-10 sm:pt-14 lg:px-12">
       <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
         <div><p className="eyebrow">Rexor bikes</p><h1 className="mt-3 max-w-3xl text-[clamp(2.8rem,7vw,6.8rem)] font-semibold leading-[0.88] tracking-[-0.065em]">Zbudowany dla Twojej trasy.</h1></div>
@@ -30,7 +29,7 @@ export function HomePage() {
     <section className="mx-auto max-w-[1480px] px-4 sm:px-8 lg:px-12">
       <div className="overflow-hidden rounded-[30px] border border-line bg-white">
         <div className="no-scrollbar flex snap-x overflow-x-auto">
-          {visibleCategories.map(({ name, description, icon: Icon, empty }) => <a key={name} href={empty ? '/rowery' : name === 'MTB' || name === 'E-bike' ? '/konfigurator' : '/rowery'} className="group flex min-w-[58vw] snap-start flex-col border-r border-line p-5 last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1 lg:p-6"><div className="grid size-11 place-items-center rounded-full bg-ink-wash transition-colors group-hover:bg-[var(--accent-brand)]"><Icon className="size-5" /></div><strong className="mt-10 text-lg tracking-tight">{name}</strong><span className="mt-1 text-sm text-ink-muted">{description}</span>{empty && <span className="mt-4 w-fit rounded-full bg-ink-wash px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-ink-subtle">W przygotowaniu</span>}</a>)}
+          {visibleCategories.map(({ name, description, icon: Icon, empty }) => <a key={name} href={empty ? '/rowery' : name === 'MTB' ? '/konfigurator' : '/rowery'} className="group flex min-w-[58vw] snap-start flex-col border-r border-line p-5 last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1 lg:p-6"><div className="grid size-11 place-items-center rounded-full bg-ink-wash transition-colors group-hover:bg-[var(--accent-brand)]"><Icon className="size-5" /></div><strong className="mt-10 text-lg tracking-tight">{name}</strong><span className="mt-1 text-sm text-ink-muted">{description}</span>{empty && <span className="mt-4 w-fit rounded-full bg-ink-wash px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-ink-subtle">W przygotowaniu</span>}</a>)}
         </div>
       </div>
     </section>

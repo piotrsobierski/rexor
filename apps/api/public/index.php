@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/src/bootstrap.php';
+require dirname(__DIR__) . '/src/PricingService.php';
 require dirname(__DIR__) . '/src/ConfigurationService.php';
 require dirname(__DIR__) . '/src/AdminService.php';
 require dirname(__DIR__) . '/src/CatalogService.php';
@@ -13,7 +14,7 @@ if (($_SERVER['HTTP_ORIGIN'] ?? '') === $allowedOrigin) {
     header('Vary: Origin');
 }
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
-header('Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 
@@ -80,9 +81,32 @@ if ($method === 'GET' && $path === '/admin/catalog') {
     jsonResponse(adminCatalog($pdo));
 }
 
-if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts)/(\d+)$~', $path, $matches)) {
+if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts|sizes)/(\d+)$~', $path, $matches)) {
     requireAdmin($pdo);
     jsonResponse(updateAdminRecord($pdo, $matches[1], (int) $matches[2], requestJson()));
+}
+
+// Osprzęt modelu: przypisanie części, pozycja domyślna i tryb grupy.
+// Cena nie jest tu przesyłana — wynika z cennika części.
+if ($method === 'POST' && $path === '/admin/model-parts') {
+    requireAdmin($pdo);
+    jsonResponse(saveModelPart($pdo, requestJson()));
+}
+
+if ($method === 'POST' && $path === '/admin/model-group-settings') {
+    requireAdmin($pdo);
+    jsonResponse(saveModelGroupSettings($pdo, requestJson()));
+}
+
+if ($method === 'POST' && preg_match('~^/admin/models/(\d+)/copy-parts$~', $path, $matches)) {
+    requireAdmin($pdo);
+    $payload = requestJson();
+    jsonResponse(copyModelParts($pdo, (int) $matches[1], (int) ($payload['source_model_id'] ?? 0)));
+}
+
+if ($method === 'POST' && $path === '/admin/recompute-prices') {
+    requireAdmin($pdo);
+    jsonResponse(['basePrices' => recomputeAllModelBasePrices($pdo)]);
 }
 
 if ($method === 'POST' && $path === '/admin/batteries') {
@@ -110,8 +134,33 @@ if ($method === 'POST' && $path === '/admin/media') {
     jsonResponse(uploadAdminMedia($pdo), 201);
 }
 
+if ($method === 'DELETE' && preg_match('~^/admin/models/(\d+)/media/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteModelMedia($pdo, (int) $matches[1], (int) $matches[2]));
+}
+
+if ($method === 'GET' && preg_match('~^/admin/configurations/([A-Za-z0-9]{20,32})$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(getConfigurationForAdmin($pdo, $matches[1]));
+}
+
 if ($method === 'GET' && preg_match('~^/uploads/(\d{4}/\d{2}/[a-f0-9]{32}\.(?:jpg|png|webp|avif))$~', $path, $matches)) {
     $file = projectRoot() . '/storage/media/' . $matches[1];
+    if (!is_file($file)) {
+        jsonResponse(['error' => 'Nie znaleziono obrazu.'], 404);
+    }
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file);
+    header('Content-Type: ' . $mime);
+    header('Cache-Control: public, max-age=31536000, immutable');
+    readfile($file);
+    exit;
+}
+
+// Zdjęcia z preseedu bazy (spoza panelu admina) leżą w /public/media, nie w
+// /storage/media — osobna, węższa trasa niż /uploads, żeby nie serwować
+// dowolnych plików spod /public.
+if ($method === 'GET' && preg_match('~^/media/(models/[a-z0-9-]+/[a-z0-9._-]+\.(?:jpg|jpeg|png|webp|avif))$~', $path, $matches)) {
+    $file = projectRoot() . '/public/media/' . $matches[1];
     if (!is_file($file)) {
         jsonResponse(['error' => 'Nie znaleziono obrazu.'], 404);
     }

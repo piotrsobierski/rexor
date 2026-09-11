@@ -29,19 +29,19 @@ function createConfiguration(PDO $pdo, array $input): array
     $modelStatement = $pdo->prepare('SELECT * FROM bike_models WHERE slug = :slug AND status <> \'archived\'');
     $modelStatement->execute(['slug' => $modelSlug]);
     $model = $modelStatement->fetch();
-    if (!$model || $model['base_price'] === null) {
+    if (!$model) {
         throw new InvalidArgumentException('Wybrany model nie jest jeszcze dostępny do konfiguracji.');
     }
 
-    $sizeStatement = $pdo->prepare('SELECT id, code, label FROM model_sizes WHERE model_id = :model AND code = :code AND is_active = TRUE');
+    $sizeStatement = $pdo->prepare('SELECT id, code, label, price_delta_gross FROM model_sizes WHERE model_id = :model AND code = :code AND is_active = TRUE');
     $sizeStatement->execute(['model' => $model['id'], 'code' => $sizeCode]);
     $size = $sizeStatement->fetch();
     if (!$size) {
         throw new InvalidArgumentException('Wybrany rozmiar nie jest dostępny dla tego modelu.');
     }
 
-    // Bateria jest wyborem klienta. Domyślny pakiet wyznacza cenę bazową modelu,
-    // a wybrany pakiet dopłatę albo upust względem tej ceny.
+    // Bateria jest osobnym składnikiem ceny, tak samo jak rama czy hamulce.
+    // Domyślny pakiet służy tylko do pokazania różnicy w konfiguratorze.
     $defaultBatteryStatement = $pdo->prepare('SELECT * FROM model_batteries WHERE model_id = :model AND is_default = TRUE AND is_active = TRUE LIMIT 1');
     $defaultBatteryStatement->execute(['model' => $model['id']]);
     $defaultBattery = $defaultBatteryStatement->fetch() ?: null;
@@ -56,89 +56,34 @@ function createConfiguration(PDO $pdo, array $input): array
         }
     }
 
-    $items = [];
-    $totalDelta = 0.0;
-    $batteryDelta = 0.0;
-    if ($battery) {
-        $batteryDelta = round((float) $battery['gross_price'] - (float) ($defaultBattery['gross_price'] ?? 0), 2);
-        $totalDelta += $batteryDelta;
-    }
     foreach ($selections as $groupSlug => $selectionSku) {
         if (!is_string($groupSlug) || !is_string($selectionSku)) {
             throw new InvalidArgumentException('Nieprawidłowy wybór części.');
         }
-
-        $groupStatement = $pdo->prepare('SELECT id, name FROM part_groups WHERE slug = :slug');
-        $groupStatement->execute(['slug' => $groupSlug]);
-        $group = $groupStatement->fetch();
-        if (!$group) {
-            throw new InvalidArgumentException("Nieznana grupa opcji: {$groupSlug}.");
-        }
-
-        $defaultStatement = $pdo->prepare(
-            'SELECT p.id, p.sku, p.name, p.description, COALESCE(mp.gross_price_override, p.gross_price) AS effective_price, ' .
-            'mp.customer_supplied_allowed, mp.customer_supplied_gross_price ' .
-            'FROM model_parts mp JOIN parts p ON p.id = mp.part_id ' .
-            'WHERE mp.model_id = :model AND p.group_id = :group_id AND mp.is_default = TRUE LIMIT 1'
-        );
-        $defaultStatement->execute(['model' => $model['id'], 'group_id' => $group['id']]);
-        $default = $defaultStatement->fetch() ?: null;
-        $defaultPrice = (float) ($default['effective_price'] ?? 0);
-
-        if ($selectionSku === '__customer_supplied__') {
-            $settingsStatement = $pdo->prepare(
-                'SELECT customer_part_allowed, customer_part_gross_price, customer_part_label FROM model_part_group_settings ' .
-                'WHERE model_id = :model AND group_id = :group_id'
-            );
-            $settingsStatement->execute(['model' => $model['id'], 'group_id' => $group['id']]);
-            $settings = $settingsStatement->fetch() ?: null;
-            $allowed = (bool) ($default['customer_supplied_allowed'] ?? false) || (bool) ($settings['customer_part_allowed'] ?? false);
-            if (!$allowed) {
-                throw new InvalidArgumentException("Własna część nie jest dozwolona w grupie {$group['name']}.");
-            }
-            $selectedPrice = $default && (bool) $default['customer_supplied_allowed']
-                ? (float) $default['customer_supplied_gross_price']
-                : (float) ($settings['customer_part_gross_price'] ?? 0);
-            $selected = [
-                'id' => null,
-                'sku' => '__customer_supplied__',
-                'name' => (string) ($settings['customer_part_label'] ?? 'Dostarczam własną część'),
-                'description' => 'Element dostarczany przez klienta; zgodność potwierdzi Rexor.',
-                'effective_price' => $selectedPrice,
-                'selection_type' => 'customer_supplied',
-            ];
-        } else {
-            $partStatement = $pdo->prepare(
-                'SELECT p.id, p.sku, p.name, p.description, p.price_status, COALESCE(mp.gross_price_override, p.gross_price) AS effective_price ' .
-                'FROM model_parts mp JOIN parts p ON p.id = mp.part_id ' .
-                'WHERE mp.model_id = :model AND p.group_id = :group_id AND p.sku = :sku AND p.is_active = TRUE LIMIT 1'
-            );
-            $partStatement->execute(['model' => $model['id'], 'group_id' => $group['id'], 'sku' => $selectionSku]);
-            $selected = $partStatement->fetch();
-            if (!$selected || $selected['price_status'] !== 'fixed' || $selected['effective_price'] === null) {
-                throw new InvalidArgumentException("Wybrana opcja w grupie {$group['name']} nie ma zatwierdzonej ceny.");
-            }
-            $selected['selection_type'] = 'catalog_part';
-            $selectedPrice = (float) $selected['effective_price'];
-        }
-
-        $delta = round($selectedPrice - $defaultPrice, 2);
-        $totalDelta += $delta;
-        $items[] = [
-            'groupSlug' => $groupSlug,
-            'groupName' => $group['name'],
-            'partId' => $selected['id'],
-            'sku' => $selected['sku'],
-            'name' => $selected['name'],
-            'description' => $selected['description'],
-            'selectionType' => $selected['selection_type'],
-            'grossPrice' => $selectedPrice,
-            'grossDelta' => $delta,
-        ];
     }
 
-    $basePrice = (float) $model['base_price'];
-    $grossTotal = round($basePrice + $totalDelta, 2);
+    // Cena powstaje wyłącznie w PricingService, z tej samej funkcji, która liczy
+    // cenę "od" w katalogu. Klient nie przysyła żadnej kwoty.
+    $groups = modelOptionGroups($pdo, (int) $model['id']);
+    foreach (array_keys($selections) as $groupSlug) {
+        if (!isset($groups[$groupSlug])) {
+            throw new InvalidArgumentException("Nieznana grupa opcji: {$groupSlug}.");
+        }
+    }
+    $model['adjustments'] = modelPriceAdjustments($pdo, (int) $model['id']);
+    $pricing = priceConfiguration($model, $groups, $size, $battery, $selections);
+    if ($pricing['issues'] !== []) {
+        throw new InvalidArgumentException('Ta konfiguracja wymaga indywidualnej wyceny: ' . implode(' ', $pricing['issues']));
+    }
+    $items = $pricing['lines'];
+    $batteryDelta = $battery !== null
+        ? round((float) $battery['gross_price'] - (float) ($defaultBattery['gross_price'] ?? 0), 2)
+        : 0.0;
+
+    // base_price_gross_snapshot to cena "od" modelu w chwili zamówienia:
+    // punkt odniesienia dla obsługi, nie składnik sumy.
+    $basePrice = $model['computed_base_price_gross'] !== null ? (float) $model['computed_base_price_gross'] : 0.0;
+    $grossTotal = $pricing['grossTotal'];
     $shareToken = randomToken();
     $resumeToken = randomToken();
     $publicId = publicId();
@@ -161,6 +106,15 @@ function createConfiguration(PDO $pdo, array $input): array
             'grossDelta' => $batteryDelta,
         ] : null,
         'items' => $items,
+        'pricing' => [
+            'framePriceGross' => $pricing['framePriceGross'],
+            'batteryPriceGross' => $pricing['batteryPriceGross'],
+            'componentsPriceGross' => $pricing['componentsPriceGross'],
+            'assemblyPriceGross' => $pricing['assemblyPriceGross'],
+            'marginPercent' => $pricing['marginPercent'],
+            'marginAmountGross' => $pricing['marginAmountGross'],
+            'adjustments' => $pricing['adjustments'],
+        ],
         'basePriceGross' => $basePrice,
         'grossTotal' => $grossTotal,
         'currency' => 'PLN',
@@ -235,6 +189,29 @@ function createConfiguration(PDO $pdo, array $input): array
         'shareUrl' => $shareUrl,
         'resumeUrl' => $resumeUrl,
         'grossTotal' => $grossTotal,
+    ];
+}
+
+/**
+ * Podgląd konfiguracji dla panelu admina, po jawnym public_id — bez
+ * sekretnego tokenu udostępniania. share_token/resume_token trzymamy w
+ * bazie tylko jako skrót SHA-256 (jak reset hasła), więc admin nie może
+ * odtworzyć oryginalnego linku klienta; to jest bezpieczny odpowiednik
+ * tej samej treści, dostępny wyłącznie po zalogowaniu.
+ */
+function getConfigurationForAdmin(PDO $pdo, string $publicId): array
+{
+    $statement = $pdo->prepare('SELECT id, public_id, gross_total, snapshot, created_at FROM configurations WHERE public_id = :public_id LIMIT 1');
+    $statement->execute(['public_id' => $publicId]);
+    $configuration = $statement->fetch();
+    if (!$configuration) {
+        throw new RuntimeException('Konfiguracja nie istnieje.', 404);
+    }
+    return [
+        'publicId' => $configuration['public_id'],
+        'grossTotal' => (float) $configuration['gross_total'],
+        'createdAt' => $configuration['created_at'],
+        'configuration' => json_decode($configuration['snapshot'], true, 64, JSON_THROW_ON_ERROR),
     ];
 }
 

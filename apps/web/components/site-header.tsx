@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Menu } from 'lucide-react';
+import { ArrowRight, Menu, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NavigationMenu, NavigationMenuItem, NavigationMenuLink, NavigationMenuList } from '@/components/ui/navigation-menu';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -32,7 +32,10 @@ export function SiteHeader() {
           </NavigationMenuList>
         </NavigationMenu>
 
-        <div className="hidden justify-end sm:flex">
+        <div className="hidden items-center justify-end gap-2 sm:flex">
+          <Button render={<a href="/admin" aria-label="Panel administracyjny" />} variant="outline" size="icon-lg" className="h-11 rounded-none border-ink hover:bg-ink hover:text-white">
+            <Settings aria-hidden="true" />
+          </Button>
           <Button render={<a href="/konfigurator" />} variant="outline" size="lg" className="h-11 rounded-none border-ink px-5 font-mono text-xs font-semibold uppercase tracking-[0.12em] hover:bg-ink hover:text-white">
             Stwórz własny projekt <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </Button>

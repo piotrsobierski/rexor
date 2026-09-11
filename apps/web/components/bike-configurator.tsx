@@ -183,9 +183,9 @@ export function BikeConfigurator() {
     }
   }
 
-  return <div className="min-h-screen bg-background text-foreground">
+  return <div className="flex min-h-screen flex-col bg-background text-foreground">
     <SiteHeader />
-    <main>
+    <main className="flex-1">
       <section className="mx-auto max-w-[1480px] px-4 pb-3 pt-7 sm:px-8 sm:pt-10 lg:px-12">
         <div className="mb-5 flex items-end justify-between gap-4"><div><p className="eyebrow">Wybierz bazę projektu</p><h1 className="mt-2 text-[clamp(2rem,5vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em]">Rower skrojony<br className="hidden sm:block" /> pod Twój teren.</h1></div><p className="hidden max-w-sm text-right text-base leading-relaxed text-ink-muted xl:block">Dobieraj komponenty, obserwuj cenę i wróć do swojego projektu przez prywatny link.</p></div>
         <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0">
