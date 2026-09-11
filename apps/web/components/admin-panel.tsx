@@ -1202,6 +1202,7 @@ const activityEventLabels: Record<string, string> = {
   model_group_settings_saved: 'Ustawienia grupy',
   model_parts_copied: 'Kopiowanie osprzętu',
   configuration_created: 'Nowa konfiguracja',
+  configurator_change: 'Zmiana w konfiguratorze',
   chat_message: 'Wiadomość czatbota',
 };
 

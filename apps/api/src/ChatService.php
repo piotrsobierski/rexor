@@ -206,7 +206,7 @@ function handleChatRequest(PDO $pdo, array $payload): array
 
     // Publiczny endpoint bez logowania - limit chroni budżet OpenRouter przed
     // jednym klientem zapętlającym żądania.
-    enforceAiRateLimit($pdo, 'chat', 15);
+    enforceRateLimit($pdo, 'chat', 15, 'Zbyt wiele żądań do asystenta AI. Spróbuj ponownie za chwilę.');
 
     $apiKey = envValue('OPENROUTER_API_KEY');
     if ($apiKey === '') {

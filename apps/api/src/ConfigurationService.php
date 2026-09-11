@@ -203,6 +203,43 @@ function createConfiguration(PDO $pdo, array $input): array
 }
 
 /**
+ * Granularne logowanie zmian w konfiguratorze (wybór modelu, rozmiaru,
+ * baterii, osprzętu) - osobne od /configurations, które zapisuje dopiero
+ * finalne zgłoszenie formularza. Endpoint jest publiczny (klient jeszcze nie
+ * podał e-maila) i celowo lekki: nie sprawdza zgodności z katalogiem, bo to
+ * tylko log aktywności, nie źródło prawdy o cenie czy dostępności - tę
+ * walidację i tak robi createConfiguration() przy złożeniu zamówienia.
+ */
+function logConfiguratorEvent(PDO $pdo, array $input): array
+{
+    $modelSlug = trim((string) ($input['modelSlug'] ?? ''));
+    $parameter = trim((string) ($input['parameter'] ?? ''));
+    $value = trim((string) ($input['value'] ?? ''));
+    $label = trim((string) ($input['label'] ?? ''));
+
+    if ($modelSlug === '' || mb_strlen($modelSlug) > 120) {
+        throw new InvalidArgumentException('Nieprawidłowy model.');
+    }
+    if ($parameter === '' || mb_strlen($parameter) > 60) {
+        throw new InvalidArgumentException('Nieprawidłowy parametr.');
+    }
+    if (mb_strlen($value) > 200 || mb_strlen($label) > 200) {
+        throw new InvalidArgumentException('Zbyt długa wartość.');
+    }
+
+    logActivity(
+        $pdo,
+        'configurator_change',
+        'customer',
+        null,
+        "Konfigurator ({$modelSlug}): " . ($label !== '' ? $label : "{$parameter} = {$value}"),
+        ['modelSlug' => $modelSlug, 'parameter' => $parameter, 'value' => $value, 'label' => $label !== '' ? $label : null]
+    );
+
+    return ['logged' => true];
+}
+
+/**
  * Podgląd konfiguracji dla panelu admina, po jawnym public_id — bez
  * sekretnego tokenu udostępniania. share_token/resume_token trzymamy w
  * bazie tylko jako skrót SHA-256 (jak reset hasła), więc admin nie może

@@ -74,6 +74,13 @@ if ($method === 'POST' && $path === '/configurations') {
     jsonResponse(createConfiguration($pdo, requestJson()), 201);
 }
 
+if ($method === 'POST' && $path === '/configurator-events') {
+    // Publiczny, bez logowania - limit chroni activity_log przed zalaniem
+    // wpisami ze skryptu odpalonego wprost na ten endpoint.
+    enforceRateLimit($pdo, 'configurator-event', 60, 'Zbyt wiele zdarzeń. Spróbuj ponownie za chwilę.');
+    jsonResponse(logConfiguratorEvent($pdo, requestJson()));
+}
+
 if ($method === 'GET' && preg_match('~^/configurations/(share|resume)/([A-Za-z0-9_-]+)$~', $path, $matches)) {
     jsonResponse(getConfigurationByToken($pdo, $matches[2], $matches[1]));
 }

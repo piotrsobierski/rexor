@@ -174,11 +174,15 @@ function clientIp(): string
 }
 
 /**
- * Limit żądań do zewnętrznego API AI (OpenRouter), per IP i per "bucket"
- * (nazwa endpointu). Każde wywołanie kosztuje - bez limitu jeden klient mógł
- * zapętlić /chat albo /admin/ai/rich-content i wyczerpać budżet OpenRouter.
+ * Ogólny limit żądań per IP i per "bucket" (nazwa endpointu). Używany zarówno
+ * dla płatnego API AI (OpenRouter) - żeby jeden klient nie zapętlił /chat albo
+ * /admin/ai/rich-content i nie wyczerpał budżetu - jak i dla publicznych
+ * endpointów bez logowania, które tylko zapisują log (np. zmiany w
+ * konfiguratorze), żeby nie dało się zalać activity_log żądaniami ze skryptu.
+ * Nazwa tabeli (ai_rate_limit_hits) została z czasów, gdy limiter obsługiwał
+ * tylko AI - technicznie jest to teraz ogólny licznik trafień per bucket.
  */
-function enforceAiRateLimit(PDO $pdo, string $bucket, int $maxPerMinute): void
+function enforceRateLimit(PDO $pdo, string $bucket, int $maxPerMinute, string $message = 'Zbyt wiele żądań. Spróbuj ponownie za chwilę.'): void
 {
     $pdo->prepare('DELETE FROM ai_rate_limit_hits WHERE created_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 MINUTE)')->execute();
 
@@ -188,7 +192,7 @@ function enforceAiRateLimit(PDO $pdo, string $bucket, int $maxPerMinute): void
     );
     $count->execute(['bucket' => $bucket, 'ip' => $ip]);
     if ((int) $count->fetchColumn() >= $maxPerMinute) {
-        jsonResponse(['error' => 'Zbyt wiele żądań do asystenta AI. Spróbuj ponownie za chwilę.'], 429);
+        jsonResponse(['error' => $message], 429);
     }
 
     $pdo->prepare('INSERT INTO ai_rate_limit_hits (bucket, ip_address) VALUES (:bucket, :ip)')

@@ -21,6 +21,19 @@ import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catal
 type ContactForm = { customerName: string; customerEmail: string; customerPhone: string; notes: string; privacyAccepted: boolean };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
+// Log "z detalami" dla dziennika aktywności w panelu admina: każda zmiana
+// wyboru w konfiguratorze (model, rozmiar, bateria, osprzęt), nie tylko
+// finalne zgłoszenie. Fire-and-forget - błąd logowania nie może przerwać
+// korzystania z konfiguratora, a keepalive dowozi żądanie nawet tuż przed
+// przejściem dalej.
+function logConfiguratorEvent(modelSlug: string, parameter: string, value: string, label?: string) {
+  fetch(`${API_BASE}/configurator-events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modelSlug, parameter, value, label }),
+    keepalive: true,
+  }).catch(() => {});
+}
 const defaultBatteryCode = (model: BikeModel): string => (model.batteries.find((item) => item.isDefault) ?? model.batteries[0])?.code ?? '';
 const formatEnergy = (wh: number) => `${new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 1 }).format(wh)} Wh`;
 // Grupa bez pozycji katalogowej, ale z dopuszczoną częścią klienta (np. damper
@@ -199,11 +212,25 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     setSize(defaultSizeCode(next));
     setGalleryIndex(0);
     carouselApi?.scrollTo(0, true);
+    logConfiguratorEvent(modelSlugs[nextId], 'model', nextId, next.name);
+  }
+
+  function changeSize(value: string) {
+    setSize(value);
+    logConfiguratorEvent(modelSlugs[model.id], 'size', value, `Rozmiar ${value}`);
+  }
+
+  function changeBattery(value: string) {
+    setBatteryByModel((current) => ({ ...current, [model.id]: value }));
+    logConfiguratorEvent(modelSlugs[model.id], 'battery', value, model.batteries.find((item) => item.code === value)?.name);
   }
 
   function choose(groupSlug: string, sku: string) {
     setTouchedModels((current) => ({ ...current, [model.id]: true }));
     setSelectionsByModel((current) => ({ ...current, [model.id]: { ...current[model.id], [groupSlug]: sku } }));
+    const group = model.groups.find((item) => item.slug === groupSlug);
+    const choiceName = group ? groupChoices(group).find((item) => item.sku === sku)?.name : undefined;
+    logConfiguratorEvent(modelSlugs[model.id], `group:${groupSlug}`, sku, group && choiceName ? `${group.name}: ${choiceName}` : undefined);
   }
 
   async function submitConfiguration(event: FormEvent<HTMLFormElement>) {
@@ -290,10 +317,10 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           <div className="flex items-start justify-between gap-5"><div><p className="eyebrow">Twój projekt</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Konfiguracja {model.name.replace('Rexor ', '')}</h2></div><span className="rounded-full bg-[var(--accent-brand)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em]">Brutto</span></div>
           <Progress value={model.available ? 72 : 12} className="mt-5 h-1.5 bg-ink-wash [&>div]:bg-ink" />
           {!model.available ? <div className="mt-8 rounded-3xl bg-ink p-6 text-white"><Bike className="size-8 text-[var(--accent-brand)]" /><h3 className="mt-8 text-2xl font-semibold">Konfiguracja w przygotowaniu</h3><p className="mt-3 leading-relaxed text-white/64">Geometria i zdjęcia CFR707 są już gotowe. Uzupełniamy konkretne komponenty oraz cenę modelu.</p><Button render={<a href="/serwis" />} className="mt-6 w-full rounded-full bg-white text-ink hover:bg-white/90">Zapytaj o CFR707 <ArrowRight data-icon="inline-end" /></Button></div> : <>
-            <section className="config-section"><div className="section-heading"><div><span>01</span><h3>Rozmiar ramy</h3></div><p>Dopasowanie potwierdzimy przed zamówieniem.</p></div><RadioGroup value={size} onValueChange={setSize} className="grid grid-cols-3 gap-2">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>
+            <section className="config-section"><div className="section-heading"><div><span>01</span><h3>Rozmiar ramy</h3></div><p>Dopasowanie potwierdzimy przed zamówieniem.</p></div><RadioGroup value={size} onValueChange={changeSize} className="grid grid-cols-3 gap-2">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>
             {model.batteries.length > 0 && <section className="config-section">
               <div className="section-heading"><div><span>02</span><h3>Bateria</h3></div><p>Pakiet dobrany do ramy i silnika. Pojemność zmienia zasięg i masę roweru.</p></div>
-              <RadioGroup value={battery?.code ?? ''} onValueChange={(value) => setBatteryByModel((current) => ({ ...current, [model.id]: value }))} className="gap-2">
+              <RadioGroup value={battery?.code ?? ''} onValueChange={changeBattery} className="gap-2">
                 {model.batteries.map((item) => { const selected = battery?.code === item.code; const delta = item.grossPrice - (defaultBattery?.grossPrice ?? item.grossPrice); return <label key={item.code} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}>
                   <RadioGroupItem value={item.code} className="choice-input" />
                   <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>

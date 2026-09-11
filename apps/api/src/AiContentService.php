@@ -19,7 +19,7 @@ function aiEditRichContent(PDO $pdo, array $input): array
 
     // Endpoint wymaga już zalogowanego admina, ale limit i tak chroni budżet
     // OpenRouter przed jednym skryptem odpalonym w pętli z jednego IP.
-    enforceAiRateLimit($pdo, 'ai-rich-content', 20);
+    enforceRateLimit($pdo, 'ai-rich-content', 20, 'Zbyt wiele żądań do asystenta AI. Spróbuj ponownie za chwilę.');
 
     if ($instruction === '') {
         throw new InvalidArgumentException('Podaj polecenie dla asystenta AI.');
