@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 import {
   Bike,
   Bold,
@@ -172,6 +172,37 @@ function PartsEditor({
     }
   }
 
+  async function uploadPartImage(part: Row, file?: File) {
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    setMessage('Wysyłam zdjęcie…');
+    try {
+      const result = await request('/admin/media', { method: 'POST', body: form });
+      await patch('parts', part.id, { image_path: `${API_BASE}${result.url}` });
+      setMessage('Zdjęcie części zapisane.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się dodać zdjęcia.');
+    }
+  }
+
+  async function removePartImage(part: Row) {
+    if (!window.confirm('Usunąć zdjęcie tej części?')) return;
+    await patch('parts', part.id, { image_path: null });
+  }
+
+  const [preview, setPreview] = useState<{ src: string; top: number; left: number } | null>(null);
+  function showPreview(event: MouseEvent<HTMLElement>, src: string) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const previewSize = 256;
+    const fitsRight = rect.right + 12 + previewSize <= window.innerWidth;
+    setPreview({
+      src,
+      top: Math.min(rect.top, window.innerHeight - previewSize - 12),
+      left: fitsRight ? rect.right + 12 : rect.left - previewSize - 12,
+    });
+  }
+
   const groupOrder = new Map(partGroups.map((g, idx) => [Number(g.id), idx]));
 
   const filtered = rows.filter((row) => {
@@ -303,6 +334,7 @@ function PartsEditor({
           <Table>
             <TableHeader>
               <TableRow className="border-b border-line bg-ink-wash/40">
+                <TableHead className="w-20">Zdjęcie</TableHead>
                 <TableHead className="w-48">
                   <span className="inline-flex items-center gap-1">
                     Kategoria części
@@ -348,6 +380,32 @@ function PartsEditor({
 
                 return (
                   <TableRow key={row.id} className="transition-colors hover:bg-black/[0.02]">
+                    <TableCell className="w-20">
+                      {row.image_path ? (
+                        <div className="group/thumb relative inline-block">
+                          <img
+                            src={String(row.image_path)}
+                            alt={String(row.name)}
+                            onMouseEnter={(event) => showPreview(event, String(row.image_path))}
+                            onMouseLeave={() => setPreview(null)}
+                            className="size-12 rounded-lg border border-line bg-white object-contain cursor-zoom-in"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removePartImage(row)}
+                            aria-label="Usuń zdjęcie części"
+                            className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-white text-ink opacity-0 shadow border border-line transition-opacity group-hover/thumb:opacity-100 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <Label className="flex size-12 cursor-pointer items-center justify-center rounded-lg border border-dashed border-line text-ink-muted hover:border-line-strong hover:text-ink">
+                          <Upload className="size-4" />
+                          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void uploadPartImage(row, event.target.files?.[0])} />
+                        </Label>
+                      )}
+                    </TableCell>
                     <TableCell className="w-48">
                       <NativeSelect
                         value={String(drafts[row.id]?.group_id ?? row.group_id ?? '')}
@@ -424,6 +482,14 @@ function PartsEditor({
           </Table>
         </div>
       </div>
+      {preview && (
+        <img
+          src={preview.src}
+          alt=""
+          style={{ top: preview.top, left: preview.left }}
+          className="pointer-events-none fixed z-50 size-64 rounded-xl border border-line bg-white object-contain p-2 shadow-2xl"
+        />
+      )}
     </div>
   );
 }
