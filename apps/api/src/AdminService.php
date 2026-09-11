@@ -96,11 +96,59 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
     return ['id' => $id, 'updated' => array_keys(array_diff_key($parameters, ['id' => true])), 'recomputedBasePrices' => $prices];
 }
 
-function slugify(string $value): string
+function slugify(string $value, string $fallback = 'element'): string
 {
     $ascii = iconv('UTF-8', 'ASCII//TRANSLIT', $value) ?: $value;
     $slug = strtolower(trim((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $ascii), '-'));
-    return $slug !== '' ? $slug : 'czesc';
+    return $slug !== '' ? $slug : $fallback;
+}
+
+function uniqueSlug(PDO $pdo, string $table, string $base): string
+{
+    $slug = $base;
+    $suffix = 2;
+    $exists = $pdo->prepare("SELECT COUNT(*) FROM {$table} WHERE slug = :slug");
+    while (true) {
+        $exists->execute(['slug' => $slug]);
+        if ((int) $exists->fetchColumn() === 0) {
+            return $slug;
+        }
+        $slug = "{$base}-{$suffix}";
+        $suffix++;
+    }
+}
+
+function createAdminModel(PDO $pdo, array $input): array
+{
+    $name = trim((string) ($input['name'] ?? ''));
+    $categoryId = (int) ($input['category_id'] ?? 0);
+    if ($name === '' || $categoryId <= 0) {
+        throw new InvalidArgumentException('Podaj nazwę i kategorię modelu.');
+    }
+
+    $category = $pdo->prepare('SELECT id FROM bike_categories WHERE id = :id');
+    $category->execute(['id' => $categoryId]);
+    if (!$category->fetch()) {
+        throw new InvalidArgumentException('Nieznana kategoria.');
+    }
+
+    $slug = uniqueSlug($pdo, 'bike_models', slugify($name, 'model'));
+    $nextSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM bike_models')->fetchColumn();
+
+    $statement = $pdo->prepare(
+        'INSERT INTO bike_models (category_id, slug, name, short_description, status, sort_order) ' .
+        'VALUES (:category_id, :slug, :name, :short_description, :status, :sort_order)'
+    );
+    $statement->execute([
+        'category_id' => $categoryId,
+        'slug' => $slug,
+        'name' => $name,
+        'short_description' => ($short = trim((string) ($input['short_description'] ?? ''))) !== '' ? $short : null,
+        'status' => in_array($input['status'] ?? 'draft', ['draft', 'published', 'archived'], true) ? $input['status'] : 'draft',
+        'sort_order' => $nextSort,
+    ]);
+
+    return ['id' => (int) $pdo->lastInsertId(), 'slug' => $slug];
 }
 
 function createAdminPart(PDO $pdo, array $input): array

@@ -93,6 +93,11 @@ if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts|sizes)/
 
 // Osprzęt modelu: przypisanie części, pozycja domyślna i tryb grupy.
 // Cena nie jest tu przesyłana — wynika z cennika części.
+if ($method === 'POST' && $path === '/admin/models') {
+    requireAdmin($pdo);
+    jsonResponse(createAdminModel($pdo, requestJson()), 201);
+}
+
 if ($method === 'POST' && $path === '/admin/parts') {
     requireAdmin($pdo);
     jsonResponse(createAdminPart($pdo, requestJson()), 201);
