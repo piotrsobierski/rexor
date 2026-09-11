@@ -204,6 +204,30 @@ function createAdminPart(PDO $pdo, array $input): array
     return ['id' => (int) $pdo->lastInsertId(), 'sku' => $sku];
 }
 
+function deleteAdminPart(PDO $pdo, int $id): array
+{
+    $usage = $pdo->prepare('SELECT COUNT(*) FROM model_parts WHERE part_id = :id');
+    $usage->execute(['id' => $id]);
+    $modelCount = (int) $usage->fetchColumn();
+    if ($modelCount > 0) {
+        throw new InvalidArgumentException(
+            "Ta część jest przypisana do {$modelCount} " . ($modelCount === 1 ? 'modelu' : 'modeli') . '. Odepnij ją najpierw w zakładce „Osprzęt i cena modelu" albo klikając chip modelu w tabeli części.'
+        );
+    }
+
+    // part_media, category_parts i part_compatibility_rules mają ON DELETE
+    // CASCADE - czyszczą się same. model_parts ma RESTRICT (sprawdzone wyżej),
+    // a configuration_items ustawia part_id na NULL, więc historyczne
+    // zapytania klientów zachowują swoją treść nawet po usunięciu części.
+    $statement = $pdo->prepare('DELETE FROM parts WHERE id = :id');
+    $statement->execute(['id' => $id]);
+    if ($statement->rowCount() === 0) {
+        throw new InvalidArgumentException('Nie znaleziono części.');
+    }
+
+    return ['id' => $id, 'deleted' => true];
+}
+
 /**
  * Bateria ma pola wyliczalne: pojemność pakietu wynika z liczby gałęzi
  * równoległych i pojemności ogniwa, a energia z pojemności i napięcia

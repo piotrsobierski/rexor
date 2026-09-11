@@ -185,6 +185,18 @@ function PartsEditor({
     }
   }
 
+  async function deletePart(part: Row) {
+    if (!window.confirm(`Usunąć część „${String(part.name)}"? Tej operacji nie można cofnąć.`)) return;
+    setMessage('Usuwam część…');
+    try {
+      await request(`/admin/parts/${part.id}`, { method: 'DELETE' });
+      await reload();
+      setMessage('Część usunięta.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się usunąć części.');
+    }
+  }
+
   async function uploadPartImage(part: Row, file?: File) {
     if (!file) return;
     const form = new FormData();
@@ -374,7 +386,7 @@ function PartsEditor({
                   </span>
                 </TableHead>
                 <TableHead className="w-20 text-center">Aktywna</TableHead>
-                <TableHead className="w-24 text-right">Akcja</TableHead>
+                <TableHead className="w-28 text-right">Akcja</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -490,19 +502,24 @@ function PartsEditor({
                         onCheckedChange={(checked) => { setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], is_active: checked } }); void patch('parts', row.id, { is_active: checked }); }}
                       />
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => patch('parts', row.id, {
-                          name: drafts[row.id]?.name,
-                          group_id: drafts[row.id]?.group_id ? Number(drafts[row.id]?.group_id) : row.group_id,
-                          description: drafts[row.id]?.description ?? '',
-                          gross_price: drafts[row.id]?.gross_price,
-                        })}
-                      >
-                        <Save /> Zapisz
-                      </Button>
+                    <TableCell className="max-w-28 text-right">
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => patch('parts', row.id, {
+                            name: drafts[row.id]?.name,
+                            group_id: drafts[row.id]?.group_id ? Number(drafts[row.id]?.group_id) : row.group_id,
+                            description: drafts[row.id]?.description ?? '',
+                            gross_price: drafts[row.id]?.gross_price,
+                          })}
+                        >
+                          <Save /> Zapisz
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => deletePart(row)} title="Usuń część" className="text-red-600 hover:bg-red-50 hover:text-red-700">
+                          <Trash2 /> Usuń
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

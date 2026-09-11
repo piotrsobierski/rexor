@@ -103,6 +103,11 @@ if ($method === 'POST' && $path === '/admin/parts') {
     jsonResponse(createAdminPart($pdo, requestJson()), 201);
 }
 
+if ($method === 'DELETE' && preg_match('~^/admin/parts/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminPart($pdo, (int) $matches[1]));
+}
+
 if ($method === 'POST' && $path === '/admin/model-parts') {
     requireAdmin($pdo);
     jsonResponse(saveModelPart($pdo, requestJson()));
