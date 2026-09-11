@@ -5,6 +5,50 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-11 — Mignięcie starej treści przy wejściu na stronę
+
+### Zgłoszenie
+
+Po edycji treści serwisu w panelu wejście na `/serwis` pokazywało na ułamek
+sekundy starą treść i dopiero potem nową. Za każdym razem.
+
+### Stan zastany
+
+`ServicePage` był komponentem klienckim: startował od treści zapisanej na
+stałe w kodzie, a prawdziwą dociągał w `useEffect`. Pierwszy render zawsze
+pokazywał więc tekst z kodu. Ten sam wzorzec dotyczył dwóch innych rzeczy:
+
+- kolory motywu ustawiał `useEffect` po pobraniu z API, więc strona najpierw
+  malowała kolory z arkusza,
+- katalog modeli pobierał `usePublicCatalog` po pierwszym renderze, więc ceny
+  „od” pojawiały się z opóźnieniem po „Cena w przygotowaniu”.
+
+### Wprowadzone zmiany
+
+- `apps/web/lib/server-catalog.ts`: pobieranie treści strony, motywu
+  i katalogu po stronie serwera z `cache: 'no-store'`. Brak API nie wywraca
+  strony, tylko włącza treść zapasową. Osobna zmienna `API_BASE_URL` pozwala
+  wskazać serwerowi inny adres API niż przeglądarce.
+- `apps/web/lib/catalog-merge.ts`: scalanie odpowiedzi API ze statycznymi
+  treściami marketingowymi wydzielone do modułu bez `'use client'`, żeby
+  serwer i klient liczyły to samo.
+- `app/serwis/page.tsx`, `app/page.tsx`, `app/rowery/page.tsx`,
+  `app/ramy/page.tsx`, `app/konfigurator/page.tsx`: komponenty serwerowe
+  pobierają dane i przekazują je w propsach.
+- `components/theme-runtime.tsx`: zamiast ustawiania zmiennych CSS po
+  załadowaniu, `<style>` z kolorami w pierwszym renderze.
+- `usePublicCatalog` przyjmuje dane z serwera; pobranie po stronie klienta
+  zostaje jako zabezpieczenie, gdy serwer nie dostał odpowiedzi z API.
+
+### Weryfikacja
+
+W pierwszym HTML są: treść serwisu z bazy (z pozycją „serwis silnika”, której
+nie ma w treści zapasowej), kolory motywu w `<style>` w `<head>`, ceny
+„od 21 179 zł” i „od 22 329 zł” oraz nazwy grup opcji konfiguratora.
+Wszystkie strony odpowiadają 200.
+
+---
+
 ## 2026-09-11 — Wysyłanie zdjęć z telefonu i błędy w odpowiedziach API
 
 ### Zgłoszenie

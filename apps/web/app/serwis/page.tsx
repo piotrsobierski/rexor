@@ -1,2 +1,7 @@
-import { ServicePage } from '@/components/service-page';
-export default function Page() { return <ServicePage />; }
+import { ServicePage, serviceFallbackContent } from '@/components/service-page';
+import { fetchPage } from '@/lib/server-catalog';
+
+export default async function Page() {
+  const page = await fetchPage('serwis');
+  return <ServicePage content={page?.content_html ?? serviceFallbackContent} />;
+}

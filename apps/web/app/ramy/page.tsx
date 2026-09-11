@@ -1,2 +1,7 @@
 import { FramesPage } from '@/components/static-pages';
-export default function Page() { return <FramesPage />; }
+import { fetchCatalog } from '@/lib/server-catalog';
+
+export default async function Page() {
+  const catalog = await fetchCatalog();
+  return <FramesPage catalog={catalog ?? undefined} />;
+}

@@ -15,7 +15,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { CUSTOMER_SUPPLIED_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
 import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/pricing';
-import { usePublicCatalog } from '@/lib/use-public-catalog';
+import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 type ContactForm = { customerName: string; customerEmail: string; customerPhone: string; notes: string; privacyAccepted: boolean };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
@@ -48,8 +48,8 @@ function groupChoices(group: OptionGroup) {
   }];
 }
 
-export function BikeConfigurator() {
-  const { models } = usePublicCatalog();
+export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
+  const { models } = usePublicCatalog(catalog);
   const [modelId, setModelId] = useState<BikeModel['id']>('e82');
   const [size, setSize] = useState('M');
   const [galleryIndex, setGalleryIndex] = useState(0);

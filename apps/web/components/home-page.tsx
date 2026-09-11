@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { formatPrice } from '@/lib/catalog';
-import { usePublicCatalog } from '@/lib/use-public-catalog';
+import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 
 const categories = [
   { slug: 'szosa', name: 'Szosa', description: 'Szybkość na asfalcie', icon: Route, empty: true },
@@ -12,8 +12,8 @@ const categories = [
   { slug: 'miejski-turystyczny', name: 'Miejski i turystyczny', description: 'Komfort każdego dnia', icon: Bike, empty: true },
 ];
 
-export function HomePage() {
-  const { models, categories: apiCategories } = usePublicCatalog();
+export function HomePage({ catalog }: { catalog?: PublicCatalogData }) {
+  const { models, categories: apiCategories } = usePublicCatalog(catalog);
   const visibleCategories = categories.map((fallback) => {
     const stored = apiCategories.find((item) => item.slug === fallback.slug);
     return { ...fallback, name: stored?.name ?? fallback.name, description: stored?.short_description ?? fallback.description };

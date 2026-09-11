@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import { ThemeRuntime } from '@/components/theme-runtime';
+import { ThemeStyle } from '@/components/theme-runtime';
+import { fetchTheme } from '@/lib/server-catalog';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin', 'latin-ext'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin', 'latin-ext'] });
@@ -11,10 +12,12 @@ export const metadata: Metadata = {
   description: 'Zbuduj własny rower Rexor i zapisz konfigurację do późniejszego powrotu.',
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const theme = await fetchTheme();
   return (
     <html lang="pl">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}><ThemeRuntime />{children}</body>
+      <head><ThemeStyle theme={theme} /></head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
     </html>
   );
 }
