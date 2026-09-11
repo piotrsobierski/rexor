@@ -122,6 +122,10 @@ export function computeBatteryEstimates(battery: {
   cell_capacity_ah?: unknown;
   cellCapacityAh?: unknown;
   code?: unknown;
+  // Bez indeksu TS traktuje ten typ jako "weak" (same opcjonalne pola) i
+  // odrzuca callerów przekazujących wiersze z bazy (Row: Record<string, ...>),
+  // mimo że strukturalnie pasują - patrz caller w admin-panel.tsx.
+  [key: string]: unknown;
 }, modelSlug = 'e82'): BatteryEstimates {
   const formatRaw = battery.cell_format ?? battery.cellFormat ?? '18650';
   const series = Math.max(0, Math.round(parseBatteryNumber(battery.series_count ?? battery.seriesCount)));

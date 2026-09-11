@@ -22,7 +22,7 @@ export function ConfigurationSummary() {
     setShareUrl(window.location.href);
     if (!params.token) return;
     fetch(`${API_BASE}/configurations/share/${params.token}`)
-      .then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error ?? 'Nie udało się otworzyć konfiguracji.'); return data; })
+      .then(async (response) => { const data = (await response.json()) as any; if (!response.ok) throw new Error(data.error ?? 'Nie udało się otworzyć konfiguracji.'); return data; })
       .then((data) => setSnapshot(data.configuration))
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Nie udało się otworzyć konfiguracji.'));
   }, [params.token]);

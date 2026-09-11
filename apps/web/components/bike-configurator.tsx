@@ -123,7 +123,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     const resumeToken = query.get('resume');
     if (resumeToken) {
       fetch(`${API_BASE}/configurations/resume/${resumeToken}`)
-        .then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error); return data; })
+        .then(async (response) => { const data = (await response.json()) as any; if (!response.ok) throw new Error(data.error); return data; })
         .then(({ configuration }) => {
           const nextModel = models.find((item) => modelSlugs[item.id] === configuration.model.slug && item.available);
           if (!nextModel) return;
@@ -231,7 +231,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           privacyConsent: contact.privacyAccepted,
         }),
       });
-      const result = await response.json();
+      const result = (await response.json()) as any;
       if (!response.ok) throw new Error(result.error ?? 'Nie udało się zapisać konfiguracji.');
       window.location.href = result.shareUrl;
     } catch (error) {

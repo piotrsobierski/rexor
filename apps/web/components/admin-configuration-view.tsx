@@ -16,7 +16,7 @@ export function AdminConfigurationView() {
     if (!token) { setError('Zaloguj się w panelu administracyjnym, aby zobaczyć tę konfigurację.'); return; }
     if (!params.publicId) return;
     fetch(`${API_BASE}/admin/configurations/${params.publicId}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error ?? 'Nie udało się otworzyć konfiguracji.'); return data; })
+      .then(async (response) => { const data = (await response.json()) as any; if (!response.ok) throw new Error(data.error ?? 'Nie udało się otworzyć konfiguracji.'); return data; })
       .then((data) => setSnapshot(data.configuration))
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Nie udało się otworzyć konfiguracji.'));
   }, [params.publicId]);

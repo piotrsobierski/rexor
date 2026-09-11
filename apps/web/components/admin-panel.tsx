@@ -62,7 +62,7 @@ export function AdminPanel() {
     // logowania - to nie jest "zapis" z perspektywy admina.
     const isMutation = method !== 'GET' && path !== '/admin/login';
     const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}), ...options.headers } });
-    const data = await response.json().catch(() => ({}));
+    const data = (await response.json().catch(() => ({}))) as any;
     if (!response.ok) {
       if (isMutation) {
         toast.add({ title: 'Nie zapisano', description: `${data.error ?? 'Operacja nie powiodła się.'} (HTTP ${response.status})`, type: 'error' });
@@ -1037,7 +1037,7 @@ function BatteriesEditor({ batteries, models, request, reload, setMessage }: { b
             <BatteryLiveMetrics
               draft={draft}
               modelSlug={modelSlug}
-              onApplyUpdate={(patch) => setDrafts({ ...drafts, [row.id]: { ...draft, ...patch } })}
+              onApplyUpdate={(patch) => setDrafts({ ...drafts, [row.id]: { ...draft, ...patch } as Row })}
             />
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1077,7 +1077,7 @@ function BatteriesEditor({ batteries, models, request, reload, setMessage }: { b
             <BatteryLiveMetrics
               draft={draftNew}
               modelSlug={modelSlug}
-              onApplyUpdate={(patch) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, ...patch } })}
+              onApplyUpdate={(patch) => setNewRows({ ...newRows, [Number(model.id)]: { ...draftNew, ...patch } as Row })}
             />
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
