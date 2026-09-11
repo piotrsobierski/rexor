@@ -182,6 +182,10 @@ function createAdminPart(PDO $pdo, array $input): array
     }
 
     $grossPrice = $input['gross_price'] ?? null;
+    $priceStatus = $input['price_status'] ?? 'fixed';
+    if (!in_array($priceStatus, ['fixed', 'quote'], true)) {
+        $priceStatus = 'fixed';
+    }
     $statement = $pdo->prepare(
         'INSERT INTO parts (group_id, sku, name, manufacturer, model, description, price_status, gross_price, is_active) ' .
         'VALUES (:group_id, :sku, :name, :manufacturer, :model, :description, :price_status, :gross_price, TRUE)'
@@ -193,7 +197,7 @@ function createAdminPart(PDO $pdo, array $input): array
         'manufacturer' => ($manufacturer = trim((string) ($input['manufacturer'] ?? ''))) !== '' ? $manufacturer : null,
         'model' => ($model = trim((string) ($input['model'] ?? ''))) !== '' ? $model : null,
         'description' => ($description = trim((string) ($input['description'] ?? ''))) !== '' ? $description : null,
-        'price_status' => in_array($input['price_status'] ?? 'fixed', ['fixed', 'quote'], true) ? $input['price_status'] : 'fixed',
+        'price_status' => $priceStatus,
         'gross_price' => $grossPrice === null || $grossPrice === '' ? null : (float) $grossPrice,
     ]);
 

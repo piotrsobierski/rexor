@@ -420,11 +420,11 @@ function PartsEditor({
                         </Label>
                       )}
                     </TableCell>
-                    <TableCell className="w-48">
+                    <TableCell className="w-48 max-w-48">
                       <NativeSelect
                         value={String(drafts[row.id]?.group_id ?? row.group_id ?? '')}
                         onChange={(e) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], group_id: e.target.value } })}
-                        className="h-9 text-xs"
+                        className="w-full h-9 text-xs"
                       >
                         {partGroups.map((g) => (
                           <NativeSelectOption key={g.id} value={g.id}>
@@ -448,7 +448,7 @@ function PartsEditor({
                         />
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-ink-subtle">
+                    <TableCell className="max-w-0 truncate font-mono text-xs text-ink-subtle" title={String(row.sku ?? '')}>
                       {String(row.sku ?? '—')}
                     </TableCell>
                     <TableCell>
