@@ -48,7 +48,8 @@ export type BikeBattery = {
 };
 
 export type BikeModel = {
-  id: 'e82' | 'e55' | 'cfr707';
+  /** Odpowiada slug modelu w bazie (bike_models.slug) - katalog nie jest już ograniczony do stałej listy. */
+  id: string;
   name: string;
   category: string;
   /** Slug kategorii z bazy (bike_categories.slug) — do filtrowania i linkowania /rowery/{slug}. */

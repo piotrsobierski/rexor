@@ -43,7 +43,6 @@ const formatEnergy = (wh: number) => `${new Intl.NumberFormat('pl-PL', { maximum
 const initialSelections = (model: BikeModel): Selections => Object.fromEntries(model.groups
   .map((group) => [group.slug, group.defaultSku ?? (group.customerPartAllowed ? CUSTOMER_SUPPLIED_SKU : (group.selectionMode === 'optional' ? NONE_SKU : null))] as const)
   .filter((entry): entry is readonly [string, string] => entry[1] !== null));
-const modelSlugs: Record<BikeModel['id'], string> = { e82: 'e82', e55: 'e55', cfr707: 'cfr707' };
 const defaultSizeCode = (model: BikeModel): string =>
   (model.sizes.find((item) => item.code === 'M') ?? model.sizes[0])?.code ?? '';
 
@@ -72,7 +71,7 @@ function groupChoices(group: OptionGroup, t: SiteCopy['configurator']) {
 export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   const { models } = usePublicCatalog(catalog);
   const copy = usePublicCopy();
-  const [modelId, setModelId] = useState<BikeModel['id']>('e82');
+  const [modelId, setModelId] = useState<BikeModel['id']>(models[0]?.id ?? 'e82');
   const [size, setSize] = useState('M');
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
@@ -141,7 +140,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
       fetch(`${API_BASE}/configurations/resume/${resumeToken}`)
         .then(async (response) => { const data = (await response.json()) as any; if (!response.ok) throw new Error(data.error); return data; })
         .then(({ configuration }) => {
-          const nextModel = models.find((item) => modelSlugs[item.id] === configuration.model.slug && item.available);
+          const nextModel = models.find((item) => item.id === configuration.model.slug && item.available);
           if (!nextModel) return;
           const restored = initialSelections(nextModel);
           for (const item of configuration.items as Array<{ groupSlug: string; sku: string }>) {
@@ -215,17 +214,17 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     setSize(defaultSizeCode(next));
     setGalleryIndex(0);
     carouselApi?.scrollTo(0, true);
-    logConfiguratorEvent(modelSlugs[nextId], 'model', nextId, next.name);
+    logConfiguratorEvent(nextId, 'model', nextId, next.name);
   }
 
   function changeSize(value: string) {
     setSize(value);
-    logConfiguratorEvent(modelSlugs[model.id], 'size', value, `Rozmiar ${value}`);
+    logConfiguratorEvent(model.id, 'size', value, `Rozmiar ${value}`);
   }
 
   function changeBattery(value: string) {
     setBatteryByModel((current) => ({ ...current, [model.id]: value }));
-    logConfiguratorEvent(modelSlugs[model.id], 'battery', value, model.batteries.find((item) => item.code === value)?.name);
+    logConfiguratorEvent(model.id, 'battery', value, model.batteries.find((item) => item.code === value)?.name);
   }
 
   function choose(groupSlug: string, sku: string) {
@@ -233,7 +232,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     setSelectionsByModel((current) => ({ ...current, [model.id]: { ...current[model.id], [groupSlug]: sku } }));
     const group = model.groups.find((item) => item.slug === groupSlug);
     const choiceName = group ? groupChoices(group, copy.configurator).find((item) => item.sku === sku)?.name : undefined;
-    logConfiguratorEvent(modelSlugs[model.id], `group:${groupSlug}`, sku, group && choiceName ? `${group.name}: ${choiceName}` : undefined);
+    logConfiguratorEvent(model.id, `group:${groupSlug}`, sku, group && choiceName ? `${group.name}: ${choiceName}` : undefined);
   }
 
   async function submitConfiguration(event: FormEvent<HTMLFormElement>) {
@@ -250,7 +249,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          modelSlug: modelSlugs[model.id],
+          modelSlug: model.id,
           sizeCode: size,
           batteryCode: battery?.code ?? '',
           selections: selectionsPayload,

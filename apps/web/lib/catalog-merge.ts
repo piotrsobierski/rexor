@@ -1,7 +1,6 @@
 import { bikeModels, type BikeBattery, type BikeModel, type BikeSize, type OptionGroup } from '@/lib/catalog';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
-const idsBySlug: Record<string, BikeModel['id']> = { e82: 'e82', e55: 'e55', cfr707: 'cfr707' };
 
 export type PublicCategory = { slug: string; name: string; short_description: string | null; description_html: string | null; default_image_path: string | null };
 
@@ -35,35 +34,48 @@ export function publicMediaUrl(path: string | null | undefined): string {
 }
 
 /**
- * Łączy odpowiedź API ze statyczną listą treści marketingowych. Używane i na
- * serwerze (pierwszy render), i na kliencie (gdy serwer nie dostarczył danych),
- * dlatego ten moduł nie jest oznaczony jako klientowy.
+ * Katalog buduje się z odpowiedzi API (dowolna liczba modeli, tylko z bazy -
+ * nowe ramy dochodzą przez panel admina, bez zmian w kodzie), nie z listy
+ * modeli zaszytej w kodzie. `bikeModels` (lib/catalog.ts) dostarcza tylko
+ * dodatkową treść marketingową (długi opis, hasła, etykiety silnika/baterii)
+ * dla trzech modeli startowych, gdy istnieje dopasowanie po slugu - reszta
+ * (cena, zdjęcia, opcje, specyfikacja) zawsze pochodzi z API. Model bez
+ * dopasowania w bikeModels wciąż się w pełni renderuje, tylko bez tych
+ * dodatkowych, ręcznie napisanych treści.
+ *
+ * Używane i na serwerze (pierwszy render), i na kliencie (gdy serwer nie
+ * dostarczył danych), dlatego ten moduł nie jest oznaczony jako klientowy.
  */
 export function mergeCatalog(data: { models: ApiModel[]; categories: PublicCategory[] }): PublicCatalogData {
   return {
     categories: data.categories,
-    models: bikeModels.map((fallback) => {
-      const apiModel = data.models.find((item) => idsBySlug[item.slug] === fallback.id);
-      if (!apiModel) return fallback;
+    models: data.models.map((apiModel): BikeModel => {
+      const fallback = bikeModels.find((item) => item.id === apiModel.slug);
+      const categoryName = data.categories.find((item) => item.slug === apiModel.category_slug)?.name ?? fallback?.category ?? apiModel.category_slug;
       const gallery = apiModel.media.map((item) => publicMediaUrl(item.storage_path)).filter(Boolean);
-      const image = publicMediaUrl(apiModel.default_image_path) || gallery[0] || fallback.image;
+      const image = publicMediaUrl(apiModel.default_image_path) || gallery[0] || fallback?.image || '';
       return {
-        ...fallback,
+        id: apiModel.slug,
         name: apiModel.name,
+        category: categoryName,
         categorySlug: apiModel.category_slug,
-        description: apiModel.short_description || fallback.description,
-        descriptionHtml: apiModel.description_html || fallback.descriptionHtml,
+        eyebrow: fallback?.eyebrow ?? categoryName,
+        description: apiModel.short_description || fallback?.description || '',
+        descriptionHtml: apiModel.description_html || fallback?.descriptionHtml,
+        image,
+        gallery: gallery.length ? gallery : fallback?.gallery ?? [],
+        frameImage: fallback?.frameImage,
         basePrice: apiModel.base_price,
         framePriceGross: apiModel.framePriceGross ?? 0,
         assemblyPriceGross: apiModel.assemblyPriceGross ?? 0,
         marginPercent: apiModel.marginPercent ?? 0,
-        image,
-        gallery: gallery.length ? gallery : fallback.gallery,
-        facts: apiModel.specifications?.facts?.length ? apiModel.specifications.facts : fallback.facts,
+        motor: fallback?.motor ?? '',
+        battery: fallback?.battery ?? '',
+        facts: apiModel.specifications?.facts?.length ? apiModel.specifications.facts : fallback?.facts,
         sizes: apiModel.sizes ?? [],
         batteries: apiModel.batteries ?? [],
-        groups: apiModel.groups ?? [],
         available: (apiModel.groups?.length ?? 0) > 0 && apiModel.base_price !== null,
+        groups: apiModel.groups ?? [],
       };
     }),
   };
