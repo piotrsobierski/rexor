@@ -20,6 +20,7 @@ export type ApiModel = {
   sizes?: BikeSize[];
   batteries?: BikeBattery[];
   groups?: OptionGroup[];
+  specifications?: { facts?: string[]; [key: string]: unknown } | null;
 };
 
 export type PublicCatalogData = { models: BikeModel[]; categories: PublicCategory[] };
@@ -57,6 +58,7 @@ export function mergeCatalog(data: { models: ApiModel[]; categories: PublicCateg
         marginPercent: apiModel.marginPercent ?? 0,
         image,
         gallery: gallery.length ? gallery : fallback.gallery,
+        facts: apiModel.specifications?.facts?.length ? apiModel.specifications.facts : fallback.facts,
         sizes: apiModel.sizes ?? [],
         batteries: apiModel.batteries ?? [],
         groups: apiModel.groups ?? [],

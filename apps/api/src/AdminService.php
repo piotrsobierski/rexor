@@ -65,6 +65,14 @@ function adminCatalog(PDO $pdo): array
         'inquiries' => $pdo->query('SELECT i.id, i.status, c.public_id, c.customer_name, c.customer_email, c.gross_total, c.created_at FROM inquiries i JOIN configurations c ON c.id = i.configuration_id ORDER BY i.created_at DESC LIMIT 50')->fetchAll(),
         'pages' => $pdo->query('SELECT id, slug, title, navigation_label, excerpt, content_html, hero_image_path, is_published, updated_at FROM site_pages ORDER BY navigation_label')->fetchAll(),
         'theme' => json_decode((string) $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'theme'")->fetchColumn(), true, 16, JSON_THROW_ON_ERROR),
+        'modelSpecifications' => (function () use ($pdo) {
+            $rows = $pdo->query('SELECT id, specifications FROM bike_models')->fetchAll();
+            $result = [];
+            foreach ($rows as $row) {
+                $result[$row['id']] = $row['specifications'] ? json_decode((string) $row['specifications'], true, 64, JSON_THROW_ON_ERROR) : [];
+            }
+            return $result;
+        })(),
         'copy' => (function () use ($pdo) {
             $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'copy'")->fetchColumn();
             return $value ? json_decode((string) $value, true, 512, JSON_THROW_ON_ERROR) : null;
@@ -76,7 +84,7 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
 {
     $definitions = [
         'categories' => ['table' => 'bike_categories', 'fields' => ['name', 'short_description', 'description_html', 'default_image_path', 'is_published', 'sort_order']],
-        'models' => ['table' => 'bike_models', 'fields' => ['category_id', 'name', 'short_description', 'description_html', 'frame_price_gross', 'assembly_price_gross', 'margin_percent', 'default_image_path', 'status', 'sort_order']],
+        'models' => ['table' => 'bike_models', 'fields' => ['category_id', 'name', 'short_description', 'description_html', 'frame_price_gross', 'assembly_price_gross', 'margin_percent', 'default_image_path', 'status', 'sort_order', 'specifications']],
         'parts' => ['table' => 'parts', 'fields' => ['name', 'group_id', 'description', 'gross_price', 'price_status', 'image_path', 'is_active']],
         'sizes' => ['table' => 'model_sizes', 'fields' => ['label', 'price_delta_gross', 'sort_order', 'is_active']],
         'pages' => ['table' => 'site_pages', 'fields' => ['title', 'navigation_label', 'excerpt', 'content_html', 'hero_image_path', 'is_published']],
@@ -94,6 +102,8 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
         $value = $input[$field];
         if ($field === 'description_html') {
             $value = sanitizeRichHtml((string) $value);
+        } elseif ($field === 'specifications') {
+            $value = json_encode((array) $value, JSON_THROW_ON_ERROR);
         }
         $updates[] = "{$field} = :{$field}";
         $parameters[$field] = $value;

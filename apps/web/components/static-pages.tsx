@@ -222,11 +222,7 @@ export function BikeModelPage({ catalog, modelSlug, copy: initialCopy }: { catal
 export function FramesPage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
   const { models: bikeModels } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
-  const frames = [
-    { model: bikeModels[0], facts: copy.frames.factsByModel[0] ?? [] },
-    { model: bikeModels[1], facts: copy.frames.factsByModel[1] ?? [] },
-    { model: bikeModels[2], facts: copy.frames.factsByModel[2] ?? [] },
-  ];
+  const frames = bikeModels.slice(0, 3).map((model) => ({ model, facts: model.facts ?? [] }));
   return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.frames.eyebrow}</p><h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.frames.title}</h1><div className="mt-12 divide-y divide-line border-y border-line">{frames.map(({ model, facts }) => <article key={model.id} className="grid gap-6 py-8 md:grid-cols-[0.7fr_1fr_1fr] md:items-center"><img src={model.frameImage ?? model.gallery[1] ?? model.image} alt={`Rama ${model.name}`} className="aspect-[4/3] w-full rounded-2xl bg-[var(--muted)] object-contain mix-blend-multiply" /><div><span className="eyebrow">{model.category}</span><h2 className="mt-2 text-3xl font-semibold">{model.name.replace('Rexor ', '')}</h2><p className="mt-3 text-sm leading-relaxed text-ink-muted">{model.description}</p></div><ul className="grid grid-cols-2 gap-2">{facts.map((fact) => <li key={fact} className="rounded-xl bg-ink-wash p-3 text-sm font-medium">{fact}</li>)}</ul></article>)}</div></section></Frame>;
 }
 

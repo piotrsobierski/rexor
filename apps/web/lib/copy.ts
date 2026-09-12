@@ -77,11 +77,6 @@ export const defaultCopy = {
   frames: {
     eyebrow: 'Ramy',
     title: 'Geometria decyduje o charakterze.',
-    factsByModel: [
-      ['Karbon T700/T800', 'Skok ramy 170 mm', 'Koła 29 cali', 'Silnik M560'],
-      ['Karbon T700/T800', 'Damper 210×55', 'Łącznik 70 mm', 'Silnik M620 CAN'],
-      ['Karbon T700/T800', 'BSA 68 mm', 'Opony do 700×50', 'Mocowanie UDH'],
-    ] as string[][],
   },
   parts: {
     eyebrow: 'Części',

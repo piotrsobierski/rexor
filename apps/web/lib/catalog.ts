@@ -67,6 +67,8 @@ export type BikeModel = {
   marginPercent: number;
   motor: string;
   battery: string;
+  /** Krótkie hasła-tabliczki pod zdjęciem ramy na stronie /ramy. Edytowalne per model w panelu (specifications.facts). */
+  facts?: string[];
   sizes: BikeSize[];
   batteries: BikeBattery[];
   available: boolean;
@@ -124,6 +126,7 @@ export const bikeModels: BikeModel[] = [
     marginPercent: 0,
     motor: 'Bafang M560 · 750 W · Bluetooth',
     battery: 'Samsung 35E · 13S6P · 982,8 Wh',
+    facts: ['Karbon T700/T800', 'Skok ramy 170 mm', 'Koła 29 cali', 'Silnik M560'],
     sizes: [],
     batteries: [],
     available: true,
@@ -184,6 +187,7 @@ export const bikeModels: BikeModel[] = [
     marginPercent: 0,
     motor: 'Bafang M620 · CAN',
     battery: 'FEB 21700 · 14S4P · 1310,4 Wh',
+    facts: ['Karbon T700/T800', 'Damper 210×55', 'Łącznik 70 mm', 'Silnik M620 CAN'],
     sizes: [],
     batteries: [],
     available: true,
@@ -247,6 +251,7 @@ export const bikeModels: BikeModel[] = [
     marginPercent: 0,
     motor: 'Napęd tradycyjny',
     battery: 'Bez baterii',
+    facts: ['Karbon T700/T800', 'BSA 68 mm', 'Opony do 700×50', 'Mocowanie UDH'],
     sizes: [],
     batteries: [],
     available: false,
