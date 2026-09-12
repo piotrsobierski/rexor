@@ -11,19 +11,25 @@ export type PublicPage = { slug: string; title: string; excerpt: string | null; 
  * (STATIC_EXPORT=1) serwer nigdy nie dociąga treści (patrz fetchJson w
  * lib/server-catalog.ts), więc bez tego klienckiego dobicia strona zostawała
  * na zawsze z pustą treścią zamiast prawdziwej z bazy.
+ *
+ * `loading` rozróżnia "jeszcze nie wiemy" od "sprawdziliśmy, strony nie ma" -
+ * bez tego widać było na mgnienie "Strona jest w przygotowaniu", zanim
+ * doszła prawdziwa treść.
  */
 export function usePublicPage(slug: string, initial?: PublicPage | null) {
   const [page, setPage] = useState<PublicPage | null>(initial ?? null);
+  const [loading, setLoading] = useState(initial === undefined);
 
   useEffect(() => {
     if (initial !== undefined) return;
     fetch(`${API_BASE}/pages/${slug}`)
       .then(async (response) => { if (!response.ok) throw new Error('page'); return response.json() as Promise<{ page: PublicPage }>; })
       .then((data) => setPage(data.page))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   // Slug jednej strony nie zmienia się po zamontowaniu komponentu.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  return page;
+  return { page, loading };
 }

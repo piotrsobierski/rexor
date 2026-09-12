@@ -108,6 +108,7 @@ export const defaultCopy = {
   },
   content: {
     notPublished: 'Strona jest w przygotowaniu.',
+    loading: 'Wczytuję…',
   },
   configurator: {
     heroEyebrow: 'Wybierz bazę projektu',
