@@ -649,6 +649,7 @@ function CategoriesEditor({ rows, patch, request, setMessage }: { rows: Row[]; p
     <div className="grid gap-3">
       <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`cat-name-${row.id}`}>Nazwa</Label><Input id={`cat-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div>
       <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`cat-desc-${row.id}`}>Krótki opis</Label><Input id={`cat-desc-${row.id}`} value={String(drafts[row.id]?.short_description ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], short_description: event.target.value } })} /></div>
+      <label className="flex items-center gap-2 text-sm"><Switch checked={Boolean(drafts[row.id]?.is_published ?? row.is_published)} onCheckedChange={(checked) => { setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], is_published: checked } }); void patch('categories', row.id, { is_published: checked }); }} /> Widoczna na stronie głównej</label>
       <Button size="sm" className="w-fit" onClick={() => patch('categories', row.id, { name: drafts[row.id]?.name ?? row.name, short_description: drafts[row.id]?.short_description ?? row.short_description })}><Save /> Zapisz</Button>
     </div>
   </article>)}</div></Panel>;
