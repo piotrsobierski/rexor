@@ -130,7 +130,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
   return <div className="min-h-screen bg-[#f4f5f2]"><Toaster /><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><RefreshButton onRefresh={refreshCatalog} /><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
     <Tabs value={activeTab} onValueChange={(value) => { const tab = String(value); if (isAdminTabSlug(tab)) { setActiveTab(tab); window.history.pushState(null, '', `/admin/${tab}`); } }}><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Strony</TabsTrigger><TabsTrigger value="texts" className="rounded-full px-4 py-2">Teksty</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity-log" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} specifications={catalog.modelSpecifications} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
-      <TabsContent value="categories"><SimpleEditor resource="categories" rows={catalog.categories} patch={patch} fields={[['name', 'Nazwa'], ['short_description', 'Krótki opis']]} /></TabsContent>
+      <TabsContent value="categories"><CategoriesEditor rows={catalog.categories} patch={patch} request={request} setMessage={setMessage} /></TabsContent>
       <TabsContent value="equipment"><ModelEquipmentEditor catalog={catalog} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="parts"><PartsEditor rows={catalog.parts} partGroups={catalog.partGroups} models={catalog.models} modelParts={catalog.modelParts} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="batteries"><BatteriesEditor batteries={catalog.batteries ?? []} models={catalog.models} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
@@ -601,6 +601,57 @@ function PartsEditor({
       )}
     </div>
   );
+}
+
+/** Zdjęcie kategorii jako pojedyncze default_image_path (jak u modeli), wgrywane przez ten sam pipeline co inne zdjęcia w panelu - usuwanie tylko czyści to pole, sam plik zostaje (spójnie z tym, jak działają zdjęcia startowe modeli). */
+function CategoriesEditor({ rows, patch, request, setMessage }: { rows: Row[]; patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>; request: (path: string, options?: RequestInit) => Promise<any>; setMessage: (value: string) => void }) {
+  const [drafts, setDrafts] = useState<Record<number, Row>>(() => Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+  }, [rows]);
+
+  function imageSrc(path: string) { return path.startsWith('http') ? path : `${API_BASE}${path}`; }
+
+  async function uploadImage(row: Row, file?: File) {
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    form.append('ownerType', 'category');
+    form.append('ownerId', String(row.id));
+    form.append('role', 'default');
+    form.append('altText', String(row.name));
+    setMessage('Wysyłam zdjęcie…');
+    try {
+      const result = await request('/admin/media', { method: 'POST', body: form });
+      await patch('categories', row.id, { default_image_path: `${API_BASE}${result.url}` });
+      setMessage('Zdjęcie kategorii zaktualizowane.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się dodać zdjęcia.');
+    }
+  }
+
+  async function removeImage(row: Row) {
+    if (!window.confirm('Usunąć zdjęcie tej kategorii?')) return;
+    await patch('categories', row.id, { default_image_path: '' });
+  }
+
+  return <Panel title="Kategorie" description="Nazwa, krótki opis i zdjęcie widoczne na stronie głównej oraz na liście kategorii."><div className="grid gap-4">{rows.map((row) => <article key={row.id} className="grid gap-4 rounded-2xl border border-line p-5 sm:grid-cols-[160px_1fr] sm:p-6">
+    <div className="grid gap-2">
+      <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--muted)]">
+        {row.default_image_path ? <img src={imageSrc(String(row.default_image_path))} alt="" className="size-full object-cover" /> : <div className="grid size-full place-items-center text-center text-xs text-ink-subtle">Brak zdjęcia</div>}
+      </div>
+      <div className="flex gap-1.5">
+        <Label className="inline-flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium"><Upload className="size-3.5" /> Zmień<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void uploadImage(row, event.target.files?.[0])} /></Label>
+        {row.default_image_path && <Button type="button" size="sm" variant="outline" className="h-8 px-2" onClick={() => void removeImage(row)}><Trash2 className="size-3.5" /></Button>}
+      </div>
+    </div>
+    <div className="grid gap-3">
+      <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`cat-name-${row.id}`}>Nazwa</Label><Input id={`cat-name-${row.id}`} value={String(drafts[row.id]?.name ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], name: event.target.value } })} /></div>
+      <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`cat-desc-${row.id}`}>Krótki opis</Label><Input id={`cat-desc-${row.id}`} value={String(drafts[row.id]?.short_description ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...drafts[row.id], short_description: event.target.value } })} /></div>
+      <Button size="sm" className="w-fit" onClick={() => patch('categories', row.id, { name: drafts[row.id]?.name ?? row.name, short_description: drafts[row.id]?.short_description ?? row.short_description })}><Save /> Zapisz</Button>
+    </div>
+  </article>)}</div></Panel>;
 }
 
 function SimpleEditor({ resource, rows, patch, fields }: { resource: string; rows: Row[]; patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>; fields: string[][] }) {

@@ -6,6 +6,7 @@ import { Reveal } from '@/components/reveal';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { formatPrice } from '@/lib/catalog';
+import { publicMediaUrl } from '@/lib/catalog-merge';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
 
@@ -22,7 +23,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
   const copy = usePublicCopy(initialCopy);
   const visibleCategories = categoryIcons.map((fallback) => {
     const stored = apiCategories.find((item) => item.slug === fallback.slug);
-    return { ...fallback, name: stored?.name ?? fallback.name, description: stored?.short_description ?? fallback.description };
+    return { ...fallback, name: stored?.name ?? fallback.name, description: stored?.short_description ?? fallback.description, image: publicMediaUrl(stored?.default_image_path) };
   });
   return <div className="flex min-h-screen flex-col bg-background text-foreground"><SiteHeader /><main className="flex-1">
     <section className="mx-auto max-w-[1480px] px-4 pb-7 pt-10 sm:px-8 sm:pb-10 sm:pt-14 lg:px-12">
@@ -35,7 +36,15 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
     <section className="mx-auto max-w-[1480px] px-4 sm:px-8 lg:px-12">
       <Reveal delayMs={80} className="overflow-hidden rounded-[30px] border border-line bg-white">
         <div className="no-scrollbar flex snap-x overflow-x-auto">
-          {visibleCategories.map(({ slug, name, description, icon: Icon, empty }) => <a key={name} href={`/rowery/${slug}`} className="group flex min-w-[58vw] snap-start flex-col border-r border-line p-5 last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1 lg:p-6"><div className="grid size-11 place-items-center rounded-full bg-ink-wash transition-colors duration-300 group-hover:bg-[var(--accent-brand)] group-hover:scale-110"><Icon className="size-5 transition-transform duration-300 group-hover:rotate-6" /></div><strong className="mt-10 text-lg tracking-tight">{name}</strong><span className="mt-1 text-sm text-ink-muted">{description}</span>{empty && <span className="mt-4 w-fit rounded-full bg-ink-wash px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-ink-subtle">{copy.home.comingSoonBadge}</span>}</a>)}
+          {visibleCategories.map(({ slug, name, description, icon: Icon, empty, image }) => <a key={name} href={`/rowery/${slug}`} className="group flex min-w-[58vw] snap-start flex-col border-r border-line last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1">
+            <div className="relative aspect-[4/3] overflow-hidden bg-ink-wash">
+              {image ? <img src={image} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" /> : null}
+              <div className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-colors duration-300 group-hover:bg-[var(--accent-brand)]"><Icon className="size-4.5 transition-transform duration-300 group-hover:rotate-6" /></div>
+            </div>
+            <div className="p-5 lg:p-6">
+              <strong className="text-lg tracking-tight">{name}</strong><span className="mt-1 block text-sm text-ink-muted">{description}</span>{empty && <span className="mt-4 inline-block w-fit rounded-full bg-ink-wash px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-ink-subtle">{copy.home.comingSoonBadge}</span>}
+            </div>
+          </a>)}
         </div>
       </Reveal>
     </section>

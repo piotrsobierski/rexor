@@ -216,7 +216,7 @@ if ($method === 'GET' && preg_match('~^/uploads/(\d{4}/\d{2}/[a-f0-9]{32}\.(?:jp
 // Zdjęcia z preseedu bazy (spoza panelu admina) leżą w /public/media, nie w
 // /storage/media — osobna, węższa trasa niż /uploads, żeby nie serwować
 // dowolnych plików spod /public.
-if ($method === 'GET' && preg_match('~^/media/(models/[a-z0-9-]+/[a-z0-9._-]+\.(?:jpg|jpeg|png|webp|avif))$~', $path, $matches)) {
+if ($method === 'GET' && preg_match('~^/media/(models/[a-z0-9-]+/[a-z0-9._-]+\.(?:jpg|jpeg|png|webp|avif)|categories/[a-z0-9._-]+\.(?:jpg|jpeg|png|webp|avif))$~', $path, $matches)) {
     $file = projectRoot() . '/public/media/' . $matches[1];
     if (!is_file($file)) {
         jsonResponse(['error' => 'Nie znaleziono obrazu.'], 404);

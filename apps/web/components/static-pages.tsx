@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { formatPrice, type BikeModel } from '@/lib/catalog';
+import { publicMediaUrl } from '@/lib/catalog-merge';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
 import type { SiteCopy } from '@/lib/copy';
@@ -83,7 +84,9 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
     </section></Frame>;
   }
 
+  const categoryImage = publicMediaUrl(category.default_image_path);
   return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
+    {categoryImage && <div className="mb-8 aspect-[21/9] w-full overflow-hidden rounded-[28px] bg-[var(--muted)]"><img src={categoryImage} alt="" className="size-full object-cover" /></div>}
     <p className="eyebrow">{copy.category.eyebrow}</p>
     <h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{category.name}</h1>
     {category.short_description && <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-muted">{category.short_description}</p>}
