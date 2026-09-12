@@ -22,6 +22,9 @@ export const defaultCopy = {
   footer: {
     serwis: 'Serwis',
     konfigurator: 'Konfigurator',
+    regulamin: 'Regulamin',
+    polityka: 'Polityka prywatności',
+    kontakt: 'Kontakt',
     vatNote: 'Ceny brutto',
   },
   home: {
@@ -55,6 +58,9 @@ export const defaultCopy = {
     notFoundTitle: 'Nie znaleziono tej kategorii.',
     backToAllCta: 'Zobacz wszystkie rowery',
     emptyModels: 'Ta kategoria nie ma jeszcze przypisanych modeli. Wkrótce się to zmieni.',
+    electricDisclaimerTitle: 'Uwaga, zanim zobaczysz ofertę',
+    electricDisclaimerText: 'Pojazdy w tej kategorii przekraczają moc i prędkość wspomagania definiujące rower elektryczny w obowiązujących przepisach, dlatego nie oferujemy ich jako rowerów elektrycznych. Zapoznaj się z lokalnymi przepisami dotyczącymi tego typu pojazdów lub skontaktuj się z nami przed zakupem.',
+    electricDisclaimerAccept: 'Rozumiem, pokaż ofertę',
   },
   model: {
     breadcrumbHome: 'Rexor',
@@ -99,6 +105,9 @@ export const defaultCopy = {
     asideText: 'Opisz model i objawy. Wrócimy z proponowanym terminem oraz zakresem.',
     asideCta: 'Napisz do serwisu',
     asideNote: 'Termin potwierdzamy indywidualnie',
+  },
+  content: {
+    notPublished: 'Strona jest w przygotowaniu.',
   },
   configurator: {
     heroEyebrow: 'Wybierz bazę projektu',

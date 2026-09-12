@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Bike, Map, Mountain, Route, Wrench } from 'lucide-react';
+import { ArrowRight, Bike, Map, Mountain, Route, Wrench, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Reveal } from '@/components/reveal';
 import { SiteFooter } from '@/components/site-footer';
@@ -14,6 +14,7 @@ const categoryIcons = [
   { slug: 'gravel', name: 'Gravel', description: 'Asfalt, szuter, wyprawa', icon: Map, empty: false },
   { slug: 'mtb', name: 'MTB', description: 'Kontrola poza asfaltem', icon: Mountain, empty: false },
   { slug: 'miejski-turystyczny', name: 'Miejski i turystyczny', description: 'Komfort każdego dnia', icon: Bike, empty: true },
+  { slug: 'elektryczne', name: 'Pojazdy elektryczne', description: 'Moc i zasięg bez kompromisów', icon: Zap, empty: false },
 ];
 
 export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {

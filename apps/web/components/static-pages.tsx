@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowRight, BatteryCharging, Gauge } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, BatteryCharging, Gauge, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
@@ -56,13 +56,32 @@ export function BikesPage({ catalog, copy: initialCopy }: { catalog?: PublicCata
   return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.bikes.eyebrow}</p><h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.bikes.title}</h1><div className="mt-10 grid gap-5 lg:grid-cols-3">{models.map((model) => <BikePickCard key={model.id} model={model} copy={copy} />)}</div></section></Frame>;
 }
 
+/** Kategorie, które przekraczają moc/prędkość roweru elektrycznego - klient musi potwierdzić ostrzeżenie raz na przeglądarkę zanim zobaczy ofertę. */
+const restrictedCategorySlugs = ['elektryczne'];
+
 export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { catalog?: PublicCatalogData; categorySlug: string; copy?: unknown }) {
   const { models, categories } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
   const category = categories.find((item) => item.slug === categorySlug);
   const categoryModels = models.filter((model) => model.categorySlug === categorySlug);
+  const isRestricted = restrictedCategorySlugs.includes(categorySlug);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+
+  useEffect(() => {
+    if (!isRestricted) return;
+    setDisclaimerAccepted(window.localStorage.getItem(`rexor_disclaimer_${categorySlug}`) === '1');
+  }, [categorySlug, isRestricted]);
 
   if (!category) return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.category.eyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.category.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.category.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></Frame>;
+
+  if (isRestricted && !disclaimerAccepted) {
+    return <Frame><section className="mx-auto max-w-[720px] px-4 py-16 text-center sm:px-8 lg:py-24">
+      <ShieldAlert className="mx-auto size-10 text-amber-600" />
+      <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{copy.category.electricDisclaimerTitle}</h1>
+      <p className="mt-4 text-base leading-relaxed text-ink-muted">{copy.category.electricDisclaimerText}</p>
+      <Button onClick={() => { window.localStorage.setItem(`rexor_disclaimer_${categorySlug}`, '1'); setDisclaimerAccepted(true); }} className="mt-8 h-12 rounded-full bg-ink px-8 text-white">{copy.category.electricDisclaimerAccept}</Button>
+    </section></Frame>;
+  }
 
   return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
     <p className="eyebrow">{copy.category.eyebrow}</p>

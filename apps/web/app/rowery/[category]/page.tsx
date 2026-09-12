@@ -9,6 +9,7 @@ export function generateStaticParams() {
     'gravel',
     'mtb',
     'miejski-turystyczny',
+    'elektryczne',
     ...knownModelSlugs,
   ].map((category) => ({ category }));
 }
