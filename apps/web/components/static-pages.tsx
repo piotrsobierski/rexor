@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { ArrowRight, BatteryCharging, Gauge, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SiteFooter } from '@/components/site-footer';
@@ -98,9 +99,16 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
   </section></Frame>;
 }
 
-export function BikeModelPage({ catalog, modelSlug, copy: initialCopy }: { catalog?: PublicCatalogData; modelSlug: string; copy?: unknown }) {
+export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initialCopy }: { catalog?: PublicCatalogData; modelSlug?: string; copy?: unknown }) {
   const { models, categories } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
+  // Statyczny eksport nie może z góry wypisać wszystkich par kategoria/model
+  // (nowe modele/ramy dochodzą wyłącznie z bazy, przez panel) - trasa
+  // /rowery/[category]/[model] renderuje więc jedną powłokę dla dowolnego
+  // sluga (patrz generateStaticParams + .htaccess), a właściwy model czytamy
+  // tu, po stronie klienta, z faktycznego URL-a.
+  const params = useParams<{ model?: string }>();
+  const modelSlug = modelSlugProp ?? params.model ?? '';
   const normalizedSlug = modelSlug.toLowerCase();
   const model = models.find((m) => m.id === normalizedSlug || m.name.toLowerCase().includes(normalizedSlug) || (normalizedSlug.includes('e82') && m.id === 'e82') || (normalizedSlug.includes('e55') && m.id === 'e55') || (normalizedSlug.includes('cfr707') && m.id === 'cfr707')) ?? models[0];
   const [selectedPhoto, setSelectedPhoto] = useState(0);

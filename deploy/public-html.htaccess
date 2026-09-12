@@ -23,6 +23,11 @@ RewriteRule ^ - [F,L]
 RewriteRule ^konfiguracja/[^/]+/?$ konfiguracja/_.html [L]
 RewriteRule ^admin/konfiguracje/[^/]+/?$ admin/konfiguracje/_.html [L]
 
+# Strona modelu roweru: modele/ramy dochodzą tylko z bazy (panel admina),
+# więc nie może być z góry ustalonej listy kategoria/model - jak wyżej,
+# jeden shell, właściwy slug BikeModelPage czyta z URL-a po stronie klienta.
+RewriteRule ^rowery/[^/]+/[^/]+/?$ rowery/_/_.html [L]
+
 # Trasy eksportu statycznego są zapisane jako nazwa.html.
 RewriteCond %{REQUEST_FILENAME}.html -f
 RewriteRule ^(.+?)/?$ $1.html [L]

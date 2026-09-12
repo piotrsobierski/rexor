@@ -1,16 +1,15 @@
 import { BikeModelPage } from '@/components/static-pages';
-import { fetchCatalog, fetchCopy } from '@/lib/server-catalog';
 
+// Nowe modele/ramy dochodzą tylko z bazy przez panel admina - nie da się
+// wypisać z góry wszystkich par kategoria/model przy eksporcie statycznym.
+// Zamiast tego generujemy jedną powłokę ("_") i .htaccess przekierowuje do
+// niej każdy request /rowery/*/*; właściwy slug BikeModelPage czyta z URL-a
+// po stronie klienta (useParams) i dobiera model z żywego katalogu z API.
+// Ten sam wzorzec już działa dla /konfiguracja/[token].
 export function generateStaticParams() {
-  return [
-    { category: 'mtb', model: 'e82' },
-    { category: 'mtb', model: 'e55' },
-    { category: 'gravel', model: 'cfr707' },
-  ];
+  return [{ category: '_', model: '_' }];
 }
 
-export default async function Page({ params }: { params: Promise<{ category: string; model: string }> }) {
-  const { model } = await params;
-  const [catalog, copy] = await Promise.all([fetchCatalog(), fetchCopy()]);
-  return <BikeModelPage catalog={catalog ?? undefined} modelSlug={model} copy={copy} />;
+export default function Page() {
+  return <BikeModelPage />;
 }
