@@ -21,10 +21,12 @@ const categoryIcons = [
 export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
   const { models, categories: apiCategories } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
-  const visibleCategories = categoryIcons.map((fallback) => {
-    const stored = apiCategories.find((item) => item.slug === fallback.slug);
-    return { ...fallback, name: stored?.name ?? fallback.name, description: stored?.short_description ?? fallback.description, image: publicMediaUrl(stored?.default_image_path) };
-  });
+  const visibleCategories = categoryIcons
+    .filter((fallback) => apiCategories.some((item) => item.slug === fallback.slug))
+    .map((fallback) => {
+      const stored = apiCategories.find((item) => item.slug === fallback.slug);
+      return { ...fallback, name: stored?.name ?? fallback.name, description: stored?.short_description ?? fallback.description, image: publicMediaUrl(stored?.default_image_path) };
+    });
   return <div className="flex min-h-screen flex-col bg-background text-foreground"><SiteHeader /><main className="flex-1">
     <section className="mx-auto max-w-[1480px] px-4 pb-7 pt-10 sm:px-8 sm:pb-10 sm:pt-14 lg:px-12">
       <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
@@ -36,9 +38,9 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
     <section className="mx-auto max-w-[1480px] px-4 sm:px-8 lg:px-12">
       <Reveal delayMs={80} className="overflow-hidden rounded-[30px] border border-line bg-white">
         <div className="no-scrollbar flex snap-x overflow-x-auto">
-          {visibleCategories.map(({ slug, name, description, icon: Icon, empty, image }) => <a key={name} href={`/rowery/${slug}`} className="group flex min-w-[58vw] snap-start flex-col border-r border-line last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1">
+          {visibleCategories.map(({ slug, name, description, icon: Icon, empty, image }, idx) => <a key={name} href={`/rowery/${slug}`} className="group flex min-w-[58vw] snap-start flex-col border-r border-line last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1">
             <div className="relative aspect-[4/3] overflow-hidden bg-ink-wash">
-              {image ? <img src={image} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" /> : null}
+              {image ? <img src={image} alt="" width={900} height={600} loading={idx < 3 ? 'eager' : 'lazy'} decoding="async" fetchPriority={idx === 0 ? 'high' : 'auto'} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" /> : null}
               <div className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-colors duration-300 group-hover:bg-[var(--accent-brand)]"><Icon className="size-4.5 transition-transform duration-300 group-hover:rotate-6" /></div>
             </div>
             <div className="p-5 lg:p-6">
@@ -59,7 +61,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
           <article className="group relative overflow-hidden rounded-[28px] bg-[var(--muted)] transition-shadow duration-300 hover:shadow-[0_10px_34px_rgba(0,0,0,0.09)] hover:-translate-y-1 focus-within:shadow-[0_10px_34px_rgba(0,0,0,0.09)] flex flex-col justify-between">
             <div>
               <a href={productHref} className="block overflow-hidden p-5 aspect-[4/3]">
-                <img src={model.image} alt={model.name} className="size-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-[1.035]" />
+                <img src={model.image} alt={model.name} loading="lazy" decoding="async" className="size-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-[1.035]" />
               </a>
               <div className="bg-white p-5 sm:p-6 pb-2">
                 <div className="flex items-start justify-between gap-4">
