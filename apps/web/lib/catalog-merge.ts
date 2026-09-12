@@ -29,6 +29,7 @@ export type PublicCatalogData = { models: BikeModel[]; categories: PublicCategor
 export function publicMediaUrl(path: string | null | undefined): string {
   if (!path) return '';
   if (path.startsWith('/media/models/')) return path.replace('/media/models/', '/models/');
+  if (path.startsWith('/media/categories/')) return path.replace('/media/categories/', '/categories/');
   if (path.startsWith('/uploads/')) return `${API_BASE}${path}`;
   return path;
 }
