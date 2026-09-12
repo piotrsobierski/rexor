@@ -35,9 +35,11 @@ import { Toaster, toast } from '@/components/ui/toast';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { isAdminTabSlug, type AdminTabSlug } from '@/lib/admin-tabs';
+import { mergeCopy, type SiteCopy } from '@/lib/copy';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
@@ -47,7 +49,7 @@ type ModelPartRow = { model_id: number; part_id: number; group_id: number; group
 type GroupSettingsRow = { model_id: number; group_id: number; group_slug: string; selection_mode: string; customer_part_allowed: number | boolean; customer_part_gross_price: string | number; customer_part_label: string; helper_text: string | null };
 type PricingLine = { groupSlug: string; groupName: string; name: string; grossPrice: number };
 type ModelPricing = { modelId: number; framePriceGross: number; batteryPriceGross: number; componentsPriceGross: number; assemblyPriceGross: number; marginPercent: number; marginAmountGross: number; grossTotal: number; issues: string[]; notes: string[]; lines: PricingLine[] };
-type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string> };
+type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null };
 type ActivityLogEntry = { id: number; event_type: string; actor_type: 'customer' | 'admin' | 'system'; actor_label: string | null; ip_address: string | null; summary: string; details: Record<string, unknown> | null; created_at: string };
 
 export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
@@ -126,13 +128,14 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
   if (!token || !catalog) return <main className="grid min-h-screen place-items-center bg-[#111] px-4"><Toaster /><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-7"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" /><p className="eyebrow mt-10">Panel administracyjny</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Zaloguj się</h1><div className="mt-6 grid gap-4"><div className="grid gap-1.5"><Label htmlFor="admin-email">E-mail</Label><Input id="admin-email" type="email" required className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} /></div><div className="grid gap-1.5"><Label htmlFor="admin-password">Hasło</Label><Input id="admin-password" type="password" required className="h-11" value={password} onChange={(event) => setPassword(event.target.value)} /></div><Button type="submit" className="h-11 rounded-full bg-ink text-white">Zaloguj</Button>{message && <p className="text-center text-sm text-ink-muted">{message}</p>}</div></form></main>;
 
   return <div className="min-h-screen bg-[#f4f5f2]"><Toaster /><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><RefreshButton onRefresh={refreshCatalog} /><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
-    <Tabs value={activeTab} onValueChange={(value) => { const tab = String(value); if (isAdminTabSlug(tab)) { setActiveTab(tab); window.history.pushState(null, '', `/admin/${tab}`); } }}><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Serwis</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity-log" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
+    <Tabs value={activeTab} onValueChange={(value) => { const tab = String(value); if (isAdminTabSlug(tab)) { setActiveTab(tab); window.history.pushState(null, '', `/admin/${tab}`); } }}><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Serwis</TabsTrigger><TabsTrigger value="texts" className="rounded-full px-4 py-2">Teksty</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity-log" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="categories"><SimpleEditor resource="categories" rows={catalog.categories} patch={patch} fields={[['name', 'Nazwa'], ['short_description', 'Krótki opis']]} /></TabsContent>
       <TabsContent value="equipment"><ModelEquipmentEditor catalog={catalog} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="parts"><PartsEditor rows={catalog.parts} partGroups={catalog.partGroups} models={catalog.models} modelParts={catalog.modelParts} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="batteries"><BatteriesEditor batteries={catalog.batteries ?? []} models={catalog.models} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="service"><PageEditor page={catalog.pages.find((page) => page.slug === 'serwis')} patch={patch} request={request} /></TabsContent>
+      <TabsContent value="texts"><CopyEditor copy={catalog.copy} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="theme"><ThemeEditor theme={catalog.theme} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="inquiries"><InquiriesTable rows={catalog.inquiries} /></TabsContent>
       <TabsContent value="activity-log"><ActivityLogPanel request={request} /></TabsContent>
@@ -1229,6 +1232,57 @@ function PageEditor({ page, patch, request }: { page?: Row; patch: (resource: st
   return <Panel title="Strona Serwis" description="Edytor WYSIWYG zapisuje formatowanie oraz obrazy w treści."><div className="grid gap-4"><div className="grid gap-1.5"><Label>Tytuł</Label><Input className="h-11" value={title} onChange={(event) => setTitle(event.target.value)} /></div><div className="grid gap-1.5"><Label>Treść</Label><WysiwygEditor value={contentHtml} onChange={setContentHtml} minHeight="min-h-80" onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', 'Zdjęcie w treści serwisu'); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} onAiEdit={async (instruction, html) => { const result = await request('/admin/ai/rich-content', { method: 'POST', body: JSON.stringify({ html, instruction }) }); return String(result.html ?? ''); }} /></div><div className="flex items-center justify-between"><label className="flex items-center gap-2 text-sm"><Switch checked={published} onCheckedChange={setPublished} /> Opublikowana</label><Button onClick={() => patch('pages', page.id, { title, content_html: contentHtml, is_published: published })}><Save /> Zapisz stronę</Button></div></div></Panel>;
 }
 
+// Struktura drzewa jest zdefiniowana w apps/web/lib/copy.ts (defaultCopy), więc
+// edytor renderuje się z niej samej: string -> pole tekstowe, string[] -> pole
+// wieloliniowe (jedna wartość na linię), obiekt -> zagnieżdżona sekcja. Nie
+// trzeba więc dopisywać UI, gdy ktoś dorzuci nowy literal do copy.ts.
+function copyFieldLabel(key: string): string {
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+}
+
+function CopyFieldNode({ node, path, label, setValue }: { node: unknown; path: string[]; label: string; setValue: (path: string[], value: unknown) => void }) {
+  const fieldId = path.join('.');
+  if (typeof node === 'string') {
+    return <div className="grid gap-1.5"><Label htmlFor={fieldId}>{label}</Label><Input id={fieldId} value={node} onChange={(event) => setValue(path, event.target.value)} /></div>;
+  }
+  if (Array.isArray(node) && node.every((item) => typeof item === 'string')) {
+    return <div className="grid gap-1.5"><Label htmlFor={fieldId}>{label}</Label><Textarea id={fieldId} className="min-h-24" value={(node as string[]).join('\n')} onChange={(event) => setValue(path, event.target.value.split('\n'))} /></div>;
+  }
+  if (Array.isArray(node)) {
+    return <div className="grid gap-3"><strong className="text-sm">{label}</strong>{node.map((item, index) => <CopyFieldNode key={index} node={item} path={[...path, String(index)]} label={`${label} ${index + 1}`} setValue={setValue} />)}</div>;
+  }
+  const entries = Object.entries(node as Record<string, unknown>);
+  return <div className="grid gap-3 rounded-2xl border border-line p-4"><strong className="text-sm">{label}</strong><div className="grid gap-3 sm:grid-cols-2">{entries.map(([key, value]) => <CopyFieldNode key={key} node={value} path={[...path, key]} label={copyFieldLabel(key)} setValue={setValue} />)}</div></div>;
+}
+
+function CopyEditor({ copy, request, reload, setMessage }: { copy: Record<string, unknown> | null; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
+  const [draft, setDraft] = useState<SiteCopy>(() => mergeCopy(copy as never));
+
+  useEffect(() => {
+    setDraft(mergeCopy(copy as never));
+  }, [copy]);
+
+  function setValue(path: string[], value: unknown) {
+    setDraft((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      let node: any = next;
+      for (const key of path.slice(0, -1)) node = node[key];
+      node[path[path.length - 1]] = value;
+      return next;
+    });
+  }
+
+  async function save() {
+    try { await request('/admin/settings/copy', { method: 'PATCH', body: JSON.stringify(draft) }); await reload(); setMessage('Teksty zapisane w bazie. Odśwież stronę publiczną, aby zobaczyć zmianę.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać tekstów.'); }
+  }
+
+  return <Panel title="Teksty strony" description="Każdy statyczny napis na stronie publicznej (nawigacja, nagłówki, przyciski, mikroteksty) - edytowane tu wartości nadpisują domyślne z kodu.">
+    <div className="grid gap-4">{Object.entries(draft).map(([section, value]) => <CopyFieldNode key={section} node={value} path={[section]} label={copyFieldLabel(section)} setValue={setValue} />)}</div>
+    <Button onClick={save} className="mt-6"><Save /> Zapisz teksty</Button>
+  </Panel>;
+}
+
 function ThemeEditor({ theme, request, reload, setMessage }: { theme: Record<string, string>; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
   const [draft, setDraft] = useState(theme);
   const labels: Record<string, string> = { background: 'Tło strony', foreground: 'Tekst', surface: 'Karty', muted: 'Tło pomocnicze', accent: 'Akcent', accentForeground: 'Tekst akcentu', border: 'Obramowania' };
@@ -1253,6 +1307,7 @@ const activityEventLabels: Record<string, string> = {
   part_deleted: 'Usunięcie części',
   battery_saved: 'Zapis baterii',
   theme_updated: 'Zmiana kolorów',
+  copy_updated: 'Zmiana tekstów strony',
   media_uploaded: 'Wgranie zdjęcia',
   media_deleted: 'Usunięcie zdjęcia',
   model_part_saved: 'Osprzęt modelu',

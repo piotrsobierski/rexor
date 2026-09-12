@@ -65,6 +65,10 @@ function adminCatalog(PDO $pdo): array
         'inquiries' => $pdo->query('SELECT i.id, i.status, c.public_id, c.customer_name, c.customer_email, c.gross_total, c.created_at FROM inquiries i JOIN configurations c ON c.id = i.configuration_id ORDER BY i.created_at DESC LIMIT 50')->fetchAll(),
         'pages' => $pdo->query('SELECT id, slug, title, navigation_label, excerpt, content_html, hero_image_path, is_published, updated_at FROM site_pages ORDER BY navigation_label')->fetchAll(),
         'theme' => json_decode((string) $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'theme'")->fetchColumn(), true, 16, JSON_THROW_ON_ERROR),
+        'copy' => (function () use ($pdo) {
+            $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'copy'")->fetchColumn();
+            return $value ? json_decode((string) $value, true, 512, JSON_THROW_ON_ERROR) : null;
+        })(),
     ];
 }
 
@@ -513,6 +517,23 @@ function updateTheme(PDO $pdo, array $input): array
     $statement->execute(['value' => json_encode($theme, JSON_THROW_ON_ERROR)]);
     logActivity($pdo, 'theme_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono kolory motywu strony.', $theme);
     return $theme;
+}
+
+/**
+ * Teksty statyczne stron publicznych. W przeciwieństwie do motywu (stały
+ * zestaw 7 kolorów) kształt tego dokumentu jest zdefiniowany po stronie
+ * frontendu (apps/web/lib/copy.ts) i może się rozrastać, więc tu tylko
+ * pilnujemy, że to niepusty obiekt, i zapisujemy go jak przyszedł.
+ */
+function updateSiteCopy(PDO $pdo, array $input): array
+{
+    if ($input === [] || array_is_list($input)) {
+        throw new RuntimeException('Nieprawidłowa treść tekstów strony.', 422);
+    }
+    $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('copy', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
+    $statement->execute(['value' => json_encode($input, JSON_THROW_ON_ERROR)]);
+    logActivity($pdo, 'copy_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono teksty strony.', null);
+    return $input;
 }
 
 /** Limity z php.ini zapisane jako 32M albo 512K przeliczamy na bajty. */

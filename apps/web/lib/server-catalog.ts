@@ -43,6 +43,11 @@ export async function fetchTheme(): Promise<Record<string, string> | null> {
   return data?.theme ?? null;
 }
 
+export async function fetchCopy(): Promise<unknown> {
+  const data = await fetchJson<{ copy: unknown }>('/settings/copy');
+  return data?.copy ?? null;
+}
+
 export async function fetchCatalog(): Promise<PublicCatalogData | null> {
   const data = await fetchJson<{ models: ApiModel[]; categories: PublicCategory[] }>('/catalog');
   return data ? mergeCatalog(data) : null;

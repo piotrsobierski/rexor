@@ -60,6 +60,11 @@ if ($method === 'GET' && $path === '/settings/theme') {
     jsonResponse(['theme' => $value ? json_decode((string) $value, true, 16, JSON_THROW_ON_ERROR) : null]);
 }
 
+if ($method === 'GET' && $path === '/settings/copy') {
+    $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'copy'")->fetchColumn();
+    jsonResponse(['copy' => $value ? json_decode((string) $value, true, 512, JSON_THROW_ON_ERROR) : null]);
+}
+
 if ($method === 'GET' && preg_match('~^/pages/([a-z0-9-]+)$~', $path, $matches)) {
     $statement = $pdo->prepare('SELECT slug, title, excerpt, content_html, hero_image_path, updated_at FROM site_pages WHERE slug = :slug AND is_published = TRUE');
     $statement->execute(['slug' => $matches[1]]);
@@ -163,6 +168,11 @@ if ($method === 'PATCH' && preg_match('~^/admin/pages/(\d+)$~', $path, $matches)
 if ($method === 'PATCH' && $path === '/admin/settings/theme') {
     requireAdmin($pdo);
     jsonResponse(['theme' => updateTheme($pdo, requestJson())]);
+}
+
+if ($method === 'PATCH' && $path === '/admin/settings/copy') {
+    requireAdmin($pdo);
+    jsonResponse(['copy' => updateSiteCopy($pdo, requestJson())]);
 }
 
 if ($method === 'POST' && $path === '/admin/ai/rich-content') {

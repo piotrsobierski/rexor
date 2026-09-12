@@ -4,15 +4,16 @@ import { ArrowRight, Menu, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NavigationMenu, NavigationMenuItem, NavigationMenuLink, NavigationMenuList } from '@/components/ui/navigation-menu';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-
-const links = [
-  { href: '/rowery', label: 'Rowery' },
-  { href: '/ramy', label: 'Ramy' },
-  { href: '/czesci', label: 'Części' },
-  { href: '/serwis', label: 'Serwis' },
-];
+import { usePublicCopy } from '@/lib/use-public-copy';
 
 export function SiteHeader() {
+  const copy = usePublicCopy();
+  const links = [
+    { href: '/rowery', label: copy.nav.rowery },
+    { href: '/ramy', label: copy.nav.ramy },
+    { href: '/czesci', label: copy.nav.czesci },
+    { href: '/serwis', label: copy.nav.serwis },
+  ];
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-white/94 backdrop-blur-xl">
       <div className="mx-auto grid h-[72px] max-w-[1480px] grid-cols-[1fr_auto] items-center px-4 sm:px-8 lg:grid-cols-[1fr_auto_1fr] lg:px-12">
@@ -33,16 +34,16 @@ export function SiteHeader() {
         </NavigationMenu>
 
         <div className="hidden items-center justify-end gap-2 sm:flex">
-          <Button render={<a href="/admin" aria-label="Panel administracyjny" />} variant="outline" size="icon-lg" className="h-11 rounded-none border-ink hover:bg-ink hover:text-white">
+          <Button render={<a href="/admin" aria-label={copy.nav.adminAria} />} variant="outline" size="icon-lg" className="h-11 rounded-none border-ink hover:bg-ink hover:text-white">
             <Settings aria-hidden="true" />
           </Button>
           <Button render={<a href="/konfigurator" />} variant="outline" size="lg" className="h-11 rounded-none border-ink px-5 font-mono text-xs font-semibold uppercase tracking-[0.12em] hover:bg-ink hover:text-white">
-            Stwórz własny projekt <ArrowRight data-icon="inline-end" aria-hidden="true" />
+            {copy.nav.cta} <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </Button>
         </div>
 
         <Sheet>
-          <SheetTrigger render={<Button variant="outline" size="icon-lg" className="justify-self-end rounded-full sm:hidden" aria-label="Otwórz menu" />}><Menu aria-hidden="true" /></SheetTrigger>
+          <SheetTrigger render={<Button variant="outline" size="icon-lg" className="justify-self-end rounded-full sm:hidden" aria-label={copy.nav.menuAria} />}><Menu aria-hidden="true" /></SheetTrigger>
           <SheetContent side="right" className="w-[88vw] bg-white sm:max-w-sm">
             <SheetHeader className="border-b border-line p-6">
               <SheetTitle><img src="/brand/rexor-logo.png" alt="Rexor" className="h-auto w-[120px]" /></SheetTitle>
@@ -53,7 +54,7 @@ export function SiteHeader() {
             </nav>
             <div className="mt-auto p-4">
               <Button render={<a href="/konfigurator" />} className="h-12 w-full rounded-full bg-ink text-white">
-                Stwórz własny projekt <ArrowRight data-icon="inline-end" aria-hidden="true" />
+                {copy.nav.cta} <ArrowRight data-icon="inline-end" aria-hidden="true" />
               </Button>
             </div>
           </SheetContent>
