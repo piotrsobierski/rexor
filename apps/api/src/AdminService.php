@@ -46,7 +46,6 @@ function loginAdmin(PDO $pdo, array $input): array
         'hash' => hash('sha256', $token),
     ]);
     $pdo->prepare('UPDATE admin_users SET last_login_at = UTC_TIMESTAMP() WHERE id = :id')->execute(['id' => $user['id']]);
-    logActivity($pdo, 'admin_login', 'admin', $user['email'], "Zalogowano jako {$user['email']}.");
     return ['token' => $token, 'user' => ['email' => $user['email'], 'displayName' => $user['display_name']]];
 }
 

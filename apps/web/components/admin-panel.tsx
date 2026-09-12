@@ -1234,7 +1234,6 @@ function InquiriesTable({ rows }: { rows: Row[] }) {
 }
 
 const activityEventLabels: Record<string, string> = {
-  admin_login: 'Logowanie admina',
   record_updated: 'Edycja rekordu',
   model_created: 'Nowy model',
   part_created: 'Nowa część',
