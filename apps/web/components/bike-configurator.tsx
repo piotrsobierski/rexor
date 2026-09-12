@@ -18,6 +18,8 @@ import { publicMediaUrl } from '@/lib/catalog-merge';
 import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
 import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/pricing';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
+import { usePublicCopy } from '@/lib/use-public-copy';
+import type { SiteCopy } from '@/lib/copy';
 type ContactForm = { customerName: string; customerEmail: string; customerPhone: string; notes: string; privacyAccepted: boolean };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
@@ -49,18 +51,18 @@ const defaultSizeCode = (model: BikeModel): string =>
  * Lista wyborów w grupie. Pozycja „własna część” nie jest produktem w katalogu:
  * jest trybem grupy z własną wartością rozliczeniową.
  */
-function groupChoices(group: OptionGroup) {
+function groupChoices(group: OptionGroup, t: SiteCopy['configurator']) {
   const catalogChoices = group.options
     .filter((option) => option.configurable || option.isDefault)
     .map((option) => ({ sku: option.sku, name: option.name, detail: option.detail, price: option.price, imagePath: publicMediaUrl(option.imagePath), customerSupplied: false }));
   const withNoneChoice = group.selectionMode === 'optional'
-    ? [{ sku: NONE_SKU, name: 'Bez dodatku', detail: 'Nie dodawaj tego elementu.', price: 0, imagePath: '', customerSupplied: false }, ...catalogChoices]
+    ? [{ sku: NONE_SKU, name: t.noneOptionName, detail: t.noneOptionDetail, price: 0, imagePath: '', customerSupplied: false }, ...catalogChoices]
     : catalogChoices;
   if (!group.customerPartAllowed) return withNoneChoice;
   return [...withNoneChoice, {
     sku: CUSTOMER_SUPPLIED_SKU,
     name: group.customerPartLabel,
-    detail: 'Zgodność potwierdzi Rexor',
+    detail: t.customerPartDetail,
     price: group.customerPartGrossPrice,
     imagePath: '',
     customerSupplied: true,
@@ -69,6 +71,7 @@ function groupChoices(group: OptionGroup) {
 
 export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   const { models } = usePublicCatalog(catalog);
+  const copy = usePublicCopy();
   const [modelId, setModelId] = useState<BikeModel['id']>('e82');
   const [size, setSize] = useState('M');
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -144,7 +147,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           for (const item of configuration.items as Array<{ groupSlug: string; sku: string }>) {
             const group = nextModel.groups.find((candidate) => candidate.slug === item.groupSlug);
             if (!group) continue;
-            if (groupChoices(group).some((choice) => choice.sku === item.sku)) restored[group.slug] = item.sku;
+            if (groupChoices(group, copy.configurator).some((choice) => choice.sku === item.sku)) restored[group.slug] = item.sku;
           }
           setTouchedModels((current) => ({ ...current, [nextModel.id]: true }));
           setModelId(nextModel.id);
@@ -155,7 +158,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           }
           setSelectionsByModel((current) => ({ ...current, [nextModel.id]: restored }));
         })
-        .catch(() => setSubmitError('Nie udało się odtworzyć zapisanej konfiguracji.'));
+        .catch(() => setSubmitError(copy.configurator.resumeError));
       return;
     }
     const requested = query.get('model') as BikeModel['id'] | null;
@@ -229,13 +232,13 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     setTouchedModels((current) => ({ ...current, [model.id]: true }));
     setSelectionsByModel((current) => ({ ...current, [model.id]: { ...current[model.id], [groupSlug]: sku } }));
     const group = model.groups.find((item) => item.slug === groupSlug);
-    const choiceName = group ? groupChoices(group).find((item) => item.sku === sku)?.name : undefined;
+    const choiceName = group ? groupChoices(group, copy.configurator).find((item) => item.sku === sku)?.name : undefined;
     logConfiguratorEvent(modelSlugs[model.id], `group:${groupSlug}`, sku, group && choiceName ? `${group.name}: ${choiceName}` : undefined);
   }
 
   async function submitConfiguration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!contact.privacyAccepted) { setSubmitError('Zaznacz zgodę na kontakt i przetwarzanie danych.'); setSubmitState('error'); return; }
+    if (!contact.privacyAccepted) { setSubmitError(copy.configurator.privacyRequiredError); setSubmitState('error'); return; }
     setSubmitState('saving'); setSubmitError('');
     try {
       // Wysyłamy tylko wybory klienta. Elementy stałe i cena wynikają z bazy,
@@ -259,10 +262,10 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
         }),
       });
       const result = (await response.json()) as any;
-      if (!response.ok) throw new Error(result.error ?? 'Nie udało się zapisać konfiguracji.');
+      if (!response.ok) throw new Error(result.error ?? copy.configurator.submitError);
       window.location.href = result.shareUrl;
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Nie udało się zapisać konfiguracji.');
+      setSubmitError(error instanceof Error ? error.message : copy.configurator.submitError);
       setSubmitState('error');
     }
   }
@@ -271,9 +274,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     <SiteHeader />
     <main className="flex-1">
       <section className="mx-auto max-w-[1480px] px-4 pb-3 pt-7 sm:px-8 sm:pt-10 lg:px-12">
-        <div className="mb-5 flex items-end justify-between gap-4"><div><p className="eyebrow">Wybierz bazę projektu</p><h1 className="mt-2 text-[clamp(2rem,5vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em]">Rower skrojony<br className="hidden sm:block" /> pod Twój teren.</h1></div><p className="hidden max-w-sm text-right text-base leading-relaxed text-ink-muted xl:block">Dobieraj komponenty, obserwuj cenę i wróć do swojego projektu przez prywatny link.</p></div>
+        <div className="mb-5 flex items-end justify-between gap-4"><div><p className="eyebrow">{copy.configurator.heroEyebrow}</p><h1 className="mt-2 text-[clamp(2rem,5vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em]">{copy.configurator.heroTitleLine1}<br className="hidden sm:block" /> {copy.configurator.heroTitleLine2}</h1></div><p className="hidden max-w-sm text-right text-base leading-relaxed text-ink-muted xl:block">{copy.configurator.heroSubtitle}</p></div>
         <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0">
-          {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => selectModel(item.id)} className={`pick-card focus-ring min-w-[78vw] snap-center sm:min-w-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active}><span className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span><span className={`grid size-6 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span></span><span className="mt-1 text-xl font-semibold tracking-tight">{item.name}</span><span className="mt-1 text-sm text-ink-muted">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : 'cena w przygotowaniu'}</span></button>; })}
+          {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => selectModel(item.id)} className={`pick-card focus-ring min-w-[78vw] snap-center sm:min-w-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active}><span className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span><span className={`grid size-6 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span></span><span className="mt-1 text-xl font-semibold tracking-tight">{item.name}</span><span className="mt-1 text-sm text-ink-muted">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span></button>; })}
         </div>
       </section>
 
@@ -305,8 +308,8 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           {(model.descriptionHtml || model.description) && (
             <details className="mt-4 rounded-[28px] border border-line bg-white p-5 sm:p-6" open>
               <summary className="cursor-pointer text-base font-semibold tracking-tight text-ink flex items-center justify-between">
-                <span>O modelu {model.name}</span>
-                <span className="text-xs font-normal text-ink-muted">Opis i specyfikacja</span>
+                <span>{copy.configurator.aboutModelPrefix} {model.name}</span>
+                <span className="text-xs font-normal text-ink-muted">{copy.model.descriptionEyebrow}</span>
               </summary>
               <div className="rich-content mt-4 border-t border-line pt-4 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: model.descriptionHtml || model.description }} />
             </details>
@@ -314,18 +317,18 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
         </div>
 
         <aside className="rounded-[28px] border border-line bg-white p-5 sm:p-7 lg:p-8">
-          <div className="flex items-start justify-between gap-5"><div><p className="eyebrow">Twój projekt</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Konfiguracja {model.name.replace('Rexor ', '')}</h2></div><span className="rounded-full bg-[var(--accent-brand)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em]">Brutto</span></div>
+          <div className="flex items-start justify-between gap-5"><div><p className="eyebrow">{copy.configurator.projectEyebrow}</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">{copy.configurator.configTitlePrefix} {model.name.replace('Rexor ', '')}</h2></div><span className="rounded-full bg-[var(--accent-brand)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em]">{copy.configurator.grossBadge}</span></div>
           <Progress value={model.available ? 72 : 12} className="mt-5 h-1.5 bg-ink-wash [&>div]:bg-ink" />
-          {!model.available ? <div className="mt-8 rounded-3xl bg-ink p-6 text-white"><Bike className="size-8 text-[var(--accent-brand)]" /><h3 className="mt-8 text-2xl font-semibold">Konfiguracja w przygotowaniu</h3><p className="mt-3 leading-relaxed text-white/64">Geometria i zdjęcia CFR707 są już gotowe. Uzupełniamy konkretne komponenty oraz cenę modelu.</p><Button render={<a href="/serwis" />} className="mt-6 w-full rounded-full bg-white text-ink hover:bg-white/90">Zapytaj o CFR707 <ArrowRight data-icon="inline-end" /></Button></div> : <>
-            <section className="config-section"><div className="section-heading"><div><span>01</span><h3>Rozmiar ramy</h3></div><p>Dopasowanie potwierdzimy przed zamówieniem.</p></div><RadioGroup value={size} onValueChange={changeSize} className="grid grid-cols-3 gap-2">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>
+          {!model.available ? <div className="mt-8 rounded-3xl bg-ink p-6 text-white"><Bike className="size-8 text-[var(--accent-brand)]" /><h3 className="mt-8 text-2xl font-semibold">{copy.configurator.unavailableTitle}</h3><p className="mt-3 leading-relaxed text-white/64">{copy.configurator.unavailableText}</p><Button render={<a href="/serwis" />} className="mt-6 w-full rounded-full bg-white text-ink hover:bg-white/90">{copy.configurator.unavailableCta} <ArrowRight data-icon="inline-end" /></Button></div> : <>
+            <section className="config-section"><div className="section-heading"><div><span>01</span><h3>{copy.configurator.sizeSectionTitle}</h3></div><p>{copy.configurator.sizeSectionSubtitle}</p></div><RadioGroup value={size} onValueChange={changeSize} className="grid grid-cols-3 gap-2">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>
             {model.batteries.length > 0 && <section className="config-section">
-              <div className="section-heading"><div><span>02</span><h3>Bateria</h3></div><p>Pakiet dobrany do ramy i silnika. Pojemność zmienia zasięg i masę roweru.</p></div>
+              <div className="section-heading"><div><span>02</span><h3>{copy.configurator.batterySectionTitle}</h3></div><p>{copy.configurator.batterySectionSubtitle}</p></div>
               <RadioGroup value={battery?.code ?? ''} onValueChange={changeBattery} className="gap-2">
                 {model.batteries.map((item) => { const selected = battery?.code === item.code; const delta = item.grossPrice - (defaultBattery?.grossPrice ?? item.grossPrice); return <label key={item.code} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}>
                   <RadioGroupItem value={item.code} className="choice-input" />
                   <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-2 font-semibold">{item.name}{item.isDefault && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-subtle">W standardzie</span>}</span>
+                    <span className="flex flex-wrap items-center gap-2 font-semibold">{item.name}{item.isDefault && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-subtle">{copy.configurator.defaultBadge}</span>}</span>
                     <span className="mt-0.5 block text-sm text-ink-muted">
                       {item.shortLabel?.includes('Wh') ? item.shortLabel : `${item.shortLabel ? `${item.shortLabel} · ` : ''}${formatEnergy(item.energyWh)}`}
                       {(() => {
@@ -334,7 +337,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                       })()}
                     </span>
                   </span>
-                  <span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{delta === 0 ? 'w cenie' : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span>
+                  <span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{delta === 0 ? copy.configurator.includedPrice : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span>
                 </label>; })}
               </RadioGroup>
 
@@ -344,10 +347,10 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                     <div>
                       <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink">
                         <Zap className="size-3.5 text-amber-600" />
-                        Szacowane zasięgi ({formatEnergy(battery.energyWh)})
+                        {copy.configurator.rangeEstimateTitle} ({formatEnergy(battery.energyWh)})
                       </h4>
                       <p className="mt-0.5 text-[11px] text-ink-muted">
-                        Wyliczone na żywo w oparciu o typowe zużycie energii w zróżnicowanych warunkach.
+                        {copy.configurator.rangeEstimateSubtitle}
                       </p>
                     </div>
                     <span className="rounded-md bg-white border border-line px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-ink">
@@ -359,9 +362,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                     <table className="w-full text-left text-xs">
                       <thead>
                         <tr className="text-[11px] text-ink-subtle">
-                          <th className="pb-1.5 font-medium">Tryb / warunki</th>
-                          <th className="pb-1.5 font-medium text-center">Typowe zużycie</th>
-                          <th className="pb-1.5 text-right font-semibold text-ink">Estymowany zasięg</th>
+                          <th className="pb-1.5 font-medium">{copy.configurator.rangeTableModeHeader}</th>
+                          <th className="pb-1.5 font-medium text-center">{copy.configurator.rangeTableConsumptionHeader}</th>
+                          <th className="pb-1.5 text-right font-semibold text-ink">{copy.configurator.rangeTableRangeHeader}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-line/60">
@@ -388,7 +391,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               )}
             </section>}
             {model.groups.filter((group) => group.selectionMode !== 'fixed').map((group, groupIndex) => {
-              const choices = groupChoices(group);
+              const choices = groupChoices(group, copy.configurator);
               const defaultPrice = groupDefaultPrice(group);
               return <section className="config-section" key={group.slug}>
                 <div className="section-heading"><div><span>{String(groupIndex + (model.batteries.length > 0 ? 3 : 2)).padStart(2, '0')}</span><h3>{group.name}</h3></div><p>{group.helper}</p></div>
@@ -398,15 +401,15 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                     <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>
                     {choice.imagePath && <img src={choice.imagePath} alt="" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setZoomedImage(choice.imagePath); }} className="size-10 shrink-0 cursor-zoom-in rounded-lg border border-line bg-white object-contain transition-transform hover:scale-110" />}
                     <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2 font-semibold">{choice.name}{choice.customerSupplied && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-muted">Twoja część</span>}</span>
+                      <span className="flex flex-wrap items-center gap-2 font-semibold">{choice.name}{choice.customerSupplied && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-muted">{copy.configurator.customerPartBadge}</span>}</span>
                       <span className="mt-0.5 block text-sm text-ink-muted">{choice.detail}</span>
                     </span>
-                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{choice.sku === NONE_SKU ? '—' : delta === null ? 'wycena' : delta === 0 ? 'w cenie' : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span>
+                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${delta === 0 ? 'text-ink-subtle' : ''}`}>{choice.sku === NONE_SKU ? '—' : delta === null ? copy.configurator.quotePrice : delta === 0 ? copy.configurator.includedPrice : `${delta > 0 ? '+' : '−'}${formatPrice(Math.abs(delta))}`}</span>
                   </label>; })}
                 </RadioGroup>
               </section>;
             })}
-            <div className="mt-7 rounded-3xl bg-ink p-5 text-white sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-white/54">Cena Twojej konfiguracji</p><p className="mt-1 text-3xl font-semibold tracking-[-0.04em] tabular-nums">{pricing.total === null ? 'wycena indywidualna' : formatPrice(pricing.total)}</p></div>{pricing.delta !== 0 && <span className="rounded-full bg-white/10 px-3 py-1.5 text-sm tabular-nums">{pricing.delta > 0 ? '+' : '−'}{formatPrice(Math.abs(pricing.delta))}</span>}</div><Button onClick={() => setDialogOpen(true)} variant="brand" className="mt-6 h-12 w-full rounded-full font-semibold transition-all hover:brightness-95">Zapisz i przejdź do podsumowania <ArrowRight data-icon="inline-end" className="shrink-0" /></Button><p className="mt-3 flex items-center justify-center gap-2 text-center text-xs text-white/48"><ShieldCheck className="size-3.5" /> Cena brutto · zgodność potwierdzi Rexor</p></div>
+            <div className="mt-7 rounded-3xl bg-ink p-5 text-white sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-white/54">{copy.configurator.priceLabel}</p><p className="mt-1 text-3xl font-semibold tracking-[-0.04em] tabular-nums">{pricing.total === null ? copy.configurator.priceIndividual : formatPrice(pricing.total)}</p></div>{pricing.delta !== 0 && <span className="rounded-full bg-white/10 px-3 py-1.5 text-sm tabular-nums">{pricing.delta > 0 ? '+' : '−'}{formatPrice(Math.abs(pricing.delta))}</span>}</div><Button onClick={() => setDialogOpen(true)} variant="brand" className="mt-6 h-12 w-full rounded-full font-semibold transition-all hover:brightness-95">{copy.configurator.saveCta} <ArrowRight data-icon="inline-end" className="shrink-0" /></Button><p className="mt-3 flex items-center justify-center gap-2 text-center text-xs text-white/48"><ShieldCheck className="size-3.5" /> {copy.configurator.grossPriceNote}</p></div>
           </>}
         </aside>
       </section>
@@ -416,24 +419,24 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:max-w-lg sm:p-8">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold tracking-tight text-ink">Zapisz projekt {model.name}</DialogTitle>
-          <DialogDescription className="text-sm text-ink-muted">Podaj kontakt. Utworzymy prywatny link z dokładnie tą konfiguracją i przygotujemy wiadomość e-mail.</DialogDescription>
+          <DialogTitle className="text-2xl font-semibold tracking-tight text-ink">{copy.configurator.saveDialogTitlePrefix} {model.name}</DialogTitle>
+          <DialogDescription className="text-sm text-ink-muted">{copy.configurator.saveDialogDescription}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submitConfiguration} className="mt-2 grid gap-4">
-          <div className="grid gap-1.5"><Label htmlFor="customerName" className="font-medium text-ink">Imię i nazwisko</Label><Input id="customerName" required autoComplete="name" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerName} onChange={(e) => setContact({ ...contact, customerName: e.target.value })} /></div>
-          <div className="grid gap-1.5"><Label htmlFor="customerEmail" className="font-medium text-ink">E-mail</Label><Input id="customerEmail" required type="email" autoComplete="email" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerEmail} onChange={(e) => setContact({ ...contact, customerEmail: e.target.value })} /></div>
-          <div className="grid gap-1.5"><Label htmlFor="customerPhone" className="font-medium text-ink">Telefon <span className="text-ink-subtle font-normal">(opcjonalnie)</span></Label><Input id="customerPhone" type="tel" autoComplete="tel" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerPhone} onChange={(e) => setContact({ ...contact, customerPhone: e.target.value })} /></div>
-          <div className="grid gap-1.5"><Label htmlFor="notes" className="font-medium text-ink">Uwagi <span className="text-ink-subtle font-normal">(opcjonalnie)</span></Label><Textarea id="notes" rows={3} className="bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.notes} onChange={(e) => setContact({ ...contact, notes: e.target.value })} placeholder="Wzrost, styl jazdy lub inne istotne informacje" /></div>
-          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-ink-wash p-4 text-sm leading-relaxed text-ink"><Checkbox checked={contact.privacyAccepted} onCheckedChange={(checked) => setContact({ ...contact, privacyAccepted: checked === true })} className="mt-0.5" /><span>Zgadzam się na kontakt w sprawie tej konfiguracji i przetwarzanie podanych danych.</span></label>
+          <div className="grid gap-1.5"><Label htmlFor="customerName" className="font-medium text-ink">{copy.configurator.nameLabel}</Label><Input id="customerName" required autoComplete="name" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerName} onChange={(e) => setContact({ ...contact, customerName: e.target.value })} /></div>
+          <div className="grid gap-1.5"><Label htmlFor="customerEmail" className="font-medium text-ink">{copy.configurator.emailLabel}</Label><Input id="customerEmail" required type="email" autoComplete="email" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerEmail} onChange={(e) => setContact({ ...contact, customerEmail: e.target.value })} /></div>
+          <div className="grid gap-1.5"><Label htmlFor="customerPhone" className="font-medium text-ink">{copy.configurator.phoneLabel} <span className="text-ink-subtle font-normal">{copy.configurator.optionalHint}</span></Label><Input id="customerPhone" type="tel" autoComplete="tel" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerPhone} onChange={(e) => setContact({ ...contact, customerPhone: e.target.value })} /></div>
+          <div className="grid gap-1.5"><Label htmlFor="notes" className="font-medium text-ink">{copy.configurator.notesLabel} <span className="text-ink-subtle font-normal">{copy.configurator.optionalHint}</span></Label><Textarea id="notes" rows={3} className="bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.notes} onChange={(e) => setContact({ ...contact, notes: e.target.value })} placeholder={copy.configurator.notesPlaceholder} /></div>
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-ink-wash p-4 text-sm leading-relaxed text-ink"><Checkbox checked={contact.privacyAccepted} onCheckedChange={(checked) => setContact({ ...contact, privacyAccepted: checked === true })} className="mt-0.5" /><span>{copy.configurator.privacyConsentLabel}</span></label>
           {submitError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>}
-          <Button type="submit" disabled={submitState === 'saving'} className="h-12 rounded-full bg-ink text-white font-semibold transition-colors hover:bg-black">{submitState === 'saving' ? 'Zapisuję…' : 'Utwórz prywatny link'} <ArrowRight data-icon="inline-end" /></Button>
+          <Button type="submit" disabled={submitState === 'saving'} className="h-12 rounded-full bg-ink text-white font-semibold transition-colors hover:bg-black">{submitState === 'saving' ? copy.configurator.submittingCta : copy.configurator.submitCta} <ArrowRight data-icon="inline-end" /></Button>
         </form>
       </DialogContent>
     </Dialog>
 
     <Dialog open={zoomedImage !== null} onOpenChange={(open) => !open && setZoomedImage(null)}>
       <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] items-center justify-center rounded-3xl bg-white p-4 shadow-2xl sm:max-w-xl">
-        <DialogTitle className="sr-only">Powiększone zdjęcie części</DialogTitle>
+        <DialogTitle className="sr-only">{copy.configurator.zoomedImageTitle}</DialogTitle>
         {zoomedImage && <img src={zoomedImage} alt="" className="max-h-[70vh] w-full object-contain" />}
       </DialogContent>
     </Dialog>
