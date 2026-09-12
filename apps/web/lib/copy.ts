@@ -126,7 +126,7 @@ export const defaultCopy = {
     rangeTableRangeHeader: 'Estymowany zasięg',
     customerPartBadge: 'Twoja część',
     quotePrice: 'wycena',
-    priceLabel: 'Cena Twojej konfiguracji',
+    priceLabel: 'Sugerowana cena twojej konfiguracji',
     priceIndividual: 'wycena indywidualna',
     saveCta: 'Zapisz i przejdź do podsumowania',
     grossPriceNote: 'Cena brutto · zgodność potwierdzi Rexor',
