@@ -229,7 +229,7 @@ function createAdminModel(PDO $pdo, array $input): array
         'slug' => $slug,
         'name' => $name,
         'short_description' => ($short = trim((string) ($input['short_description'] ?? ''))) !== '' ? $short : null,
-        'status' => in_array($input['status'] ?? 'draft', ['draft', 'published', 'archived'], true) ? $input['status'] : 'draft',
+        'status' => in_array($input['status'] ?? 'draft', ['draft', 'published', 'archived'], true) ? ($input['status'] ?? 'draft') : 'draft',
         'sort_order' => $nextSort,
     ]);
 
