@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { ArrowRight, BatteryCharging, Gauge, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SiteFooter } from '@/components/site-footer';
@@ -107,8 +107,16 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
   // /rowery/[category]/[model] renderuje więc jedną powłokę dla dowolnego
   // sluga (patrz generateStaticParams + .htaccess), a właściwy model czytamy
   // tu, po stronie klienta, z faktycznego URL-a.
-  const params = useParams<{ model?: string }>();
-  const modelSlug = modelSlugProp ?? params.model ?? '';
+  //
+  // Celowo `usePathname()`, nie `useParams()`: w tym frameworku useParams()
+  // przy twardym wejściu na stronę (wpisany adres, link spoza <Link>, np.
+  // nasze zwykłe <a href>) zostaje na wartości placeholderowej z powłoki
+  // ("_"), bo klientowy stan parametrów startuje pusty i wypełnia się tylko
+  // przy nawigacji przez router. usePathname() czyta realny
+  // window.location.pathname od razu po stronie klienta, więc faktycznie
+  // pokazuje żądany model zamiast zawsze pierwszego z listy.
+  const pathname = usePathname();
+  const modelSlug = modelSlugProp ?? pathname.split('/').filter(Boolean).pop() ?? '';
   const normalizedSlug = modelSlug.toLowerCase();
   const model = models.find((m) => m.id === normalizedSlug || m.name.toLowerCase().includes(normalizedSlug) || (normalizedSlug.includes('e82') && m.id === 'e82') || (normalizedSlug.includes('e55') && m.id === 'e55') || (normalizedSlug.includes('cfr707') && m.id === 'cfr707')) ?? models[0];
   const [selectedPhoto, setSelectedPhoto] = useState(0);

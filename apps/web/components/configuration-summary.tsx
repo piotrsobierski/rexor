@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Copy, Mail } from 'lucide-react';
-import { useParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SiteFooter } from '@/components/site-footer';
@@ -13,7 +13,11 @@ import { usePublicCopy } from '@/lib/use-public-copy';
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
 export function ConfigurationSummary() {
-  const params = useParams<{ token: string }>();
+  // useParams() zostaje na placeholderze powłoki przy twardym wejściu (link
+  // udostępniony klientowi, nie nawigacja przez router) - patrz ten sam
+  // problem i wyjaśnienie w components/static-pages.tsx.
+  const pathname = usePathname();
+  const token = pathname.split('/').filter(Boolean).pop() ?? '';
   const copy = usePublicCopy();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
@@ -22,14 +26,14 @@ export function ConfigurationSummary() {
 
   useEffect(() => {
     setShareUrl(window.location.href);
-    if (!params.token) return;
-    fetch(`${API_BASE}/configurations/share/${params.token}`)
+    if (!token) return;
+    fetch(`${API_BASE}/configurations/share/${token}`)
       .then(async (response) => { const data = (await response.json()) as any; if (!response.ok) throw new Error(data.error ?? copy.summary.genericLoadError); return data; })
       .then((data) => setSnapshot(data.configuration))
       .catch((reason) => setError(reason instanceof Error ? reason.message : copy.summary.genericLoadError));
   // Odczytujemy tekst błędu raz, przy pierwszym pobraniu.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.token]);
+  }, [token]);
 
   async function copyLink() {
     await navigator.clipboard.writeText(window.location.href);
