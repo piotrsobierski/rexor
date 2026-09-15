@@ -30,7 +30,8 @@ mkdir -p \
   "$release_dir/public/media" \
   "$release_dir/scripts" \
   "$release_dir/storage/media" \
-  "$release_dir/storage/backups"
+  "$release_dir/storage/backups" \
+  "$release_dir/storage/paint-reference"
 
 rsync -a \
   --exclude='.assetsignore' \
@@ -40,6 +41,11 @@ rsync -a \
 rsync -a apps/api/public apps/api/src "$release_dir/apps/api/"
 rsync -a database/schema.sql database/seed.sql database/migrations "$release_dir/database/"
 rsync -a public/media/ "$release_dir/public/media/"
+# Zdjęcia referencyjne lakierów: poza katalogiem publicznym, serwowane wyłącznie
+# przez /api/admin/paint-reference/ po zalogowaniu (docs/PLAN_LAKIERY.md, dec. 6).
+# Nie są w Git, więc paczka jest jedyną drogą, żeby trafiły na serwer - bez nich
+# `paint_colors.reference_image_path` wskazywałby na nieistniejące pliki.
+rsync -a storage/paint-reference/ "$release_dir/storage/paint-reference/"
 install -m 0644 scripts/migrate.php scripts/remote-migrate.php "$release_dir/scripts/"
 install -m 0600 "$remote_env" "$release_dir/.env"
 install -m 0644 deploy/public-html.htaccess "$release_dir/.htaccess"

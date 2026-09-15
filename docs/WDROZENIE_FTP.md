@@ -43,3 +43,36 @@ zdalnych plików ani wgranych mediów.
 
 Host FTP należy brać z panelu lub z nazwy serwera źródłowego, nie z domeny
 strony korzystającej z proxy Cloudflare.
+
+
+## Lakiery a rozmiar paczki
+
+`public/media/paints/renders/` waży ok. 57 MB (457 renderów ram w kolorach)
+i wchodzi do paczki razem z resztą `public/media/`. To jednorazowy transfer -
+kolejne wdrożenia rsync-ują tylko zmiany, ale pierwsze wgranie przez FTP potrwa
+odpowiednio dłużej.
+
+Zdjęcia referencyjne lakierów (`storage/paint-reference/`, ok. 66 MB) **wchodzą
+do paczki**, ale nie do repozytorium - to cudze materiały z galerii Rennbow.
+Na serwerze leżą poza katalogiem publicznym i serwuje je wyłącznie
+`GET /api/admin/paint-reference/…` po zalogowaniu, a `reference_is_public`
+zostaje `FALSE` (`docs/PLAN_LAKIERY.md`, decyzja 6). Bez nich w paczce
+`paint_colors.reference_image_path` wskazywałby na nieistniejące pliki, więc
+kafelek w panelu byłby pusty. Publikację na stronie sprzedażowej włącza
+administrator świadomie, per kolor, po rozstrzygnięciu praw do zdjęć.
+
+## Katalog lakierów jedzie migracją, nie importem
+
+`import-paints.php` działa tylko lokalnie: wymaga Node.js i repozytorium
+`e55-paint-to-sample`, więc nie uruchomi się na hostingu PHP. Nie da się go też
+uruchomić z komputera przeciwko zdalnej bazie - DSN dev i produkcji wskazuje
+nazwy hostów widoczne wyłącznie z serwera (`localhost` oraz `mysql8:3380`),
+a zdalny dostęp do MySQL jest zamknięty.
+
+Dlatego katalog (686 kolorów, 457 renderów, 664 referencje) jest zrzucony do
+`database/migrations/029_paint_catalog.sql` i dociera na serwer tą samą drogą
+co reszta schematu. Migracja wiąże kolory z paletami, a rendery z kolorami
+i modelami **przez slug**, więc nie zależy od AUTO_INCREMENT na docelowej bazie.
+
+Po dołożeniu nowych lakierów lokalnym importem generujemy **nową** migrację -
+runner pilnuje sumy kontrolnej i odmówi wykonania zmienionego starego pliku.
