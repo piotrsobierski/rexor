@@ -37,3 +37,6 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# incremental TS build cache - churns on every build
+tsconfig.tsbuildinfo
