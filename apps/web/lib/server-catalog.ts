@@ -45,6 +45,13 @@ export async function fetchTheme(): Promise<Record<string, string> | null> {
   return data?.theme ?? null;
 }
 
+export type ApiBranding = { faviconPath: string | null };
+
+export async function fetchBranding(): Promise<ApiBranding | null> {
+  const data = await fetchJson<{ branding: ApiBranding }>('/settings/branding');
+  return data?.branding ?? null;
+}
+
 export async function fetchCopy(): Promise<unknown> {
   const data = await fetchJson<{ copy: unknown }>('/settings/copy');
   return data?.copy ?? null;

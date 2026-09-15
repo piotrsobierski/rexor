@@ -91,6 +91,7 @@ function adminCatalog(PDO $pdo): array
         'frameMedia' => adminFrameMedia($pdo),
         'projects' => adminProjects($pdo),
         'projectMedia' => adminProjectMedia($pdo),
+        'branding' => getBranding($pdo),
         'mailRouting' => getMailRouting($pdo),
         'configurationEmailTemplate' => getConfigurationEmailTemplate($pdo),
     ];
@@ -567,6 +568,43 @@ function updateTheme(PDO $pdo, array $input): array
     $statement->execute(['value' => json_encode($theme, JSON_THROW_ON_ERROR)]);
     logActivity($pdo, 'theme_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono kolory motywu strony.', $theme);
     return $theme;
+}
+
+/**
+ * Ikona strony (favicona). Domyślnie serwujemy statyczny plik wygenerowany
+ * z logo (apps/web/scripts/build-favicon.py); tu admin może wskazać własny
+ * obrazek z biblioteki mediów, bez redeployu frontendu. Puste pole =
+ * wracamy do domyślnej ikony z kodu.
+ */
+function getBranding(PDO $pdo): array
+{
+    $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'branding'")->fetchColumn();
+    $stored = $value ? json_decode((string) $value, true, 16, JSON_THROW_ON_ERROR) : [];
+
+    return ['faviconPath' => $stored['faviconPath'] ?? null];
+}
+
+function updateBranding(PDO $pdo, array $input): array
+{
+    $path = trim((string) ($input['faviconPath'] ?? ''));
+    // Tylko ścieżki z naszej biblioteki mediów: wartość trafia prosto do
+    // atrybutu href w <link>, więc nie może być dowolnym adresem.
+    if ($path !== '' && !preg_match('~^/uploads/\d{4}/\d{2}/[a-f0-9]{32}\.(?:jpg|png|webp|avif)$~', $path)) {
+        throw new InvalidArgumentException('Ikona musi pochodzić z biblioteki mediów (wgraj plik przyciskiem obok).');
+    }
+    $branding = ['faviconPath' => $path !== '' ? $path : null];
+    $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('branding', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
+    $statement->execute(['value' => json_encode($branding, JSON_THROW_ON_ERROR)]);
+    logActivity(
+        $pdo,
+        'branding_updated',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        $branding['faviconPath'] === null ? 'Przywrócono domyślną ikonę strony.' : 'Zmieniono ikonę strony (favicon).',
+        $branding
+    );
+
+    return $branding;
 }
 
 /**

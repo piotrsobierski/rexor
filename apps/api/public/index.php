@@ -94,6 +94,10 @@ if ($method === 'GET' && $path === '/settings/theme') {
     jsonResponse(['theme' => $value ? json_decode((string) $value, true, 16, JSON_THROW_ON_ERROR) : null]);
 }
 
+if ($method === 'GET' && $path === '/settings/branding') {
+    jsonResponse(['branding' => getBranding($pdo)]);
+}
+
 if ($method === 'GET' && $path === '/settings/copy') {
     $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'copy'")->fetchColumn();
     jsonResponse(['copy' => $value ? json_decode((string) $value, true, 512, JSON_THROW_ON_ERROR) : null]);
@@ -207,6 +211,11 @@ if ($method === 'PATCH' && $path === '/admin/settings/theme') {
 if ($method === 'PATCH' && $path === '/admin/settings/copy') {
     requireAdmin($pdo);
     jsonResponse(['copy' => updateSiteCopy($pdo, requestJson())]);
+}
+
+if ($method === 'PATCH' && $path === '/admin/settings/branding') {
+    requireAdmin($pdo);
+    jsonResponse(['branding' => updateBranding($pdo, requestJson())]);
 }
 
 if ($method === 'PATCH' && $path === '/admin/settings/chatbot-prompt') {
