@@ -42,10 +42,12 @@ function smtpSendMail(string $to, string $toName, string $subject, string $html)
         }
         return $response;
     };
-    $expect = function (string $context) use ($readResponse, $socket): string {
+    $expect = function (string $context) use ($readResponse): string {
         $response = $readResponse();
         if ($response === '' || !preg_match('/^[123]/', $response)) {
-            fclose($socket);
+            // Zamknięcie gniazda zostawiamy blokowi finally poniżej - podwójny
+            // fclose() tego samego zasobu rzuca błąd, który maskuje prawdziwą
+            // przyczynę (widać wtedy tylko "not an open stream resource").
             throw new RuntimeException("Serwer SMTP odrzucił krok '{$context}': {$response}");
         }
         return $response;
