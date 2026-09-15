@@ -7,6 +7,7 @@ import { mergeCopy } from '@/lib/copy';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { ChatWidget } from '@/components/chatbot/chat-widget';
 import { FaviconRuntime } from '@/components/favicon-runtime';
+import { ThemeClientRuntime } from '@/components/theme-client-runtime';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin', 'latin-ext'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin', 'latin-ext'] });
@@ -39,6 +40,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <head><ThemeStyle theme={theme} /></head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
+        <ThemeClientRuntime applied={theme !== null} />
         <FaviconRuntime applied={branding !== null} />
         <ChatWidget />
       </body>
