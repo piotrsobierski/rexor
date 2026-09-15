@@ -6,6 +6,8 @@
  * mają być prawdziwe, nie rendery z generatora.
  */
 
+import { publicMediaUrl } from '@/lib/catalog-merge';
+
 export type ApiProject = {
   slug: string;
   title: string;
@@ -35,3 +37,28 @@ export type PublicProject = Omit<ApiProject, 'media' | 'cover_image_path'> & {
 };
 
 export const projectHref = (project: { slug: string }) => `/realizacje/${project.slug}`;
+
+/** Jak `mergeFrame`: nazwa kategorii dochodzi z katalogu, media dostają URL-e. */
+export function mergeProject(project: ApiProject, categories: Array<{ slug: string; name: string }>): PublicProject {
+  const { media, cover_image_path, ...rest } = project;
+  const gallery = media
+    .filter((item) => item.role === 'cover' || item.role === 'gallery')
+    .map((item) => publicMediaUrl(item.storage_path))
+    .filter(Boolean);
+
+  return {
+    ...rest,
+    image: publicMediaUrl(cover_image_path) || gallery[0] || '',
+    gallery,
+    categoryName: project.category_slug
+      ? categories.find((item) => item.slug === project.category_slug)?.name ?? project.category_slug
+      : null,
+  };
+}
+
+/** "2026-09-14" -> "09/2026". Realizacje datujemy z dokładnością do miesiąca. */
+export function formatCompletedAt(value: string | null): string | null {
+  if (!value) return null;
+  const [year, month] = value.split('-');
+  return year && month ? `${month}/${year}` : value;
+}

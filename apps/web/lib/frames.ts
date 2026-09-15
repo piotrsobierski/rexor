@@ -10,6 +10,8 @@
  * i /rowery pokazywał tę samą listę.
  */
 
+import { publicMediaUrl } from '@/lib/catalog-merge';
+
 /** Kształt wiersza z `GET /frames` i `GET /frames/{slug}` - 1:1 z kolumnami tabeli `frames`. */
 export type ApiFrame = {
   slug: string;
@@ -52,3 +54,29 @@ export type PublicFrame = Omit<ApiFrame, 'media' | 'default_image_path'> & {
 };
 
 export const frameHref = (frame: { slug: string }) => `/ramy/${frame.slug}`;
+
+/**
+ * Złączenie odpowiedzi API z katalogiem kategorii. Kategorie przychodzą
+ * osobnym zapytaniem (`/catalog`), bo są wspólne dla ram i rowerów - dlatego
+ * merge jest tutaj, a nie po stronie API.
+ */
+export function mergeFrame(frame: ApiFrame, categories: Array<{ slug: string; name: string }>): PublicFrame {
+  const { media, default_image_path, ...rest } = frame;
+  const gallery = media
+    .filter((item) => item.role === 'default' || item.role === 'gallery')
+    .map((item) => publicMediaUrl(item.storage_path))
+    .filter(Boolean);
+  const geometryImages = media
+    .filter((item) => item.role === 'geometry')
+    .map((item) => publicMediaUrl(item.storage_path))
+    .filter(Boolean);
+
+  return {
+    ...rest,
+    image: publicMediaUrl(default_image_path) || gallery[0] || '',
+    gallery,
+    geometryImages,
+    facts: frame.specifications?.facts ?? [],
+    categoryName: categories.find((item) => item.slug === frame.category_slug)?.name ?? frame.category_slug,
+  };
+}

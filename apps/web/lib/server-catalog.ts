@@ -12,6 +12,8 @@
 
 // Po stronie serwera API może być pod innym adresem niż dla przeglądarki
 // (np. adres wewnętrzny kontenera), dlatego osobna zmienna ma pierwszeństwo.
+import type { ApiFrame } from '@/lib/frames';
+import type { ApiProject } from '@/lib/projects';
 import { mergeCatalog, type ApiModel, type PublicCatalogData, type PublicCategory } from '@/lib/catalog-merge';
 
 const SERVER_API_BASE = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
@@ -51,4 +53,28 @@ export async function fetchCopy(): Promise<unknown> {
 export async function fetchCatalog(): Promise<PublicCatalogData | null> {
   const data = await fetchJson<{ models: ApiModel[]; categories: PublicCategory[] }>('/catalog');
   return data ? mergeCatalog(data) : null;
+}
+
+// Ramy i realizacje celowo NIE są scalane tutaj z kategoriami: nazwa kategorii
+// pochodzi z `/catalog`, a ten sam merge musi zadziałać też po stronie
+// klienta (eksport statyczny). Serwer podaje więc surowe wiersze z API.
+
+export async function fetchFrames(): Promise<ApiFrame[] | null> {
+  const data = await fetchJson<{ frames: ApiFrame[] }>('/frames');
+  return data?.frames ?? null;
+}
+
+export async function fetchFrame(slug: string): Promise<ApiFrame | null> {
+  const data = await fetchJson<{ frame: ApiFrame }>(`/frames/${slug}`);
+  return data?.frame ?? null;
+}
+
+export async function fetchProjects(): Promise<ApiProject[] | null> {
+  const data = await fetchJson<{ projects: ApiProject[] }>('/projects');
+  return data?.projects ?? null;
+}
+
+export async function fetchProject(slug: string): Promise<ApiProject | null> {
+  const data = await fetchJson<{ project: ApiProject }>(`/projects/${slug}`);
+  return data?.project ?? null;
 }
