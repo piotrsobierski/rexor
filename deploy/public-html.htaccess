@@ -34,6 +34,22 @@ RewriteRule ^admin/konfiguracje/[^/]+/?$ admin/konfiguracje/_.html [L]
 # jeden shell, właściwy slug BikeModelPage czyta z URL-a po stronie klienta.
 RewriteRule ^rowery/[^/]+/[^/]+/?$ rowery/_/_.html [L]
 
+# Ramy i realizacje: pod tymi katalogami nie ma żadnej wyeksportowanej
+# podstrony poza powłoką, więc reguła może być bezwarunkowa. Wzorzec wymaga
+# ukośnika i segmentu, więc same /ramy i /realizacje tu nie wpadają i trafiają
+# niżej, do mapowania na ramy.html / realizacje.html.
+RewriteRule ^ramy/[^/]+/?$ ramy/_.html [L]
+RewriteRule ^realizacje/[^/]+/?$ realizacje/_.html [L]
+
+# Kategoria roweru. Tu, inaczej niż wyżej, część kategorii MA wyeksportowaną
+# stronę (te znane w chwili builda) - najpierw więc próbujemy pliku .html,
+# a dopiero gdy go nie ma, schodzimy na powłokę. Bez tej kolejności nowa
+# kategoria z panelu dostawała 404, a stare kategorie traciłyby render
+# serwerowy na rzecz dociągania danych w przeglądarce.
+RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+RewriteRule ^(rowery/[^/]+?)/?$ $1.html [L]
+RewriteRule ^rowery/[^/]+/?$ rowery/_.html [L]
+
 # Trasy eksportu statycznego są zapisane jako nazwa.html.
 # DOCUMENT_ROOT zamiast REQUEST_FILENAME, żeby /trasa i /trasa/ trafiały tak samo.
 RewriteCond %{DOCUMENT_ROOT}/$1.html -f

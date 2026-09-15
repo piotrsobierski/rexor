@@ -260,3 +260,30 @@ export function PartsPage({ copy: initialCopy }: { copy?: unknown } = {}) {
   const groups = Object.values(copy.parts.groups);
   return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.parts.eyebrow}</p><h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.parts.title}</h1><div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{groups.map(({ name, text }, index) => <article key={name} className="flex min-h-56 flex-col rounded-[24px] border border-line bg-white p-6"><span className="font-mono text-xs text-ink-subtle">{String(index + 1).padStart(2, '0')}</span><h2 className="mt-auto text-2xl font-semibold tracking-tight">{name}</h2><p className="mt-3 text-sm leading-relaxed text-ink-muted">{text}</p></article>)}</div><Button render={<a href="/konfigurator" />} className="mt-8 h-12 rounded-full bg-ink px-6 text-white">{copy.parts.cta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
 }
+
+/**
+ * Powłoka "_" trasy /rowery/[category].
+ *
+ * Kategorie dodane w panelu nie mają własnej, wyeksportowanej strony, bo
+ * generateStaticParams() zna tylko kategorie istniejące w chwili builda.
+ * .htaccess kieruje więc każdy jednosegmentowy /rowery/* bez gotowego pliku do
+ * tej powłoki, a ona rozstrzyga po stronie klienta, czy slug jest modelem
+ * (historyczne adresy /rowery/e82), czy kategorią.
+ *
+ * Katalog pobieramy raz i przekazujemy niżej jako `catalog`, żeby CategoryPage
+ * ani BikeModelPage nie odpytywały API po raz drugi.
+ */
+export function CategoryOrModelPage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
+  const { models, categories, loaded } = usePublicCatalog(catalog);
+  const copy = usePublicCopy(initialCopy);
+  const pathname = usePathname();
+  const slug = (pathname.split('/').filter(Boolean).pop() ?? '').toLowerCase();
+
+  // Bez tego, zanim dojedzie katalog, mignęłoby "nie znaleziono kategorii".
+  if (!loaded) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-20 sm:px-8 lg:px-12"><p className="text-sm text-ink-muted">{copy.content.loading}</p></section></PageFrame>;
+
+  const resolved: PublicCatalogData = { models, categories };
+  return models.some((model) => model.id === slug)
+    ? <BikeModelPage catalog={resolved} modelSlug={slug} copy={initialCopy} />
+    : <CategoryPage catalog={resolved} categorySlug={slug} copy={initialCopy} />;
+}
