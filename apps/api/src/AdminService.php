@@ -474,6 +474,91 @@ function deleteAdminCategory(PDO $pdo, int $id): array
 }
 
 /**
+ * Dodanie rozmiaru ramy. `geometry` jest kolumną JSON NOT NULL bez wartości
+ * domyślnej, a panel nie ma na razie edytora geometrii - nowy rozmiar startuje
+ * więc z pustym obiektem i tabela geometrii po prostu go pomija, dopóki ktoś
+ * nie uzupełni danych.
+ */
+function createAdminSize(PDO $pdo, array $input): array
+{
+    $modelId = (int) ($input['model_id'] ?? 0);
+    $code = trim((string) ($input['code'] ?? ''));
+    $label = trim((string) ($input['label'] ?? ''));
+
+    if ($modelId <= 0) {
+        throw new InvalidArgumentException('Wskaż model.');
+    }
+    if ($code === '' || mb_strlen($code) > 40) {
+        throw new InvalidArgumentException('Podaj oznaczenie rozmiaru (np. M), maksymalnie 40 znaków.');
+    }
+    if ($label === '' || mb_strlen($label) > 120) {
+        throw new InvalidArgumentException('Podaj nazwę rozmiaru widoczną dla klienta, maksymalnie 120 znaków.');
+    }
+
+    $model = $pdo->prepare('SELECT name FROM bike_models WHERE id = :id');
+    $model->execute(['id' => $modelId]);
+    $modelName = $model->fetchColumn();
+    if ($modelName === false) {
+        throw new InvalidArgumentException('Nie znaleziono modelu.');
+    }
+
+    // UNIQUE (model_id, code) złapałby to samo, ale surowy błąd klucza jest
+    // dla admina nieczytelny.
+    $duplicate = $pdo->prepare('SELECT 1 FROM model_sizes WHERE model_id = :model AND code = :code');
+    $duplicate->execute(['model' => $modelId, 'code' => $code]);
+    if ($duplicate->fetchColumn() !== false) {
+        throw new InvalidArgumentException("Model ma już rozmiar o oznaczeniu „{$code}”.");
+    }
+
+    $priceDelta = (float) ($input['price_delta_gross'] ?? 0);
+    if ($priceDelta < 0) {
+        throw new InvalidArgumentException('Dopłata za rozmiar nie może być ujemna.');
+    }
+
+    $height = static function (string $field) use ($input): ?int {
+        $raw = $input[$field] ?? null;
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        $value = (int) $raw;
+
+        return $value > 0 ? $value : null;
+    };
+
+    $statement = $pdo->prepare(
+        'INSERT INTO model_sizes (model_id, code, label, price_delta_gross, rider_height_min_cm, rider_height_max_cm, geometry, source_url, sort_order, is_active) ' .
+        'VALUES (:model, :code, :label, :price_delta, :height_min, :height_max, :geometry, :source_url, :sort_order, :is_active)'
+    );
+    $statement->execute([
+        'model' => $modelId,
+        'code' => $code,
+        'label' => $label,
+        'price_delta' => $priceDelta,
+        'height_min' => $height('rider_height_min_cm'),
+        'height_max' => $height('rider_height_max_cm'),
+        'geometry' => json_encode((object) ($input['geometry'] ?? []), JSON_THROW_ON_ERROR),
+        'source_url' => ($sourceUrl = trim((string) ($input['source_url'] ?? ''))) !== '' ? $sourceUrl : null,
+        'sort_order' => (int) ($input['sort_order'] ?? 0),
+        'is_active' => ($input['is_active'] ?? true) ? 1 : 0,
+    ]);
+    $id = (int) $pdo->lastInsertId();
+
+    logActivity(
+        $pdo,
+        'size_created',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Dodano rozmiar \"{$label}\" (#{$id}) do modelu \"{$modelName}\" (#{$modelId}).",
+        ['id' => $id, 'modelId' => $modelId, 'code' => $code]
+    );
+
+    $row = $pdo->prepare('SELECT id, model_id, code, label, price_delta_gross, sort_order, is_active FROM model_sizes WHERE id = :id');
+    $row->execute(['id' => $id]);
+
+    return ['size' => $row->fetch(), 'basePriceGross' => recomputeModelBasePrice($pdo, $modelId)];
+}
+
+/**
  * Usuwanie rozmiaru ramy. Zapisane konfiguracje mają `model_size_id` z SET
  * NULL i własną migawkę z etykietą rozmiaru, więc nie tracą treści. Ostatniego
  * rozmiaru nie usuwamy: model bez rozmiaru nie da się skonfigurować.

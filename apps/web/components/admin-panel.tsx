@@ -5798,6 +5798,43 @@ function ModelEquipmentEditor({
       .map((row) => [Number(row.group_id), row]),
   );
 
+  const [newSize, setNewSize] = useState({
+    code: '',
+    label: '',
+    price_delta_gross: '0',
+  });
+
+  async function addSize() {
+    if (!newSize.code.trim() || !newSize.label.trim()) {
+      setMessage('Podaj kod i nazwę rozmiaru.');
+      return;
+    }
+    setMessage('Dodaję rozmiar…');
+    try {
+      await request('/admin/sizes', {
+        method: 'POST',
+        body: JSON.stringify({
+          model_id: modelId,
+          code: newSize.code.trim(),
+          label: newSize.label.trim(),
+          price_delta_gross: Number(newSize.price_delta_gross || 0),
+          sort_order:
+            catalog.modelSizes.filter((row) => Number(row.model_id) === modelId)
+              .length * 10 + 10,
+        }),
+      });
+      setNewSize({ code: '', label: '', price_delta_gross: '0' });
+      await reload();
+      setMessage('Rozmiar dodany.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Nie udało się dodać rozmiaru.',
+      );
+    }
+  }
+
   async function saveModelPart(body: Record<string, unknown>) {
     setMessage('Zapisuję osprzęt…');
     try {
@@ -6393,6 +6430,49 @@ function ModelEquipmentEditor({
         title="Rozmiary i dopłaty"
         description="Rozmiar może mieć własną dopłatę, jeśli rama w danym rozmiarze kosztuje więcej."
       >
+        <div className="mb-5 rounded-2xl border border-line bg-white p-4 sm:p-5">
+          <h3 className="text-sm font-semibold tracking-tight text-ink">
+            Dodaj rozmiar
+          </h3>
+          <p className="mt-1 text-xs text-ink-subtle">
+            Geometrię uzupełnia się w danych modelu - nowy rozmiar pojawi się
+            w konfiguratorze od razu, a w tabeli geometrii dopiero z wymiarami.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[110px_1fr_160px_auto]">
+            <Input
+              placeholder="Kod (M)"
+              value={newSize.code}
+              onChange={(event) =>
+                setNewSize({ ...newSize, code: event.target.value })
+              }
+              className="h-9 text-sm"
+            />
+            <Input
+              placeholder="Nazwa dla klienta (M / 17 cali)"
+              value={newSize.label}
+              onChange={(event) =>
+                setNewSize({ ...newSize, label: event.target.value })
+              }
+              className="h-9 text-sm"
+            />
+            <Input
+              type="number"
+              step="0.01"
+              placeholder="Dopłata brutto"
+              value={newSize.price_delta_gross}
+              onChange={(event) =>
+                setNewSize({
+                  ...newSize,
+                  price_delta_gross: event.target.value,
+                })
+              }
+              className="h-9 text-sm"
+            />
+            <Button size="sm" onClick={() => void addSize()}>
+              <Save /> Dodaj
+            </Button>
+          </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
