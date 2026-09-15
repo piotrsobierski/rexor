@@ -4,15 +4,13 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ArrowRight, BatteryCharging, Gauge, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SiteFooter } from '@/components/site-footer';
-import { SiteHeader } from '@/components/site-header';
+import { PageFrame } from '@/components/page-frame';
 import { formatPrice, type BikeModel } from '@/lib/catalog';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
 import type { SiteCopy } from '@/lib/copy';
 
-const Frame = ({ children }: { children: React.ReactNode }) => <div className="flex min-h-screen flex-col"><SiteHeader /><main className="flex-1">{children}</main><SiteFooter /></div>;
 
 function BikePickCard({ model, copy }: { model: BikeModel; copy: SiteCopy }) {
   const productHref = `/rowery/${model.categorySlug}/${model.id}`;
@@ -55,7 +53,7 @@ export function BikesPage({ catalog, copy: initialCopy }: { catalog?: PublicCata
   // żeby pierwszy render nie pokazywał danych zapasowych.
   const { models } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
-  return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.bikes.eyebrow}</p><h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.bikes.title}</h1><div className="mt-10 grid gap-5 lg:grid-cols-3">{models.map((model) => <BikePickCard key={model.id} model={model} copy={copy} />)}</div></section></Frame>;
+  return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.bikes.eyebrow}</p><h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.bikes.title}</h1><div className="mt-10 grid gap-5 lg:grid-cols-3">{models.map((model) => <BikePickCard key={model.id} model={model} copy={copy} />)}</div></section></PageFrame>;
 }
 
 /** Kategorie, które przekraczają moc/prędkość roweru elektrycznego - klient musi potwierdzić ostrzeżenie raz na przeglądarkę zanim zobaczy ofertę. */
@@ -74,19 +72,19 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
     setDisclaimerAccepted(window.localStorage.getItem(`rexor_disclaimer_${categorySlug}`) === '1');
   }, [categorySlug, isRestricted]);
 
-  if (!category) return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.category.eyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.category.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.category.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></Frame>;
+  if (!category) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.category.eyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.category.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.category.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
 
   if (isRestricted && !disclaimerAccepted) {
-    return <Frame><section className="mx-auto max-w-[720px] px-4 py-16 text-center sm:px-8 lg:py-24">
+    return <PageFrame><section className="mx-auto max-w-[720px] px-4 py-16 text-center sm:px-8 lg:py-24">
       <ShieldAlert className="mx-auto size-10 text-amber-600" />
       <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{copy.category.electricDisclaimerTitle}</h1>
       <p className="mt-4 text-base leading-relaxed text-ink-muted">{copy.category.electricDisclaimerText}</p>
       <Button onClick={() => { window.localStorage.setItem(`rexor_disclaimer_${categorySlug}`, '1'); setDisclaimerAccepted(true); }} className="mt-8 h-12 rounded-full bg-ink px-8 text-white">{copy.category.electricDisclaimerAccept}</Button>
-    </section></Frame>;
+    </section></PageFrame>;
   }
 
   const categoryImage = publicMediaUrl(category.default_image_path);
-  return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
+  return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
     {categoryImage && <div className="mb-8 aspect-[21/9] w-full overflow-hidden rounded-[28px] bg-[var(--muted)]"><img src={categoryImage} alt="" className="size-full object-cover" /></div>}
     <p className="eyebrow">{copy.category.eyebrow}</p>
     <h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{category.name}</h1>
@@ -96,7 +94,7 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
     {categoryModels.length === 0
       ? <p className="mt-10 rounded-2xl bg-[var(--muted)] p-6 text-sm text-ink-muted">{copy.category.emptyModels}</p>
       : <div className="mt-10 grid gap-5 lg:grid-cols-3">{categoryModels.map((model) => <BikePickCard key={model.id} model={model} copy={copy} />)}</div>}
-  </section></Frame>;
+  </section></PageFrame>;
 }
 
 export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initialCopy }: { catalog?: PublicCatalogData; modelSlug?: string; copy?: unknown }) {
@@ -122,7 +120,7 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
   const [selectedPhoto, setSelectedPhoto] = useState(0);
 
   if (!model) {
-    return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.model.notFoundEyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.model.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.model.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></Frame>;
+    return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.model.notFoundEyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.model.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.model.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
   }
 
   const category = categories.find((c) => c.slug === model.categorySlug);
@@ -131,7 +129,7 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
   const ctaLabel = model.available ? copy.model.configureCta : copy.model.askCta;
 
   return (
-    <Frame>
+    <PageFrame>
       <section className="mx-auto max-w-[1480px] px-4 py-8 sm:px-8 lg:px-12 lg:py-12">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
@@ -253,19 +251,12 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
           </div>
         </div>
       </section>
-    </Frame>
+    </PageFrame>
   );
-}
-
-export function FramesPage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
-  const { models: bikeModels } = usePublicCatalog(catalog);
-  const copy = usePublicCopy(initialCopy);
-  const frames = bikeModels.slice(0, 3).map((model) => ({ model, facts: model.facts ?? [] }));
-  return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.frames.eyebrow}</p><h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.frames.title}</h1><div className="mt-12 divide-y divide-line border-y border-line">{frames.map(({ model, facts }) => <article key={model.id} className="grid gap-6 py-8 md:grid-cols-[0.7fr_1fr_1fr] md:items-center"><img src={model.frameImage ?? model.gallery[1] ?? model.image} alt={`Rama ${model.name}`} className="aspect-[4/3] w-full rounded-2xl bg-[var(--muted)] object-contain mix-blend-multiply" /><div><span className="eyebrow">{model.category}</span><h2 className="mt-2 text-3xl font-semibold">{model.name.replace('Rexor ', '')}</h2><p className="mt-3 text-sm leading-relaxed text-ink-muted">{model.description}</p></div><ul className="grid grid-cols-2 gap-2">{facts.map((fact) => <li key={fact} className="rounded-xl bg-ink-wash p-3 text-sm font-medium">{fact}</li>)}</ul></article>)}</div></section></Frame>;
 }
 
 export function PartsPage({ copy: initialCopy }: { copy?: unknown } = {}) {
   const copy = usePublicCopy(initialCopy);
   const groups = Object.values(copy.parts.groups);
-  return <Frame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.parts.eyebrow}</p><h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.parts.title}</h1><div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{groups.map(({ name, text }, index) => <article key={name} className="flex min-h-56 flex-col rounded-[24px] border border-line bg-white p-6"><span className="font-mono text-xs text-ink-subtle">{String(index + 1).padStart(2, '0')}</span><h2 className="mt-auto text-2xl font-semibold tracking-tight">{name}</h2><p className="mt-3 text-sm leading-relaxed text-ink-muted">{text}</p></article>)}</div><Button render={<a href="/konfigurator" />} className="mt-8 h-12 rounded-full bg-ink px-6 text-white">{copy.parts.cta} <ArrowRight data-icon="inline-end" /></Button></section></Frame>;
+  return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.parts.eyebrow}</p><h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.parts.title}</h1><div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{groups.map(({ name, text }, index) => <article key={name} className="flex min-h-56 flex-col rounded-[24px] border border-line bg-white p-6"><span className="font-mono text-xs text-ink-subtle">{String(index + 1).padStart(2, '0')}</span><h2 className="mt-auto text-2xl font-semibold tracking-tight">{name}</h2><p className="mt-3 text-sm leading-relaxed text-ink-muted">{text}</p></article>)}</div><Button render={<a href="/konfigurator" />} className="mt-8 h-12 rounded-full bg-ink px-6 text-white">{copy.parts.cta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
 }
