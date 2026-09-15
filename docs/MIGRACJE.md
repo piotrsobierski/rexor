@@ -32,4 +32,19 @@ Skrót wdrożeniowy `php scripts/startup.php` uruchamia migracje z `--apply`. Sk
 6. Nie zakładać pełnej transakcyjności DDL MySQL - wiele operacji `ALTER/CREATE` wykonuje implicit commit.
 7. Migracja danych powinna sprawdzać liczbę rekordów przed i po oraz zapisywać błędy bez ujawniania danych osobowych.
 
+## Wykonane zmiany schematu poza migracją bazową
+
+- `025_frames_and_projects.sql` (15 września 2026) - tabele `frames`,
+  `frame_media`, `projects`, `project_media` oraz kategoria `inne`
+  w `bike_categories`. Kategorie ram są wspólne z rowerami, więc migracja nie
+  tworzy własnego słownika. Wykonana lokalnie na MySQL 8.0.
+
+`database/schema.sql` nie jest utrzymywany równolegle z migracjami - nie ma
+w nim m.in. `admin_login_attempts` (017), `ai_rate_limit_hits` (018) ani
+`activity_log` (019). Pusta baza i tak dostaje komplet tabel, bo
+`migrationFiles()` uruchamia `schema.sql` jako `000_base_schema`, a zaraz po
+nim wszystkie pliki z `database/migrations/`. Nowych tabel nie dopisujemy
+więc do `schema.sql`, żeby nie tworzyć drugiego, rozjeżdżającego się źródła
+prawdy.
+
 Migracja bazowa i preseed zostały wykonane integracyjnie 11 września 2026 na lokalnym PHP 8.5.10 i MySQL 8.0.46. Kolejne zmiany schematu muszą już trafiać do nowych, numerowanych plików zamiast modyfikowania wykonanej migracji produkcyjnej.

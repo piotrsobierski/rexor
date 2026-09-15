@@ -43,7 +43,18 @@ rexor-bike-configurator/
 - zapis i odczyt konfiguracji przez bezpieczny identyfikator,
 - utworzenie zapytania klienta,
 - uwierzytelniony CRUD katalogu dla administratora,
-- zarządzanie mediami.
+- zarządzanie mediami,
+- ramy sprzedawane osobno (`frames`) - pozycje katalogowe z własną ceną
+  brutto, poza cennikiem konfiguratora, z formularzem zapytania,
+- realizacje (`projects`) - portfolio zbudowanych rowerów: redagowana strona
+  ze zdjęciami i spisem komponentów, bez cennika i konfiguracji.
+
+Ramy i modele są celowo osobnymi bytami. Model jest wpięty w cennik
+(`model_parts`, `model_sizes`, `model_batteries`, przeliczanie ceny bazowej),
+rama ma cenę własną, a `NULL` znaczy „wymaga wyceny”. Trzymanie ramy jako
+„modelu bez konfiguratora” oznaczałoby NULL-e i warunki w całej wycenie.
+Słownik kategorii (`bike_categories`) pozostaje wspólny dla rowerów, ram
+i realizacji, żeby filtr na `/rowery`, `/ramy` i `/realizacje` był ten sam.
 
 Nie należy budować reguł konfiguratora wyłącznie w React. Jedno źródło prawdy dla zgodności i cen powinno działać po stronie backendu.
 

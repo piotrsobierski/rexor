@@ -5,6 +5,69 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-15 — Backend ram i realizacji
+
+### Zgłoszenie
+
+Mail klienta z 13 września: ramy mają być sprzedawane osobno, z własną ceną
+i formularzem zapytania, a zrealizowane budowy mają dostać własne podstrony.
+Zakres i kontrakt pól ustalone w `docs/PLAN_RAMY_REALIZACJE.md`. To jest
+wątek backendowy; front publiczny i panel admina powstają równolegle.
+
+### Stan zastany
+
+Katalog znał wyłącznie modele konfiguratora. Rama istniała jako kolumna ceny
+w `bike_models` (`frame_price_gross`), czyli składnik wyceny roweru, a nie
+pozycja, którą można kupić. Realizacji nie było w ogóle. Czatbot budował
+kontekst z kategorii, modeli i strony serwisu, więc na pytanie „jakie macie
+ramy” odpowiadał rowerami w całości.
+
+### Wprowadzone zmiany
+
+- `database/migrations/025_frames_and_projects.sql`: tabele `frames`,
+  `frame_media`, `projects`, `project_media` oraz kategoria `inne`.
+  Kategorie są wspólne z rowerami - ramy trafiają do `bike_categories`,
+  a nie do własnego słownika.
+- `apps/api/src/FramesService.php`, `ProjectsService.php`: odczyt publiczny
+  (tylko pozycje opublikowane) i operacje panelu. Kształt odpowiedzi jest
+  1:1 z `ApiFrame`/`ApiProject` z `apps/web/lib` - to kontrakt z frontem.
+- `apps/api/src/MediaLinkService.php`: obsługa tabel `*_media` zebrana raz,
+  sparametryzowana whitelistą zasobów. Nazwa tabeli i kolumny nigdy nie
+  pochodzi z żądania.
+- `apps/api/public/index.php`: `GET /frames`, `GET /frames/{slug}`,
+  `GET /projects`, `GET /projects/{slug}` oraz komplet tras adminowych
+  (tworzenie, PATCH, usuwanie, przypisanie zdjęcia z rolą, kolejność
+  galerii) wzorowanych na trasach modeli.
+- `apps/api/src/AdminService.php`: `GET /admin/catalog` dostaje klucze
+  `frames`, `frameMedia`, `projects`, `projectMedia`; `updateAdminRecord()`
+  rozszerzone o oba zasoby wraz z listą pól, dla których puste pole panelu
+  znaczy `NULL` (m.in. `price_gross`, czyli „wymaga wyceny”).
+- `apps/api/src/ChatService.php`: sekcje `### RAMY DOSTĘPNE OSOBNO`
+  i `### ZREALIZOWANE PROJEKTY` w prompcie czatbota, przed wiedzą
+  o zasięgach.
+- `apps/api/src/ContactService.php`: `type: 'frame'` w istniejącym
+  `POST /contact`, adresat `order_email`, temat
+  `Zapytanie o ramę — {frameName} — {name}`, zdarzenie `frame_message`.
+
+### Przy okazji
+
+`deleteModelMedia()` sprawdzało, czy zdjęcie jest jeszcze gdzieś używane,
+tylko w trzech tabelach łączących. Po dołożeniu `frame_media`
+i `project_media` usunięcie zdjęcia z modelu kasowałoby plik nadal używany
+przez ramę albo realizację. Lista tabel jest teraz jedna, w
+`mediaLinkTables()`, i każda nowa tabela `*_media` musi tam trafić.
+
+### Weryfikacja
+
+Migracja wykonana lokalnie (MySQL 8.0). Każda nowa trasa sprawdzona curlem
+na realnych danych: publiczne wprost, adminowe z tokenem z
+`POST /admin/login`. Sprawdzone też, że pozycje nieopublikowane nie wychodzą
+publicznie ani nie trafiają do promptu czatbota, że `GET /catalog`
+i `GET /admin/catalog` działają bez zmian oraz że `type: 'contact'`
+i `type: 'service'` nadal idą na swoje adresy.
+
+---
+
 ## 2026-09-11 — Mignięcie starej treści przy wejściu na stronę
 
 ### Zgłoszenie
