@@ -30,7 +30,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
   return <div className="flex min-h-screen flex-col bg-background text-foreground"><SiteHeader /><main className="flex-1">
     <section className="mx-auto max-w-[1480px] px-4 pb-7 pt-10 sm:px-8 sm:pb-10 sm:pt-14 lg:px-12">
       <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
-        <Reveal><p className="eyebrow">{copy.home.eyebrow}</p><h1 className="mt-3 max-w-3xl whitespace-nowrap text-[clamp(1.6rem,4.2vw,3.6rem)] font-semibold leading-[0.95] tracking-[-0.045em]">{copy.home.heroTitle}</h1></Reveal>
+        <Reveal><p className="eyebrow">{copy.home.eyebrow}</p><h1 className="mt-3 max-w-3xl text-[clamp(1.6rem,4.2vw,3.6rem)] font-semibold leading-[0.95] tracking-[-0.045em]">{copy.home.heroTitle}</h1></Reveal>
         <Reveal delayMs={120} className="flex flex-col items-start gap-6 lg:items-end"><p className="max-w-lg text-base leading-relaxed text-ink-muted lg:text-right lg:text-lg">{copy.home.heroSubtitle}</p><Button render={<a href="/konfigurator" />} size="lg" className="h-12 rounded-full bg-ink px-6 text-white transition-transform hover:scale-[1.03] active:scale-[0.98]">{copy.home.heroCta} <ArrowRight data-icon="inline-end" /></Button></Reveal>
       </div>
     </section>
