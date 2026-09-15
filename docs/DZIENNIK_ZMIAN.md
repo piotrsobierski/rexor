@@ -5,6 +5,47 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-15 — Odznaczone pole wyboru wywracało zapis w panelu
+
+### Zgłoszenie
+
+Zapis ramy w nowej zakładce panelu nie przechodził. Okazało się, że problem
+jest starszy niż ramy i dotyczy każdego zapisu niosącego wartość `false`.
+
+### Przyczyna
+
+`updateAdminRecord()` wiązało wartości przez PDO bez jawnego typu. PHP-owe
+`false` idzie wtedy do MySQL-a jako pusty ciąg, a serwer w trybie ścisłym
+odrzuca `''` dla kolumny `TINYINT(1)`:
+
+```
+SQLSTATE[HY000]: General error: 1366 Incorrect integer value: ''
+for column 'is_recommended' at row 1
+```
+
+`UPDATE` jest jednym zapytaniem, więc wywracał się cały zapis — nie zapisywało
+się żadne z pozostałych pól formularza. Dotyczyło to tak samo odznaczenia
+„Opublikowana” na stronie i w kategorii oraz `is_active` części; te ścieżki
+były zepsute od początku, tylko nikt nie odznaczał tych pól. Nowe zakładki
+uwidoczniły błąd, bo mają po dwa pola wyboru w domyślnym formularzu.
+
+Pozostałe miejsca w `AdminService.php` (baterie, `model_parts`, ustawienia
+grup) rzutowały już jawnie przez `? 1 : 0` — brakowało tego wyłącznie
+w `updateAdminRecord()`.
+
+### Wprowadzone zmiany
+
+- `apps/api/src/AdminService.php`: rzutowanie `is_bool($value)` na `0/1` przed
+  związaniem parametru, wspólne dla wszystkich zasobów i pól.
+
+### Weryfikacja
+
+`PATCH /admin/frames/{id}` z `is_recommended: false` zapisuje komplet pól;
+`PATCH /admin/pages/{id}` z `is_published: false` (ścieżka sprzed zmiany)
+przechodzi w obie strony.
+
+---
+
 ## 2026-09-15 — Backend ram i realizacji
 
 ### Zgłoszenie
