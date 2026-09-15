@@ -175,6 +175,11 @@ if ($method === 'PATCH' && $path === '/admin/settings/copy') {
     jsonResponse(['copy' => updateSiteCopy($pdo, requestJson())]);
 }
 
+if ($method === 'PATCH' && $path === '/admin/settings/chatbot-prompt') {
+    requireAdmin($pdo);
+    jsonResponse(['chatbotPrompt' => updateChatbotPrompt($pdo, requestJson())]);
+}
+
 if ($method === 'POST' && $path === '/admin/ai/rich-content') {
     requireAdmin($pdo);
     jsonResponse(aiEditRichContent($pdo, requestJson()));

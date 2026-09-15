@@ -49,7 +49,7 @@ type ModelPartRow = { model_id: number; part_id: number; group_id: number; group
 type GroupSettingsRow = { model_id: number; group_id: number; group_slug: string; selection_mode: string; customer_part_allowed: number | boolean; customer_part_gross_price: string | number; customer_part_label: string; helper_text: string | null };
 type PricingLine = { groupSlug: string; groupName: string; name: string; grossPrice: number };
 type ModelPricing = { modelId: number; framePriceGross: number; batteryPriceGross: number; componentsPriceGross: number; assemblyPriceGross: number; marginPercent: number; marginAmountGross: number; grossTotal: number; issues: string[]; notes: string[]; lines: PricingLine[] };
-type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null; modelSpecifications: Record<number, { facts?: string[]; [key: string]: unknown }> };
+type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null; chatbotPrompt: { instructions?: string; extra_context?: string } | null; modelSpecifications: Record<number, { facts?: string[]; [key: string]: unknown }> };
 type ActivityLogEntry = { id: number; event_type: string; actor_type: 'customer' | 'admin' | 'system'; actor_label: string | null; ip_address: string | null; summary: string; details: Record<string, unknown> | null; created_at: string };
 
 export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
@@ -128,7 +128,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
   if (!token || !catalog) return <main className="grid min-h-screen place-items-center bg-[#111] px-4"><Toaster /><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-7"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" /><p className="eyebrow mt-10">Panel administracyjny</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Zaloguj się</h1><div className="mt-6 grid gap-4"><div className="grid gap-1.5"><Label htmlFor="admin-email">E-mail</Label><Input id="admin-email" type="email" required className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} /></div><div className="grid gap-1.5"><Label htmlFor="admin-password">Hasło</Label><Input id="admin-password" type="password" required className="h-11" value={password} onChange={(event) => setPassword(event.target.value)} /></div><Button type="submit" className="h-11 rounded-full bg-ink text-white">Zaloguj</Button>{message && <p className="text-center text-sm text-ink-muted">{message}</p>}</div></form></main>;
 
   return <div className="min-h-screen bg-[#f4f5f2]"><Toaster /><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><RefreshButton onRefresh={refreshCatalog} /><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
-    <Tabs value={activeTab} onValueChange={(value) => { const tab = String(value); if (isAdminTabSlug(tab)) { setActiveTab(tab); window.history.pushState(null, '', `/admin/${tab}`); } }}><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Strony</TabsTrigger><TabsTrigger value="texts" className="rounded-full px-4 py-2">Teksty</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity-log" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
+    <Tabs value={activeTab} onValueChange={(value) => { const tab = String(value); if (isAdminTabSlug(tab)) { setActiveTab(tab); window.history.pushState(null, '', `/admin/${tab}`); } }}><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Strony</TabsTrigger><TabsTrigger value="texts" className="rounded-full px-4 py-2">Teksty</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="chatbot" className="rounded-full px-4 py-2">Chatbot AI</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity-log" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} specifications={catalog.modelSpecifications} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="categories"><CategoriesEditor rows={catalog.categories} patch={patch} request={request} setMessage={setMessage} /></TabsContent>
       <TabsContent value="equipment"><ModelEquipmentEditor catalog={catalog} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
@@ -137,6 +137,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
       <TabsContent value="service"><PagesEditor pages={catalog.pages} patch={patch} request={request} /></TabsContent>
       <TabsContent value="texts"><CopyEditor copy={catalog.copy} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="theme"><ThemeEditor theme={catalog.theme} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
+      <TabsContent value="chatbot"><ChatbotPromptEditor chatbotPrompt={catalog.chatbotPrompt} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="inquiries"><InquiriesTable rows={catalog.inquiries} /></TabsContent>
       <TabsContent value="activity-log"><ActivityLogPanel request={request} /></TabsContent>
     </Tabs>
@@ -1362,6 +1363,46 @@ function ThemeEditor({ theme, request, reload, setMessage }: { theme: Record<str
   return <Panel title="Kolorystyka serwisu" description="Jeden motyw dla strony publicznej i konfiguratora, przechowywany w bazie."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(labels).map(([key, label]) => <label key={key} className="flex items-center gap-3 rounded-2xl border p-3"><input type="color" value={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} className="size-10 cursor-pointer rounded-lg border-0 bg-transparent" /><span><strong className="block text-sm">{label}</strong><span className="font-mono text-xs text-ink-subtle">{draft[key]}</span></span></label>)}</div><Button onClick={save} className="mt-6"><Save /> Zapisz motyw</Button></Panel>;
 }
 
+/**
+ * System prompt chatbota jest normalnie w pełni generowany po stronie PHP
+ * (ChatService.php) z danych katalogu. Tu admin może opcjonalnie nadpisać
+ * stały blok instrukcji i dopisać dodatkowy kontekst bez zmiany kodu i
+ * redeployu - puste pola oznaczają, że używany jest domyślny prompt z kodu.
+ */
+function ChatbotPromptEditor({ chatbotPrompt, request, reload, setMessage }: { chatbotPrompt: { instructions?: string; extra_context?: string } | null; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
+  const [instructions, setInstructions] = useState(chatbotPrompt?.instructions ?? '');
+  const [extraContext, setExtraContext] = useState(chatbotPrompt?.extra_context ?? '');
+
+  useEffect(() => {
+    setInstructions(chatbotPrompt?.instructions ?? '');
+    setExtraContext(chatbotPrompt?.extra_context ?? '');
+  }, [chatbotPrompt]);
+
+  async function save() {
+    try {
+      await request('/admin/settings/chatbot-prompt', { method: 'PATCH', body: JSON.stringify({ instructions, extra_context: extraContext }) });
+      await reload();
+      setMessage('Prompt chatbota zapisany w bazie. Zmiana obowiązuje od razu, bez redeployu.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać promptu chatbota.');
+    }
+  }
+
+  return <Panel title="Chatbot AI (Rexor AI Advisor)" description="Katalog, ceny i baterie chatbot pobiera zawsze automatycznie z bazy. Tu możesz opcjonalnie nadpisać instrukcje zachowania i dopisać dodatkowy kontekst (np. promocje, wyjątki, aktualności) - bez zmiany kodu.">
+    <div className="grid gap-6">
+      <div className="grid gap-1.5">
+        <Label htmlFor="chatbot-instructions">Instrukcje zachowania (nadpisuje domyślne zasady z kodu)</Label>
+        <Textarea id="chatbot-instructions" className="min-h-56 font-mono text-xs" placeholder="Pozostaw puste, aby używać domyślnych instrukcji zdefiniowanych w kodzie." value={instructions} onChange={(event) => setInstructions(event.target.value)} />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="chatbot-context">Dodatkowy kontekst (dopisywany do promptu, np. promocje, aktualności, wyjątki)</Label>
+        <Textarea id="chatbot-context" className="min-h-40" placeholder="Np. Do końca miesiąca trwa promocja -5% na model E82." value={extraContext} onChange={(event) => setExtraContext(event.target.value)} />
+      </div>
+      <Button onClick={save}><Save /> Zapisz prompt chatbota</Button>
+    </div>
+  </Panel>;
+}
+
 const inquiryColumns: string[][] = [['public_id', 'Projekt'], ['customer_name', 'Klient'], ['customer_email', 'E-mail'], ['gross_total', 'Cena brutto'], ['status', 'Status'], ['created_at', 'Data']];
 
 function InquiriesTable({ rows }: { rows: Row[] }) {
@@ -1376,6 +1417,7 @@ const activityEventLabels: Record<string, string> = {
   battery_saved: 'Zapis baterii',
   theme_updated: 'Zmiana kolorów',
   copy_updated: 'Zmiana tekstów strony',
+  chatbot_prompt_updated: 'Zmiana promptu chatbota',
   media_uploaded: 'Wgranie zdjęcia',
   media_deleted: 'Usunięcie zdjęcia',
   model_part_saved: 'Osprzęt modelu',

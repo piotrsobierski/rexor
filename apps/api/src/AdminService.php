@@ -77,6 +77,10 @@ function adminCatalog(PDO $pdo): array
             $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'copy'")->fetchColumn();
             return $value ? json_decode((string) $value, true, 512, JSON_THROW_ON_ERROR) : null;
         })(),
+        'chatbotPrompt' => (function () use ($pdo) {
+            $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'chatbot_prompt'")->fetchColumn();
+            return $value ? json_decode((string) $value, true, 16, JSON_THROW_ON_ERROR) : null;
+        })(),
     ];
 }
 
@@ -544,6 +548,25 @@ function updateSiteCopy(PDO $pdo, array $input): array
     $statement->execute(['value' => json_encode($input, JSON_THROW_ON_ERROR)]);
     logActivity($pdo, 'copy_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono teksty strony.', null);
     return $input;
+}
+
+/**
+ * Nadpisania promptu systemowego chatbota AI. Domyślnie prompt jest w pełni
+ * generowany w ChatService.php (buildChatbotSystemPromptFromDb); tu admin
+ * może opcjonalnie podmienić stały blok instrukcji ("instructions") i/lub
+ * dopisać dodatkowy kontekst ("extra_context") bez zmiany kodu i redeployu.
+ * Puste pole = używany jest domyślny prompt z kodu.
+ */
+function updateChatbotPrompt(PDO $pdo, array $input): array
+{
+    $prompt = [
+        'instructions' => trim((string) ($input['instructions'] ?? '')),
+        'extra_context' => trim((string) ($input['extra_context'] ?? '')),
+    ];
+    $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('chatbot_prompt', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
+    $statement->execute(['value' => json_encode($prompt, JSON_THROW_ON_ERROR)]);
+    logActivity($pdo, 'chatbot_prompt_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono prompt i kontekst chatbota AI.', null);
+    return $prompt;
 }
 
 /** Limity z php.ini zapisane jako 32M albo 512K przeliczamy na bajty. */

@@ -20,9 +20,17 @@ function buildChatbotSystemPromptFromDb(PDO $pdo): string
     $serviceStatement->execute();
     $servicePage = $serviceStatement->fetch();
 
+    $promptSettingValue = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'chatbot_prompt'")->fetchColumn();
+    $promptSetting = $promptSettingValue ? json_decode((string) $promptSettingValue, true, 16, JSON_THROW_ON_ERROR) : null;
+    $customInstructions = trim((string) ($promptSetting['instructions'] ?? ''));
+    $extraContext = trim((string) ($promptSetting['extra_context'] ?? ''));
+
     $sections = [];
 
-    $sections[] = <<<PROMPT
+    // Admin może w panelu nadpisać ten blok bez zmiany kodu i redeployu
+    // (site_settings.chatbot_prompt.instructions); w przeciwnym razie stosujemy
+    // domyślny prompt zdefiniowany tutaj.
+    $sections[] = $customInstructions !== '' ? $customInstructions : <<<PROMPT
 Jesteś oficjalnym doradcą technicznym AI marki Rexor Bikes (Rexor AI Advisor).
 Twoja rola: Pomagasz klientom w wyborze modelu, dopasowaniu baterii, silnika, części, zrozumieniu zasięgów i cen.
 Wszystkie poniższe informacje pochodzą BEZPOŚREDNIO Z AKTUALNEJ BAZY DANYCH I CENNIKA REXOR BIKES (stan na teraz).
@@ -187,6 +195,11 @@ RANGES;
 - Jeżeli grupa części dopuszcza "część klienta", klient może dostarczyć własny amortyzator, damper czy hamulce, a cena części domyślnej zostanie odliczona z ceny roweru do 0 zł!
 - Rexor montuje elementy klienta bez dodatkowej opłaty w ramach budowy roweru.
 RULES;
+
+    // 6. DODATKOWY KONTEKST Z PANELU ADMINA (opcjonalny, edytowalny bez redeployu)
+    if ($extraContext !== '') {
+        $sections[] = "### DODATKOWY KONTEKST OD ADMINISTRATORA:\n{$extraContext}";
+    }
 
     return implode("\n\n", $sections);
 }
