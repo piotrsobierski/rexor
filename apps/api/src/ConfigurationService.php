@@ -172,18 +172,39 @@ function createConfiguration(PDO $pdo, array $input): array
             'shareUrl' => $shareUrl,
             'resumeUrl' => $resumeUrl,
         ];
-        $pdo->prepare(
-            'INSERT INTO email_outbox (configuration_id, recipient_email, template_key, payload) VALUES (:configuration, :recipient, \'configuration_confirmation\', :payload)'
-        )->execute([
-            'configuration' => $configurationId,
-            'recipient' => $email,
-            'payload' => json_encode($mailPayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        ]);
+        $confirmationOutboxId = insertOutboxMail($pdo, $configurationId, $email, 'configuration_confirmation', $mailPayload);
+        $orderRecipient = getMailRouting($pdo)['order_email'];
+        $notificationOutboxId = insertOutboxMail($pdo, $configurationId, $orderRecipient, 'inquiry_notification', $mailPayload);
         $pdo->commit();
     } catch (Throwable $error) {
         $pdo->rollBack();
         throw $error;
     }
+
+    // Wysyłka poza transakcją: I/O do serwera SMTP nie powinno trzymać
+    // otwartej transakcji DB, a błąd wysyłki nie może cofnąć zapisanego
+    // zamówienia - jest już zapisany w email_outbox do ew. ponowienia.
+    $price = number_format($grossTotal, 0, ',', ' ') . ' zł brutto';
+    sendOutboxMailBestEffort(
+        $pdo,
+        $confirmationOutboxId,
+        $email,
+        $name,
+        "Twój projekt {$model['name']} — Rexor Bikes",
+        "<h1>Dziękujemy, " . htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "</h1><p>Konfiguracja <strong>{$model['name']}</strong> została zapisana.</p><p>Aktualna cena: <strong>{$price}</strong>.</p><p><a href=\"{$shareUrl}\">Otwórz podsumowanie</a></p><p><a href=\"{$resumeUrl}\">Wróć do konfiguratora</a></p><p>Przed realizacją Rexor potwierdzi kompatybilność i ostateczny zakres.</p>"
+    );
+    sendOutboxMailBestEffort(
+        $pdo,
+        $notificationOutboxId,
+        $orderRecipient,
+        'Rexor Bikes',
+        "Nowe zapytanie ofertowe — {$model['name']}",
+        '<h1>Nowe zapytanie ofertowe</h1><p><strong>Klient:</strong> ' . htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' (' . htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ')</p>'
+            . '<p><strong>Model:</strong> ' . htmlspecialchars($model['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' (' . htmlspecialchars($size['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ')</p>'
+            . "<p><strong>Cena:</strong> {$price}</p>"
+            . "<p><a href=\"{$shareUrl}\">Podgląd konfiguracji</a></p>"
+            . '<p><a href="' . rtrim(envValue('FRONTEND_URL', envValue('APP_URL', 'http://localhost:3000')), '/') . "/admin/konfiguracje/{$publicId}\">Otwórz w panelu admina</a></p>"
+    );
 
     logActivity(
         $pdo,

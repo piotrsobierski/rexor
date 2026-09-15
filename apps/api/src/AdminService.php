@@ -81,6 +81,7 @@ function adminCatalog(PDO $pdo): array
             $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'chatbot_prompt'")->fetchColumn();
             return $value ? json_decode((string) $value, true, 16, JSON_THROW_ON_ERROR) : null;
         })(),
+        'mailRouting' => getMailRouting($pdo),
     ];
 }
 
@@ -546,7 +547,7 @@ function updateSiteCopy(PDO $pdo, array $input): array
     }
     $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('copy', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
     $statement->execute(['value' => json_encode($input, JSON_THROW_ON_ERROR)]);
-    logActivity($pdo, 'copy_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono teksty strony.', null);
+    logActivity($pdo, 'copy_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono teksty strony.', []);
     return $input;
 }
 
@@ -565,7 +566,7 @@ function updateChatbotPrompt(PDO $pdo, array $input): array
     ];
     $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('chatbot_prompt', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
     $statement->execute(['value' => json_encode($prompt, JSON_THROW_ON_ERROR)]);
-    logActivity($pdo, 'chatbot_prompt_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono prompt i kontekst chatbota AI.', null);
+    logActivity($pdo, 'chatbot_prompt_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono prompt i kontekst chatbota AI.', $prompt);
     return $prompt;
 }
 

@@ -9,10 +9,17 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
+require dirname(__DIR__) . '/src/MailService.php';
+
+/**
+ * Filet bezpieczeństwa: normalnie każdy e-mail jest już wysyłany synchronicznie
+ * przy żądaniu (ConfigurationService.php, ContactService.php) przez
+ * sendOutboxMailBestEffort(), bo hosting współdzielony home.pl nie ma tu
+ * skonfigurowanego crona. Ten skrypt dogrywa tylko to, co się nie wysłało
+ * (status 'failed') - trzeba go uruchamiać ręcznie lub przez cron, jeśli
+ * kiedyś zostanie dodany.
+ */
 $pdo = database();
-$transport = envValue('MAIL_TRANSPORT', 'log');
-$fromAddress = envValue('MAIL_FROM_ADDRESS', 'no-reply@rexorbikes.com');
-$fromName = envValue('MAIL_FROM_NAME', 'Rexor Bikes');
 $limit = 20;
 
 $statement = $pdo->prepare("SELECT * FROM email_outbox WHERE status IN ('pending', 'failed') AND available_at <= UTC_TIMESTAMP() AND attempts < 5 ORDER BY id LIMIT {$limit}");
@@ -28,40 +35,31 @@ foreach ($messages as $message) {
 
     try {
         $payload = json_decode($message['payload'], true, 32, JSON_THROW_ON_ERROR);
-        $name = htmlspecialchars((string) ($payload['customerName'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $name = htmlspecialchars((string) ($payload['customerName'] ?? $payload['name'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $model = htmlspecialchars((string) ($payload['modelName'] ?? 'Rexor'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $shareUrl = htmlspecialchars((string) ($payload['shareUrl'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $resumeUrl = htmlspecialchars((string) ($payload['resumeUrl'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $price = number_format((float) ($payload['grossTotal'] ?? 0), 0, ',', ' ') . ' zł brutto';
-        $subject = "Twój projekt {$model} — Rexor Bikes";
-        $html = "<h1>Dziękujemy, {$name}</h1><p>Konfiguracja <strong>{$model}</strong> została zapisana.</p><p>Aktualna cena: <strong>{$price}</strong>.</p><p><a href=\"{$shareUrl}\">Otwórz podsumowanie</a></p><p><a href=\"{$resumeUrl}\">Wróć do konfiguratora</a></p><p>Przed realizacją Rexor potwierdzi kompatybilność i ostateczny zakres.</p>";
 
-        if ($transport === 'log') {
-            $directory = projectRoot() . '/storage/logs';
-            if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
-                throw new RuntimeException('Nie udało się utworzyć katalogu logów.');
-            }
-            file_put_contents($directory . '/mail.log', json_encode(['to' => $message['recipient_email'], 'subject' => $subject, 'html' => $html], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
-        } elseif ($transport === 'mail') {
-            $headers = [
-                'MIME-Version: 1.0',
-                'Content-Type: text/html; charset=UTF-8',
-                'From: ' . mb_encode_mimeheader($fromName) . " <{$fromAddress}>",
-            ];
-            if (!mail((string) $message['recipient_email'], mb_encode_mimeheader($subject), $html, implode("\r\n", $headers))) {
-                throw new RuntimeException('Funkcja mail() odrzuciła wiadomość.');
-            }
+        $templateKey = (string) $message['template_key'];
+        if ($templateKey === 'inquiry_notification') {
+            $subject = "Nowe zapytanie ofertowe — {$model}";
+            $html = "<h1>Nowe zapytanie ofertowe</h1><p><strong>Klient:</strong> {$name}</p><p><strong>Model:</strong> {$model}</p><p><strong>Cena:</strong> {$price}</p><p><a href=\"{$shareUrl}\">Podgląd konfiguracji</a></p>";
+        } elseif ($templateKey === 'contact_message' || $templateKey === 'service_message') {
+            $email = htmlspecialchars((string) ($payload['email'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $phone = htmlspecialchars((string) ($payload['phone'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $bodyMessage = nl2br(htmlspecialchars((string) ($payload['message'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+            $label = $templateKey === 'service_message' ? 'Zgłoszenie serwisowe' : 'Wiadomość z formularza kontaktowego';
+            $subject = "{$label} — " . ($payload['name'] ?? '');
+            $html = "<h1>{$label}</h1><p><strong>Imię:</strong> {$name}</p><p><strong>E-mail:</strong> {$email}</p>" . ($phone !== '' ? "<p><strong>Telefon:</strong> {$phone}</p>" : '') . "<p><strong>Wiadomość:</strong><br>{$bodyMessage}</p>";
         } else {
-            throw new RuntimeException("Nieobsługiwany MAIL_TRANSPORT: {$transport}.");
+            $subject = "Twój projekt {$model} — Rexor Bikes";
+            $html = "<h1>Dziękujemy, {$name}</h1><p>Konfiguracja <strong>{$model}</strong> została zapisana.</p><p>Aktualna cena: <strong>{$price}</strong>.</p><p><a href=\"{$shareUrl}\">Otwórz podsumowanie</a></p><p><a href=\"{$resumeUrl}\">Wróć do konfiguratora</a></p><p>Przed realizacją Rexor potwierdzi kompatybilność i ostateczny zakres.</p>";
         }
 
-        $pdo->prepare("UPDATE email_outbox SET status = 'sent', sent_at = UTC_TIMESTAMP(), last_error = NULL WHERE id = :id")->execute(['id' => $message['id']]);
+        dispatchMail($pdo, (string) $message['recipient_email'], strip_tags($name), $subject, $html, (int) $message['id']);
         fwrite(STDOUT, "Wysłano kolejkę #{$message['id']} do {$message['recipient_email']}.\n");
     } catch (Throwable $error) {
-        $pdo->prepare("UPDATE email_outbox SET status = 'failed', last_error = :error, available_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 MINUTE) WHERE id = :id")->execute([
-            'id' => $message['id'],
-            'error' => mb_substr($error->getMessage(), 0, 1000),
-        ]);
         fwrite(STDERR, "Błąd kolejki #{$message['id']}: {$error->getMessage()}\n");
     }
 }

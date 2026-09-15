@@ -9,6 +9,8 @@ require dirname(__DIR__) . '/src/AdminService.php';
 require dirname(__DIR__) . '/src/CatalogService.php';
 require dirname(__DIR__) . '/src/ChatService.php';
 require dirname(__DIR__) . '/src/AiContentService.php';
+require dirname(__DIR__) . '/src/MailService.php';
+require dirname(__DIR__) . '/src/ContactService.php';
 
 $allowedOrigin = envValue('CORS_ORIGIN', 'http://localhost:3000');
 if (($_SERVER['HTTP_ORIGIN'] ?? '') === $allowedOrigin) {
@@ -53,6 +55,10 @@ if ($method === 'GET' && $path === '/catalog') {
 
 if ($method === 'POST' && $path === '/chat') {
     jsonResponse(handleChatRequest($pdo, requestJson()));
+}
+
+if ($method === 'POST' && $path === '/contact') {
+    jsonResponse(handleContactRequest($pdo, requestJson()));
 }
 
 if ($method === 'GET' && $path === '/settings/theme') {
@@ -178,6 +184,11 @@ if ($method === 'PATCH' && $path === '/admin/settings/copy') {
 if ($method === 'PATCH' && $path === '/admin/settings/chatbot-prompt') {
     requireAdmin($pdo);
     jsonResponse(['chatbotPrompt' => updateChatbotPrompt($pdo, requestJson())]);
+}
+
+if ($method === 'PATCH' && $path === '/admin/settings/mail-routing') {
+    requireAdmin($pdo);
+    jsonResponse(['mailRouting' => updateMailRouting($pdo, requestJson())]);
 }
 
 if ($method === 'POST' && $path === '/admin/ai/rich-content') {
