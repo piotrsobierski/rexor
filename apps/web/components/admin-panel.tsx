@@ -49,7 +49,7 @@ type ModelPartRow = { model_id: number; part_id: number; group_id: number; group
 type GroupSettingsRow = { model_id: number; group_id: number; group_slug: string; selection_mode: string; customer_part_allowed: number | boolean; customer_part_gross_price: string | number; customer_part_label: string; helper_text: string | null };
 type PricingLine = { groupSlug: string; groupName: string; name: string; grossPrice: number };
 type ModelPricing = { modelId: number; framePriceGross: number; batteryPriceGross: number; componentsPriceGross: number; assemblyPriceGross: number; marginPercent: number; marginAmountGross: number; grossTotal: number; issues: string[]; notes: string[]; lines: PricingLine[] };
-type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null; chatbotPrompt: { instructions?: string; extra_context?: string } | null; mailRouting: { order_email: string; contact_email: string; service_email: string }; configurationEmailTemplate: { subject: string; body_html: string }; modelSpecifications: Record<number, { facts?: string[]; [key: string]: unknown }> };
+type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null; chatbotPrompt: { instructions?: string; extra_context?: string; default_instructions?: string } | null; mailRouting: { order_email: string; contact_email: string; service_email: string }; configurationEmailTemplate: { subject: string; body_html: string }; modelSpecifications: Record<number, { facts?: string[]; [key: string]: unknown }> };
 type ActivityLogEntry = { id: number; event_type: string; actor_type: 'customer' | 'admin' | 'system'; actor_label: string | null; ip_address: string | null; summary: string; details: Record<string, unknown> | null; created_at: string };
 
 export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
@@ -1370,12 +1370,14 @@ function ThemeEditor({ theme, request, reload, setMessage }: { theme: Record<str
  * stały blok instrukcji i dopisać dodatkowy kontekst bez zmiany kodu i
  * redeployu - puste pola oznaczają, że używany jest domyślny prompt z kodu.
  */
-function ChatbotPromptEditor({ chatbotPrompt, request, reload, setMessage }: { chatbotPrompt: { instructions?: string; extra_context?: string } | null; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
-  const [instructions, setInstructions] = useState(chatbotPrompt?.instructions ?? '');
+function ChatbotPromptEditor({ chatbotPrompt, request, reload, setMessage }: { chatbotPrompt: { instructions?: string; extra_context?: string; default_instructions?: string } | null; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
+  // Pole startuje z domyślnymi instrukcjami z kodu, żeby admin od razu widział,
+  // co faktycznie wysyłamy dziś, zamiast pustego pola bez punktu odniesienia.
+  const [instructions, setInstructions] = useState(chatbotPrompt?.instructions || chatbotPrompt?.default_instructions || '');
   const [extraContext, setExtraContext] = useState(chatbotPrompt?.extra_context ?? '');
 
   useEffect(() => {
-    setInstructions(chatbotPrompt?.instructions ?? '');
+    setInstructions(chatbotPrompt?.instructions || chatbotPrompt?.default_instructions || '');
     setExtraContext(chatbotPrompt?.extra_context ?? '');
   }, [chatbotPrompt]);
 
@@ -1389,11 +1391,12 @@ function ChatbotPromptEditor({ chatbotPrompt, request, reload, setMessage }: { c
     }
   }
 
-  return <Panel title="Chatbot AI (Rexor AI Advisor)" description="Katalog, ceny i baterie chatbot pobiera zawsze automatycznie z bazy. Tu możesz opcjonalnie nadpisać instrukcje zachowania i dopisać dodatkowy kontekst (np. promocje, wyjątki, aktualności) - bez zmiany kodu.">
+  return <Panel title="Chatbot AI (Rexor AI Advisor)" description="Katalog, ceny i baterie chatbot pobiera zawsze automatycznie z bazy. Poniżej widać faktyczne instrukcje zachowania, które dziś wysyłamy - edytuj je swobodnie albo dopisz dodatkowy kontekst (np. promocje, wyjątki, aktualności), bez zmiany kodu.">
     <div className="grid gap-6">
       <div className="grid gap-1.5">
-        <Label htmlFor="chatbot-instructions">Instrukcje zachowania (nadpisuje domyślne zasady z kodu)</Label>
-        <Textarea id="chatbot-instructions" className="min-h-56 font-mono text-xs" placeholder="Pozostaw puste, aby używać domyślnych instrukcji zdefiniowanych w kodzie." value={instructions} onChange={(event) => setInstructions(event.target.value)} />
+        <Label htmlFor="chatbot-instructions">Instrukcje zachowania</Label>
+        <Textarea id="chatbot-instructions" className="min-h-56 font-mono text-xs" value={instructions} onChange={(event) => setInstructions(event.target.value)} />
+        {chatbotPrompt?.default_instructions && <p className="text-xs text-ink-subtle">Wyczyść pole i zapisz, aby wrócić do domyślnych instrukcji z kodu.</p>}
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="chatbot-context">Dodatkowy kontekst (dopisywany do promptu, np. promocje, aktualności, wyjątki)</Label>

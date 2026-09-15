@@ -12,25 +12,15 @@ declare(strict_types=1);
  * 4. Wysyła zapytanie do OpenRouter API z modelem z-ai/glm-5.3-flash.
  */
 
-function buildChatbotSystemPromptFromDb(PDO $pdo): string
+/**
+ * Domyślny blok instrukcji zachowania chatbota - wydzielony z
+ * buildChatbotSystemPromptFromDb(), żeby panel admina mógł go pokazać jako
+ * gotowy punkt startowy do edycji (site_settings.chatbot_prompt.instructions),
+ * zamiast pustego pola bez żadnego kontekstu co faktycznie wysyłamy dziś.
+ */
+function defaultChatbotInstructions(): string
 {
-    $catalog = publicCatalog($pdo);
-
-    $serviceStatement = $pdo->prepare('SELECT title, excerpt, content_html FROM site_pages WHERE slug = "serwis" AND is_published = TRUE LIMIT 1');
-    $serviceStatement->execute();
-    $servicePage = $serviceStatement->fetch();
-
-    $promptSettingValue = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'chatbot_prompt'")->fetchColumn();
-    $promptSetting = $promptSettingValue ? json_decode((string) $promptSettingValue, true, 16, JSON_THROW_ON_ERROR) : null;
-    $customInstructions = trim((string) ($promptSetting['instructions'] ?? ''));
-    $extraContext = trim((string) ($promptSetting['extra_context'] ?? ''));
-
-    $sections = [];
-
-    // Admin może w panelu nadpisać ten blok bez zmiany kodu i redeployu
-    // (site_settings.chatbot_prompt.instructions); w przeciwnym razie stosujemy
-    // domyślny prompt zdefiniowany tutaj.
-    $sections[] = $customInstructions !== '' ? $customInstructions : <<<PROMPT
+    return <<<PROMPT
 Jesteś oficjalnym doradcą technicznym AI marki Rexor Bikes (Rexor AI Advisor).
 Twoja rola: Pomagasz klientom w wyborze modelu, dopasowaniu baterii, silnika, części, zrozumieniu zasięgów i cen.
 Wszystkie poniższe informacje pochodzą BEZPOŚREDNIO Z AKTUALNEJ BAZY DANYCH I CENNIKA REXOR BIKES (stan na teraz).
@@ -49,6 +39,27 @@ ZASADY:
 - Pole `selected_motor`/silnik referencyjny nie oznacza automatycznie stałej cechy platformy. Jeśli grupa silnika zawiera kilka opcji, traktuj silnik jako konfigurowalny i nie używaj wariantu domyślnego do rozstrzygania między modelami.
 - Odpowiadaj zwięźle (standardowo maksymalnie 450 słów) i doprowadzaj każdą odpowiedź do pełnego zakończenia. Nie zaczynaj rozbudowanej tabeli ani listy, jeśli nie zmieści się wraz z rekomendacją; nigdy nie kończ w połowie zdania, punktu, tabeli ani linku.
 PROMPT;
+}
+
+function buildChatbotSystemPromptFromDb(PDO $pdo): string
+{
+    $catalog = publicCatalog($pdo);
+
+    $serviceStatement = $pdo->prepare('SELECT title, excerpt, content_html FROM site_pages WHERE slug = "serwis" AND is_published = TRUE LIMIT 1');
+    $serviceStatement->execute();
+    $servicePage = $serviceStatement->fetch();
+
+    $promptSettingValue = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'chatbot_prompt'")->fetchColumn();
+    $promptSetting = $promptSettingValue ? json_decode((string) $promptSettingValue, true, 16, JSON_THROW_ON_ERROR) : null;
+    $customInstructions = trim((string) ($promptSetting['instructions'] ?? ''));
+    $extraContext = trim((string) ($promptSetting['extra_context'] ?? ''));
+
+    $sections = [];
+
+    // Admin może w panelu nadpisać ten blok bez zmiany kodu i redeployu
+    // (site_settings.chatbot_prompt.instructions); w przeciwnym razie stosujemy
+    // domyślny prompt zdefiniowany w defaultChatbotInstructions().
+    $sections[] = $customInstructions !== '' ? $customInstructions : defaultChatbotInstructions();
 
     // 1. KATEGORIE Z BAZY
     if (!empty($catalog['categories'])) {

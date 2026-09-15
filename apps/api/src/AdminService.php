@@ -79,7 +79,13 @@ function adminCatalog(PDO $pdo): array
         })(),
         'chatbotPrompt' => (function () use ($pdo) {
             $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'chatbot_prompt'")->fetchColumn();
-            return $value ? json_decode((string) $value, true, 16, JSON_THROW_ON_ERROR) : null;
+            $stored = $value ? json_decode((string) $value, true, 16, JSON_THROW_ON_ERROR) : [];
+            return [
+                'instructions' => $stored['instructions'] ?? '',
+                'extra_context' => $stored['extra_context'] ?? '',
+                // Punkt startowy do edycji w panelu - to, co faktycznie wysyłamy dziś, gdy admin nic nie nadpisał.
+                'default_instructions' => defaultChatbotInstructions(),
+            ];
         })(),
         'mailRouting' => getMailRouting($pdo),
         'configurationEmailTemplate' => getConfigurationEmailTemplate($pdo),
