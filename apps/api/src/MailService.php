@@ -200,6 +200,90 @@ function getMailRouting(PDO $pdo): array
     ];
 }
 
+/**
+ * Prosty konwerter Markdown -> HTML, tylko pod potrzeby szablonów maili
+ * edytowanych w panelu (nagłówki #/##, **pogrubienie**, [link](url),
+ * akapity). Escapujemy CAŁY tekst przed rozpoznaniem składni, więc HTML
+ * wklejony przez admina (albo w danych klienta podstawionych w placeholdery)
+ * nigdy nie wykona się jako znacznik - to jedyna bariera przed XSS w mailu.
+ */
+function renderMarkdownToHtml(string $markdown): string
+{
+    $escaped = htmlspecialchars($markdown, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $escaped = preg_replace('/\[([^\]]+)\]\(([^)\s]+)\)/', '<a href="$2">$1</a>', $escaped);
+    $escaped = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped);
+
+    $blocks = preg_split('/\n{2,}/', trim($escaped)) ?: [];
+    $html = [];
+    foreach ($blocks as $block) {
+        $block = trim($block);
+        if ($block === '') {
+            continue;
+        }
+        if (preg_match('/^(#{1,3})\s+(.*)$/s', $block, $matches)) {
+            $level = strlen($matches[1]) + 1; // # -> h2, żeby nie kolidować z domyślnym <h1> w layoucie maila
+            $html[] = "<h{$level}>{$matches[2]}</h{$level}>";
+        } else {
+            $html[] = '<p>' . nl2br($block) . '</p>';
+        }
+    }
+    return implode('', $html);
+}
+
+/**
+ * Szablon maila potwierdzającego zapisanie konfiguracji przez klienta -
+ * edytowalny w panelu (Markdown + placeholdery), z sensownym domyślnym
+ * tekstem, gdyby admin nic nie ustawił.
+ */
+function getConfigurationEmailTemplate(PDO $pdo): array
+{
+    $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'configuration_email_template'")->fetchColumn();
+    $stored = $value ? json_decode((string) $value, true, 8, JSON_THROW_ON_ERROR) : [];
+    $defaultSubject = 'Twój projekt {{modelName}} — Rexor Bikes';
+    $defaultBody = <<<MKD
+# Dziękujemy, {{customerName}}
+
+Konfiguracja **{{modelName}}** została zapisana.
+
+Aktualna cena: **{{price}}**.
+
+[Otwórz podsumowanie]({{shareUrl}})
+
+[Wróć do konfiguratora]({{resumeUrl}})
+
+Przed realizacją Rexor potwierdzi kompatybilność i ostateczny zakres.
+MKD;
+    return [
+        'subject' => trim((string) ($stored['subject'] ?? '')) ?: $defaultSubject,
+        'body_markdown' => trim((string) ($stored['body_markdown'] ?? '')) ?: $defaultBody,
+    ];
+}
+
+function updateConfigurationEmailTemplate(PDO $pdo, array $input): array
+{
+    $template = [
+        'subject' => trim((string) ($input['subject'] ?? '')),
+        'body_markdown' => trim((string) ($input['body_markdown'] ?? '')),
+    ];
+    if ($template['subject'] === '' || $template['body_markdown'] === '') {
+        throw new InvalidArgumentException('Temat i treść szablonu nie mogą być puste.');
+    }
+    $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('configuration_email_template', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
+    $statement->execute(['value' => json_encode($template, JSON_THROW_ON_ERROR)]);
+    logActivity($pdo, 'configuration_email_template_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono szablon e-maila potwierdzenia konfiguracji.', $template);
+    return $template;
+}
+
+/** Podstawia placeholdery {{klucz}} w temacie/treści szablonu i renderuje treść z Markdown do HTML. */
+function renderConfigurationEmail(PDO $pdo, array $vars): array
+{
+    $template = getConfigurationEmailTemplate($pdo);
+    return [
+        'subject' => strtr($template['subject'], $vars),
+        'html' => renderMarkdownToHtml(strtr($template['body_markdown'], $vars)),
+    ];
+}
+
 function updateMailRouting(PDO $pdo, array $input): array
 {
     $routing = [];

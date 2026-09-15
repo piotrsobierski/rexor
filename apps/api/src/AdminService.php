@@ -82,6 +82,7 @@ function adminCatalog(PDO $pdo): array
             return $value ? json_decode((string) $value, true, 16, JSON_THROW_ON_ERROR) : null;
         })(),
         'mailRouting' => getMailRouting($pdo),
+        'configurationEmailTemplate' => getConfigurationEmailTemplate($pdo),
     ];
 }
 

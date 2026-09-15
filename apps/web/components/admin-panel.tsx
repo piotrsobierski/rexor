@@ -49,7 +49,7 @@ type ModelPartRow = { model_id: number; part_id: number; group_id: number; group
 type GroupSettingsRow = { model_id: number; group_id: number; group_slug: string; selection_mode: string; customer_part_allowed: number | boolean; customer_part_gross_price: string | number; customer_part_label: string; helper_text: string | null };
 type PricingLine = { groupSlug: string; groupName: string; name: string; grossPrice: number };
 type ModelPricing = { modelId: number; framePriceGross: number; batteryPriceGross: number; componentsPriceGross: number; assemblyPriceGross: number; marginPercent: number; marginAmountGross: number; grossTotal: number; issues: string[]; notes: string[]; lines: PricingLine[] };
-type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null; chatbotPrompt: { instructions?: string; extra_context?: string } | null; mailRouting: { order_email: string; contact_email: string; service_email: string }; modelSpecifications: Record<number, { facts?: string[]; [key: string]: unknown }> };
+type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null; chatbotPrompt: { instructions?: string; extra_context?: string } | null; mailRouting: { order_email: string; contact_email: string; service_email: string }; configurationEmailTemplate: { subject: string; body_markdown: string }; modelSpecifications: Record<number, { facts?: string[]; [key: string]: unknown }> };
 type ActivityLogEntry = { id: number; event_type: string; actor_type: 'customer' | 'admin' | 'system'; actor_label: string | null; ip_address: string | null; summary: string; details: Record<string, unknown> | null; created_at: string };
 
 export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
@@ -138,7 +138,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
       <TabsContent value="texts"><CopyEditor copy={catalog.copy} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="theme"><ThemeEditor theme={catalog.theme} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="chatbot"><ChatbotPromptEditor chatbotPrompt={catalog.chatbotPrompt} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
-      <TabsContent value="mail"><MailRoutingEditor mailRouting={catalog.mailRouting} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
+      <TabsContent value="mail"><div className="grid gap-6"><MailRoutingEditor mailRouting={catalog.mailRouting} request={request} reload={loadCatalog} setMessage={setMessage} /><ConfigurationEmailTemplateEditor template={catalog.configurationEmailTemplate} request={request} reload={loadCatalog} setMessage={setMessage} /></div></TabsContent>
       <TabsContent value="inquiries"><InquiriesTable rows={catalog.inquiries} /></TabsContent>
       <TabsContent value="activity-log"><ActivityLogPanel request={request} /></TabsContent>
     </Tabs>
@@ -1443,6 +1443,49 @@ function MailRoutingEditor({ mailRouting, request, reload, setMessage }: { mailR
   </Panel>;
 }
 
+const configurationEmailPlaceholders: Array<[string, string]> = [
+  ['{{customerName}}', 'Imię i nazwisko klienta'],
+  ['{{modelName}}', 'Nazwa modelu roweru'],
+  ['{{price}}', 'Cena konfiguracji (sformatowana, np. "15 000 zł brutto")'],
+  ['{{shareUrl}}', 'Link do podglądu zapisanej konfiguracji'],
+  ['{{resumeUrl}}', 'Link powrotu do konfiguratora'],
+  ['{{publicId}}', 'Publiczny identyfikator zamówienia'],
+];
+
+/**
+ * Mail wysyłany klientowi zaraz po zapisaniu konfiguracji w konfiguratorze -
+ * treść w prostym Markdown (# nagłówek, **pogrubienie**, [link](url)),
+ * żeby admin mógł edytować tekst bez znajomości HTML.
+ */
+function ConfigurationEmailTemplateEditor({ template, request, reload, setMessage }: { template: { subject: string; body_markdown: string }; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
+  const [subject, setSubject] = useState(template.subject);
+  const [body, setBody] = useState(template.body_markdown);
+
+  useEffect(() => {
+    setSubject(template.subject);
+    setBody(template.body_markdown);
+  }, [template]);
+
+  async function save() {
+    try {
+      await request('/admin/settings/configuration-email-template', { method: 'PATCH', body: JSON.stringify({ subject, body_markdown: body }) });
+      await reload();
+      setMessage('Szablon e-maila zapisany w bazie.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać szablonu e-maila.');
+    }
+  }
+
+  return <Panel title="E-mail potwierdzenia konfiguracji" description="Wysyłany do klienta zaraz po zapisaniu konfiguracji w konfiguratorze, razem z linkiem do podsumowania. Treść w prostym Markdown - dostępne są #/## nagłówki, **pogrubienie** i [link](url).">
+    <div className="grid gap-4">
+      <div className="grid gap-1.5"><Label htmlFor="config-mail-subject">Temat</Label><Input id="config-mail-subject" value={subject} onChange={(event) => setSubject(event.target.value)} /></div>
+      <div className="grid gap-1.5"><Label htmlFor="config-mail-body">Treść (Markdown)</Label><Textarea id="config-mail-body" className="min-h-56 font-mono text-xs" value={body} onChange={(event) => setBody(event.target.value)} /></div>
+      <div className="rounded-xl bg-ink-wash px-3 py-2 text-xs text-ink-muted"><strong className="text-ink">Dostępne placeholdery:</strong> {configurationEmailPlaceholders.map(([token, label]) => <span key={token} className="mr-3 inline-block"><code className="rounded bg-white px-1 py-0.5">{token}</code> — {label}</span>)}</div>
+    </div>
+    <Button onClick={save} className="mt-6"><Save /> Zapisz szablon</Button>
+  </Panel>;
+}
+
 const inquiryColumns: string[][] = [['public_id', 'Projekt'], ['customer_name', 'Klient'], ['customer_email', 'E-mail'], ['gross_total', 'Cena brutto'], ['status', 'Status'], ['created_at', 'Data']];
 
 function InquiriesTable({ rows }: { rows: Row[] }) {
@@ -1459,6 +1502,7 @@ const activityEventLabels: Record<string, string> = {
   copy_updated: 'Zmiana tekstów strony',
   chatbot_prompt_updated: 'Zmiana promptu chatbota',
   mail_routing_updated: 'Zmiana adresów e-mail',
+  configuration_email_template_updated: 'Zmiana szablonu e-maila konfiguracji',
   contact_message: 'Wiadomość z formularza kontaktowego',
   service_message: 'Zgłoszenie serwisowe',
   media_uploaded: 'Wgranie zdjęcia',

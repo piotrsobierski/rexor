@@ -191,6 +191,11 @@ if ($method === 'PATCH' && $path === '/admin/settings/mail-routing') {
     jsonResponse(['mailRouting' => updateMailRouting($pdo, requestJson())]);
 }
 
+if ($method === 'PATCH' && $path === '/admin/settings/configuration-email-template') {
+    requireAdmin($pdo);
+    jsonResponse(['configurationEmailTemplate' => updateConfigurationEmailTemplate($pdo, requestJson())]);
+}
+
 if ($method === 'POST' && $path === '/admin/ai/rich-content') {
     requireAdmin($pdo);
     jsonResponse(aiEditRichContent($pdo, requestJson()));

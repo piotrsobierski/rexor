@@ -53,8 +53,16 @@ foreach ($messages as $message) {
             $subject = "{$label} — " . ($payload['name'] ?? '');
             $html = "<h1>{$label}</h1><p><strong>Imię:</strong> {$name}</p><p><strong>E-mail:</strong> {$email}</p>" . ($phone !== '' ? "<p><strong>Telefon:</strong> {$phone}</p>" : '') . "<p><strong>Wiadomość:</strong><br>{$bodyMessage}</p>";
         } else {
-            $subject = "Twój projekt {$model} — Rexor Bikes";
-            $html = "<h1>Dziękujemy, {$name}</h1><p>Konfiguracja <strong>{$model}</strong> została zapisana.</p><p>Aktualna cena: <strong>{$price}</strong>.</p><p><a href=\"{$shareUrl}\">Otwórz podsumowanie</a></p><p><a href=\"{$resumeUrl}\">Wróć do konfiguratora</a></p><p>Przed realizacją Rexor potwierdzi kompatybilność i ostateczny zakres.</p>";
+            $rendered = renderConfigurationEmail($pdo, [
+                '{{customerName}}' => (string) ($payload['customerName'] ?? ''),
+                '{{modelName}}' => (string) ($payload['modelName'] ?? 'Rexor'),
+                '{{price}}' => $price,
+                '{{shareUrl}}' => (string) ($payload['shareUrl'] ?? ''),
+                '{{resumeUrl}}' => (string) ($payload['resumeUrl'] ?? ''),
+                '{{publicId}}' => (string) ($payload['publicId'] ?? ''),
+            ]);
+            $subject = $rendered['subject'];
+            $html = $rendered['html'];
         }
 
         dispatchMail($pdo, (string) $message['recipient_email'], strip_tags($name), $subject, $html, (int) $message['id']);

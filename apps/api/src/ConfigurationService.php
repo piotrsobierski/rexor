@@ -185,14 +185,15 @@ function createConfiguration(PDO $pdo, array $input): array
     // otwartej transakcji DB, a błąd wysyłki nie może cofnąć zapisanego
     // zamówienia - jest już zapisany w email_outbox do ew. ponowienia.
     $price = number_format($grossTotal, 0, ',', ' ') . ' zł brutto';
-    sendOutboxMailBestEffort(
-        $pdo,
-        $confirmationOutboxId,
-        $email,
-        $name,
-        "Twój projekt {$model['name']} — Rexor Bikes",
-        "<h1>Dziękujemy, " . htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "</h1><p>Konfiguracja <strong>{$model['name']}</strong> została zapisana.</p><p>Aktualna cena: <strong>{$price}</strong>.</p><p><a href=\"{$shareUrl}\">Otwórz podsumowanie</a></p><p><a href=\"{$resumeUrl}\">Wróć do konfiguratora</a></p><p>Przed realizacją Rexor potwierdzi kompatybilność i ostateczny zakres.</p>"
-    );
+    $confirmationEmail = renderConfigurationEmail($pdo, [
+        '{{customerName}}' => $name,
+        '{{modelName}}' => $model['name'],
+        '{{price}}' => $price,
+        '{{shareUrl}}' => $shareUrl,
+        '{{resumeUrl}}' => $resumeUrl,
+        '{{publicId}}' => $publicId,
+    ]);
+    sendOutboxMailBestEffort($pdo, $confirmationOutboxId, $email, $name, $confirmationEmail['subject'], $confirmationEmail['html']);
     sendOutboxMailBestEffort(
         $pdo,
         $notificationOutboxId,
