@@ -4,7 +4,7 @@ set -euo pipefail
 
 project_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 release_dir="$project_root/.deploy/release"
-remote_env="$project_root/.env.remote"
+remote_env="${REMOTE_ENV_FILE:-$project_root/.env.remote}"
 
 if [[ ! -f "$remote_env" ]]; then
   echo "Brak $remote_env. Utwórz go na podstawie .env.production.example." >&2

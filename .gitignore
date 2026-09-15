@@ -5,7 +5,9 @@
 !.env.local.example
 !.env.production.example
 .deploy.env
+.deploy.env.*
 .deploy/
+docs/CREDS.md
 node_modules/
 vendor/
 dist/

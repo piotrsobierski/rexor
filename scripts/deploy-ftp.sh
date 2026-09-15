@@ -3,7 +3,7 @@
 set -euo pipefail
 
 project_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
-deploy_env="$project_root/.deploy.env"
+deploy_env="${DEPLOY_ENV_FILE:-$project_root/.deploy.env}"
 release_dir="$project_root/.deploy/release"
 mode="${1:---apply}"
 
