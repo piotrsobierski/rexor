@@ -207,7 +207,18 @@ function bearerToken(): string
 
 function requireAdmin(PDO $pdo): array
 {
-    $token = bearerToken();
+    return requireAdminToken($pdo, bearerToken());
+}
+
+/**
+ * Ta sama weryfikacja co requireAdmin(), ale z tokenem podanym wprost.
+ * Potrzebna dla adresów wstawianych do <img src>, gdzie przeglądarka nie
+ * wyśle nagłówka Authorization - dziś wyłącznie zdjęcia referencyjne lakierów
+ * w panelu. Token jest wtedy w adresie, więc trasa może być tylko odczytem
+ * pliku i nigdy nie wolno jej rozszerzać o operacje zmieniające dane.
+ */
+function requireAdminToken(PDO $pdo, string $token): array
+{
     if ($token === '') {
         jsonResponse(['error' => 'Brak autoryzacji.'], 401);
     }

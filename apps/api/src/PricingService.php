@@ -141,7 +141,7 @@ function modelPriceAdjustments(PDO $pdo, int $modelId): array
  * Zwraca pozycje, podsumy i listę problemów. Pusta lista problemów znaczy,
  * że konfigurację można wycenić bez kontaktu z Rexor.
  */
-function priceConfiguration(array $model, array $groups, ?array $size, ?array $battery, array $selections): array
+function priceConfiguration(array $model, array $groups, ?array $size, ?array $battery, array $selections, ?array $paint = null): array
 {
     $lines = [];
     $issues = [];
@@ -242,6 +242,12 @@ function priceConfiguration(array $model, array $groups, ?array $size, ?array $b
         $adjustments[] = ['code' => $adjustment['code'], 'name' => $adjustment['name'], 'type' => $adjustment['adjustment_type'], 'amount' => $amount];
     }
 
+    // Dopłata za kolor lakieru jest ceną sprzedaży ustaloną w palecie, a nie
+    // kosztem składnika, więc nie przechodzi przez narzut modelu. Doliczamy ją
+    // na samym końcu, tak samo jak dopłaty modelu.
+    $paintPrice = $paint !== null ? round((float) $paint['priceGross'], 2) : 0.0;
+    $total = round($total + $paintPrice, 2);
+
     return [
         'lines' => $lines,
         'framePriceGross' => $frameTotal,
@@ -251,6 +257,7 @@ function priceConfiguration(array $model, array $groups, ?array $size, ?array $b
         'marginPercent' => $marginPercent,
         'marginAmountGross' => $marginAmount,
         'adjustments' => $adjustments,
+        'paintPriceGross' => $paintPrice,
         'grossTotal' => $total,
         'issues' => $issues,
         'notes' => $notes,

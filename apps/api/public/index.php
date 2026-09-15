@@ -7,6 +7,8 @@ require dirname(__DIR__) . '/src/PricingService.php';
 require dirname(__DIR__) . '/src/ConfigurationService.php';
 require dirname(__DIR__) . '/src/AdminService.php';
 require dirname(__DIR__) . '/src/CatalogService.php';
+require dirname(__DIR__) . '/src/PaintService.php';
+require dirname(__DIR__) . '/src/AdminPaintService.php';
 require dirname(__DIR__) . '/src/MediaLinkService.php';
 require dirname(__DIR__) . '/src/FramesService.php';
 require dirname(__DIR__) . '/src/ProjectsService.php';
@@ -67,6 +69,17 @@ if ($method === 'GET' && preg_match('~^/frames/([a-z0-9-]+)$~', $path, $matches)
         jsonResponse(['error' => 'Nie znaleziono ramy.'], 404);
     }
     jsonResponse($frame);
+}
+
+// Palety lakierów pobierane osobno, nie razem z /catalog: 680 kolorów to
+// ładunek, którego strona główna i listing modeli nie potrzebują. Konfigurator
+// woła ten adres dopiero przy pierwszym otwarciu wyboru koloru.
+if ($method === 'GET' && preg_match('~^/paints/(model|frame)/([a-z0-9-]+)$~', $path, $matches)) {
+    $paints = publicPaints($pdo, $matches[1], $matches[2]);
+    if ($paints === null) {
+        jsonResponse(['error' => 'Nie znaleziono produktu albo nie ma dla niego lakierowania.'], 404);
+    }
+    jsonResponse($paints);
 }
 
 if ($method === 'GET' && $path === '/projects') {
@@ -345,6 +358,73 @@ if ($method === 'GET' && preg_match('~^/admin/configurations/([A-Za-z0-9]{20,32}
     jsonResponse(getConfigurationForAdmin($pdo, $matches[1]));
 }
 
+// Panel lakierów: palety, kolory, przypisanie do modeli/ram i rendery.
+if ($method === 'GET' && $path === '/admin/paints') {
+    requireAdmin($pdo);
+    jsonResponse(adminPaints($pdo));
+}
+
+if ($method === 'POST' && $path === '/admin/paint-palettes') {
+    requireAdmin($pdo);
+    jsonResponse(saveAdminPaintPalette($pdo, null, requestJson()), 201);
+}
+
+if ($method === 'PATCH' && preg_match('~^/admin/paint-palettes/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(saveAdminPaintPalette($pdo, (int) $matches[1], requestJson()));
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/paint-palettes/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminPaintPalette($pdo, (int) $matches[1]));
+}
+
+if ($method === 'POST' && $path === '/admin/paint-colors') {
+    requireAdmin($pdo);
+    jsonResponse(saveAdminPaintColor($pdo, null, requestJson()), 201);
+}
+
+if ($method === 'PATCH' && preg_match('~^/admin/paint-colors/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(saveAdminPaintColor($pdo, (int) $matches[1], requestJson()));
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/paint-colors/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminPaintColor($pdo, (int) $matches[1]));
+}
+
+if ($method === 'POST' && $path === '/admin/paint-availability') {
+    requireAdmin($pdo);
+    jsonResponse(saveAdminPaintAvailability($pdo, requestJson()));
+}
+
+if ($method === 'POST' && $path === '/admin/paint-renders') {
+    requireAdmin($pdo);
+    jsonResponse(saveAdminPaintRender($pdo, requestJson()), 201);
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/paint-renders/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminPaintRender($pdo, (int) $matches[1]));
+}
+
+// Zdjęcia referencyjne aut leżą POZA katalogiem publicznym i wymagają
+// zalogowania. Token idzie w adresie, bo <img> nie wyśle nagłówka
+// Authorization; to jedyna trasa, która go tak przyjmuje, i tylko do odczytu
+// obrazu, który i tak jest widoczny wyłącznie w panelu.
+if ($method === 'GET' && preg_match('~^/admin/paint-reference/([a-z0-9-]+/[a-z0-9._-]+\.(?:jpg|jpeg|png|webp|avif))$~', $path, $matches)) {
+    requireAdminToken($pdo, (string) ($_GET['token'] ?? ''));
+    $file = projectRoot() . '/storage/paint-reference/' . $matches[1];
+    if (!is_file($file)) {
+        jsonResponse(['error' => 'Nie znaleziono zdjęcia referencyjnego.'], 404);
+    }
+    header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($file));
+    header('Cache-Control: private, max-age=3600');
+    readfile($file);
+    exit;
+}
+
 if ($method === 'GET' && preg_match('~^/uploads/(\d{4}/\d{2}/[a-f0-9]{32}\.(?:jpg|png|webp|avif))$~', $path, $matches)) {
     $file = projectRoot() . '/storage/media/' . $matches[1];
     if (!is_file($file)) {
@@ -360,6 +440,20 @@ if ($method === 'GET' && preg_match('~^/uploads/(\d{4}/\d{2}/[a-f0-9]{32}\.(?:jp
 // Zdjęcia z preseedu bazy (spoza panelu admina) leżą w /public/media, nie w
 // /storage/media — osobna, węższa trasa niż /uploads, żeby nie serwować
 // dowolnych plików spod /public.
+// Rendery lakierów: setki plików generowanych maszynowo, trzymane poza
+// tabelą `media` i poza buildem frontendu. Wzorzec nie dopuszcza kropki
+// poza rozszerzeniem, więc nie da się nim wyjść z katalogu.
+if ($method === 'GET' && preg_match('~^/media/(paints/renders/[a-z0-9-]+/[a-z0-9_-]+\.(?:jpg|jpeg|png|webp|avif))$~', $path, $matches)) {
+    $file = projectRoot() . '/public/media/' . $matches[1];
+    if (!is_file($file)) {
+        jsonResponse(['error' => 'Nie znaleziono renderu.'], 404);
+    }
+    header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($file));
+    header('Cache-Control: public, max-age=31536000, immutable');
+    readfile($file);
+    exit;
+}
+
 if ($method === 'GET' && preg_match('~^/media/(models/[a-z0-9-]+/[a-z0-9._-]+\.(?:jpg|jpeg|png|webp|avif)|categories/[a-z0-9._-]+\.(?:jpg|jpeg|png|webp|avif))$~', $path, $matches)) {
     $file = projectRoot() . '/public/media/' . $matches[1];
     if (!is_file($file)) {

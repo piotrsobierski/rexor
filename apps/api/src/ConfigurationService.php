@@ -11,6 +11,8 @@ function createConfiguration(PDO $pdo, array $input): array
     $modelSlug = trim((string) ($input['modelSlug'] ?? ''));
     $sizeCode = trim((string) ($input['sizeCode'] ?? ''));
     $batteryCode = trim((string) ($input['batteryCode'] ?? ''));
+    $paintPaletteSlug = trim((string) ($input['paintPaletteSlug'] ?? ''));
+    $paintColorSlug = trim((string) ($input['paintColorSlug'] ?? ''));
     $selections = $input['selections'] ?? [];
 
     if ($name === '' || mb_strlen($name) > 200) {
@@ -71,7 +73,22 @@ function createConfiguration(PDO $pdo, array $input): array
         }
     }
     $model['adjustments'] = modelPriceAdjustments($pdo, (int) $model['id']);
-    $pricing = priceConfiguration($model, $groups, $size, $battery, $selections);
+
+    // Kolor lakieru jest osobnym wymiarem konfiguracji, nie częścią z grupy.
+    // Dostępność palety, cenę i wymaganą opcję lakierowania ustala wyłącznie
+    // serwer - klient przysyła same slugi.
+    $paint = resolvePaintSelection(
+        $pdo,
+        'model',
+        (int) $model['id'],
+        $paintPaletteSlug !== '' ? $paintPaletteSlug : null,
+        $paintColorSlug !== '' ? $paintColorSlug : null
+    );
+    if ($paint !== null) {
+        validatePaintSelection($groups, $selections, $paint);
+    }
+
+    $pricing = priceConfiguration($model, $groups, $size, $battery, $selections, $paint);
     if ($pricing['issues'] !== []) {
         throw new InvalidArgumentException('Ta konfiguracja wymaga indywidualnej wyceny: ' . implode(' ', $pricing['issues']));
     }
@@ -106,6 +123,17 @@ function createConfiguration(PDO $pdo, array $input): array
             'grossDelta' => $batteryDelta,
         ] : null,
         'items' => $items,
+        'paint' => $paint !== null ? [
+            'paletteName' => $paint['paletteName'],
+            'paletteSlug' => $paint['paletteSlug'],
+            'colorSlug' => $paint['colorSlug'],
+            'name' => $paint['name'],
+            'code' => $paint['code'],
+            'hex' => $paint['hex'],
+            'finish' => $paint['finish'],
+            'grossPrice' => $paint['priceGross'],
+            'render' => $paint['render'],
+        ] : null,
         'pricing' => [
             'framePriceGross' => $pricing['framePriceGross'],
             'batteryPriceGross' => $pricing['batteryPriceGross'],
@@ -113,6 +141,7 @@ function createConfiguration(PDO $pdo, array $input): array
             'assemblyPriceGross' => $pricing['assemblyPriceGross'],
             'marginPercent' => $pricing['marginPercent'],
             'marginAmountGross' => $pricing['marginAmountGross'],
+            'paintPriceGross' => $pricing['paintPriceGross'],
             'adjustments' => $pricing['adjustments'],
             'notes' => $pricing['notes'],
         ],
@@ -163,6 +192,10 @@ function createConfiguration(PDO $pdo, array $input): array
             ]);
         }
 
+        if ($paint !== null) {
+            storeConfigurationPaint($pdo, $configurationId, $paint);
+        }
+
         $pdo->prepare('INSERT INTO inquiries (configuration_id) VALUES (:id)')->execute(['id' => $configurationId]);
         $mailPayload = [
             'customerName' => $name,
@@ -203,6 +236,10 @@ function createConfiguration(PDO $pdo, array $input): array
         '<h1>Nowe zapytanie ofertowe</h1><p><strong>Klient:</strong> ' . htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' (' . htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ')</p>'
             . '<p><strong>Model:</strong> ' . htmlspecialchars($model['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' (' . htmlspecialchars($size['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ')</p>'
             . "<p><strong>Cena:</strong> {$price}</p>"
+            . ($paint !== null
+                ? '<p><strong>Lakier:</strong> ' . htmlspecialchars($paint['name'] . ($paint['code'] !== null ? " ({$paint['code']})" : '') . ' — ' . $paint['paletteName'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                    . ' (' . number_format($paint['priceGross'], 0, ',', ' ') . ' zł)</p>'
+                : '')
             . ($notes !== '' ? '<p><strong>Uwagi klienta:</strong><br />' . nl2br(htmlspecialchars($notes, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>' : '')
             . "<p><a href=\"{$shareUrl}\">Podgląd konfiguracji</a></p>"
             . '<p><a href="' . rtrim(envValue('FRONTEND_URL', envValue('APP_URL', 'http://localhost:3000')), '/') . "/admin/konfiguracje/{$publicId}\">Otwórz w panelu admina</a></p>"
@@ -214,7 +251,7 @@ function createConfiguration(PDO $pdo, array $input): array
         'customer',
         $email,
         "Nowa konfiguracja {$model['name']} ({$size['label']}) dla {$name} — " . number_format($grossTotal, 0, ',', ' ') . ' zł.',
-        ['publicId' => $publicId, 'modelSlug' => $model['slug'], 'sizeCode' => $size['code'], 'batteryCode' => $battery['code'] ?? null, 'grossTotal' => $grossTotal, 'selections' => $selections]
+        ['publicId' => $publicId, 'modelSlug' => $model['slug'], 'sizeCode' => $size['code'], 'batteryCode' => $battery['code'] ?? null, 'grossTotal' => $grossTotal, 'selections' => $selections, 'paint' => $paint['name'] ?? null]
     );
 
     return [
