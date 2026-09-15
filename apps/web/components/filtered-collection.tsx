@@ -74,12 +74,13 @@ export function FilteredCollection({
     <div className="mt-8">
       {filters.length > 0 && (
         // Na telefonie filtry przewijają się poziomo zamiast łamać układ.
-        <div role="group" aria-label={copy.collection.filtersAria} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex-wrap sm:px-0">
+        <fieldset className="-mx-4 flex min-w-0 gap-2 overflow-x-auto border-0 px-4 pb-2 sm:mx-0 sm:flex-wrap sm:px-0">
+          <legend className="sr-only">{copy.collection.filtersAria}</legend>
           <FilterChip label={copy.collection.allFilter} active={effectiveSlug === null} onClick={() => setActiveSlug(null)} />
           {filters.map((category) => (
             <FilterChip key={category.slug} label={category.name} active={effectiveSlug === category.slug} onClick={() => setActiveSlug(category.slug)} />
           ))}
-        </div>
+        </fieldset>
       )}
 
       {visible.length === 0
