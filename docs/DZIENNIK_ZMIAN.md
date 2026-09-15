@@ -5,6 +5,49 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-15 — Wybór koloru lakieru w konfiguratorze
+
+### Zakres
+
+Kolor lakieru stał się osobnym wymiarem konfiguracji: palety, kolory, dopłaty,
+rendery i wybór w konfiguratorze. Decyzje i uzasadnienie: `docs/PLAN_LAKIERY.md`.
+
+### Co powstało
+
+- migracja `028_paint_colors.sql`: `paint_palettes`, `paint_colors`,
+  `model_paint_palettes`, `frame_paint_palettes`, `paint_renders`,
+  `configuration_paint`, plus paleta fabryczna Rexor i dwie palety płatne;
+- `apps/api/scripts/import-paints.php` — import 680 lakierów, 457 renderów
+  i 664 zdjęć referencyjnych z projektu `e55-paint-to-sample`;
+- `apps/api/src/PaintService.php` — dostępność, cena, reguła wymuszania opcji
+  lakierowania i migawka wyboru;
+- `apps/api/src/AdminPaintService.php` + zakładka „Lakiery” w panelu;
+- `apps/web/components/paint-picker.tsx` — sekcja i modal wyboru koloru.
+
+### Dwie osie ceny
+
+Grupa części `paint` dalej wycenia proces (robociznę). Paleta wycenia dostęp do
+lakieru. Dopłata za kolor jest ceną sprzedaży, więc nie przechodzi przez narzut
+modelu — doliczana jest po nim, tak samo jak `model_price_adjustments`.
+
+Spójności pilnuje `paint_palettes.requires_part_sku`: kolor z palety płatnej nie
+może stanąć obok lakierowania standardowego. Konfigurator podnosi opcję sam,
+API sprawdza to jeszcze raz przy zapisie.
+
+### Jeden kolor, nie wiele
+
+Konfigurator prowadzi do jednego koloru. `paint-custom-two-color` przestał być
+wyborem klienta (`is_customer_configurable = FALSE`), a pod sekcją stoi notka
+kierująca malowanie wielokolorowe do uwag i do ustalenia z obsługą.
+
+### Zdjęcia referencyjne poza katalogiem publicznym
+
+664 zdjęcia aut pochodzą z cudzej galerii. Leżą w `storage/paint-reference/`
+i są widoczne wyłącznie po zalogowaniu, przez `GET /api/admin/paint-reference/…`.
+Publikację każdego z osobna włącza administrator — patrz `docs/BRAKI_DANYCH.md`.
+
+---
+
 ## 2026-09-15 — Odznaczone pole wyboru wywracało zapis w panelu
 
 ### Zgłoszenie

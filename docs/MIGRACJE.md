@@ -34,6 +34,14 @@ Skrót wdrożeniowy `php scripts/startup.php` uruchamia migracje z `--apply`. Sk
 
 ## Wykonane zmiany schematu poza migracją bazową
 
+- `028_paint_colors.sql` (15 września 2026) - tabele `paint_palettes`,
+  `paint_colors`, `model_paint_palettes`, `frame_paint_palettes`,
+  `paint_renders` i `configuration_paint`, paleta fabryczna Rexor oraz palety
+  Porsche Paint to Sample i Volkswagen. Migracja wyłącza też
+  `paint-custom-two-color` z listy wyborów klienta (`is_customer_configurable`),
+  bo konfigurator prowadzi do jednego koloru. Dane lakierów wciąga osobno
+  `apps/api/scripts/import-paints.php` - import jest idempotentny i domyślnie
+  tylko pokazuje, co zrobi. Wykonana lokalnie na MySQL 8.0.
 - `025_frames_and_projects.sql` (15 września 2026) - tabele `frames`,
   `frame_media`, `projects`, `project_media` oraz kategoria `inne`
   w `bike_categories`. Kategorie ram są wspólne z rowerami, więc migracja nie

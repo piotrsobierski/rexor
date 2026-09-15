@@ -6,6 +6,28 @@ Lista będzie aktualizowana w miarę dostarczania materiałów. Warto odpowiada�
 
 Brak decyzji blokujących rozpoczęcie prac. Przyjmujemy zapytanie ofertowe bez płatności, zapis konfiguracji pod bezpiecznym linkiem, jedno konto administratora, jawne zatwierdzanie części per model oraz demonstracyjne ceny brutto 15 000 PLN i 16 500 PLN.
 
+## Priorytet 2 - lakiery
+
+Model danych i konfigurator są gotowe (`docs/PLAN_LAKIERY.md`), ale trzy rzeczy
+są wpisane roboczo i czekają na decyzję właściciela:
+
+- **paleta fabryczna Rexor** - sześć kolorów w migracji `028` (surowy karbon,
+  czarny mat, czarny połysk, biały, antracyt, czerwony) jest propozycją, nie
+  ofertą. Potrzebna prawdziwa lista kolorów w cenie wraz z wykończeniem.
+- **dopłata za palety Porsche i Volkswagen** - przyjęto 2500 zł brutto jako
+  wartość roboczą. Trzeba ją oprzeć na realnym koszcie lakieru mieszanego na
+  zamówienie i czasie realizacji. Cena jest edytowalna w panelu, także osobno
+  dla pojedynczego lakieru i dla pojedynczego modelu.
+- **prawa do zdjęć referencyjnych** - 664 zdjęcia aut pochodzą z galerii
+  Rennbow. Do czasu potwierdzenia praw są widoczne wyłącznie w panelu
+  (`storage/paint-reference/`, trasa `GET /api/admin/paint-reference/…`).
+  Do rozstrzygnięcia: publikować z atrybucją, pozyskać własne zdjęcia, czy
+  zostać przy samych renderach.
+
+Poza tym renderów jest 228 z 680 lakierów - reszta lakierów pokazuje się jako
+płaska próbka z jawną informacją, że wizualizacji nie ma. Uzupełnianie idzie
+przez upload w panelu (zakładka „Lakiery”), bez udziału programisty.
+
 ## Priorytet 2 - ramy
 
 Dla ram E82 i E55 brakuje:

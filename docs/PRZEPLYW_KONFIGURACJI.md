@@ -25,3 +25,17 @@ Edycja nie zmienia historycznie wysłanego zapytania. Wznowienie tworzy nową we
 Wiadomość zawiera imię klienta, nazwę modelu, cenę brutto, skrócone zestawienie, link podglądu i link wznowienia. E-mail trafia najpierw do `email_outbox`. Niepowodzenie SMTP jest ponawiane i nie powoduje utraty zapytania.
 
 Lokalnie `MAIL_TRANSPORT=log`, więc wiadomość nie opuszcza komputera. SMTP zostanie ustawione dopiero przez sekrety produkcyjne.
+
+
+## Lakier w migawce
+
+Kolor nie jest pozycją w `configuration_items`, bo nie jest częścią z cennika.
+Ma własną tabelę `configuration_paint` z pełną migawką: nazwa palety, nazwa
+i kod lakieru, hex, rodzaj wykończenia, dopłata i ścieżka renderu użytego jako
+obraz konfiguracji. Te same dane wchodzą do JSON-owej migawki pod kluczem
+`paint`, a kwota osobno do `pricing.paintPriceGross`.
+
+Dzięki temu zmiana cennika lakierów ani wyłączenie koloru w panelu nie ruszają
+historii: zapisana konfiguracja dalej pokazuje, co i za ile klient wybrał.
+Podsumowanie klienta pokazuje wtedy render zamiast fabrycznego zdjęcia modelu,
+a powiadomienie do sklepu ma nazwę lakieru w treści.

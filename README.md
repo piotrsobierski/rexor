@@ -27,6 +27,8 @@ Taki zestaw technologii pasuje do ograniczeń widocznych w panelu i wystarczy dl
 - [Dziennik zmian](docs/DZIENNIK_ZMIAN.md)
 - [Migracje bazy i danych](docs/MIGRACJE.md)
 - [Ceny i automatyczne dopłaty](docs/CENY_I_DOPLATY.md)
+- [Lakiery: decyzje i plan](docs/PLAN_LAKIERY.md)
+- [Architektura lakierów: palety, cenniki i powiązania](docs/ARCHITEKTURA_LAKIEROW.md)
 - [Zapis, linki i e-mail konfiguracji](docs/PRZEPLYW_KONFIGURACJI.md)
 - [Środowisko lokalne i konfiguracja](docs/SRODOWISKO.md)
 - [Backup bazy i mediów](docs/BACKUPY.md)

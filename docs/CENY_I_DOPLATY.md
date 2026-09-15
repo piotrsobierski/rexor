@@ -11,7 +11,11 @@ cena = rama (+ dopłata rozmiaru)
      + cena składania modelu
      + narzut modelu (domyślnie 0%, bo ceny części są już cenami sprzedaży)
      + dopłaty modelu (model_price_adjustments)
+     + dopłata za kolor lakieru (paint_palettes / paint_colors)
 ```
+
+Dopłata za kolor stoi po narzucie świadomie: jest ceną sprzedaży ustaloną
+w palecie, a nie kosztem składnika, więc nie ma jej po co mnożyć przez marżę.
 
 Każdy składnik ma własne pole w panelu: `bike_models.frame_price_gross`, `bike_models.assembly_price_gross`, `bike_models.margin_percent`, `model_sizes.price_delta_gross`, `model_batteries.gross_price` oraz cena części w katalogu. Cena „od” modelu (`bike_models.computed_base_price_gross`) to wynik tej samej formuły dla wszystkich wyborów domyślnych. Zapisuje ją wyłącznie serwer po każdej zmianie, która może ruszyć sumę; panel nie ma do niej pola edycji.
 
@@ -79,3 +83,30 @@ Sprawdzone 11 września 2026 r. przykłady internetowe:
 Ostatnie dwa źródła dotyczą pojedynczych podzespołów. Pozycja „grupa Deore M5100” w seedzie obejmuje również manetkę i łańcuch, dlatego nie kopiujemy sumy dwóch cen jako ceny całej grupy.
 
 Przed uruchomieniem publicznym trzeba zatwierdzić dla każdej pozycji cenę Rexor, dokładny wariant/SKU, liczbę sztuk i datę obowiązywania, a także cenę ramy i cenę składania każdego modelu.
+
+
+## Lakier: dwie osie, nie jedna
+
+Lakierowanie ma dwa niezależne składniki i konfigurator ich nie miesza:
+
+```text
+cena malowania = opcja procesu (część z grupy `paint`) + dopłata koloru (paleta)
+```
+
+* **proces** to robocizna — „lakierowanie standardowe” albo „jednokolorowe”.
+  Zwykła część w cenniku, rozliczana jak każda inna, z narzutem włącznie.
+* **kolor** to dostęp do lakieru — kolory Rexor 0 zł, Porsche Paint to Sample
+  i Volkswagen z dopłatą palety. Doliczany po narzucie.
+
+Kolejność źródeł ceny koloru:
+
+1. `paint_colors.price_gross_override` — jeden lakier drożej niż reszta palety,
+2. `model_paint_palettes.price_gross_override` (albo `frame_paint_palettes`) —
+   inna cena tej palety dla jednego produktu,
+3. `paint_palettes.price_gross` — cena palety.
+
+`paint_palettes.requires_part_sku` pilnuje, żeby kolor z palety płatnej nie
+stanął obok lakierowania standardowego. Konfigurator podnosi opcję procesu sam,
+API sprawdza regułę jeszcze raz przy zapisie.
+
+Szczegóły i uzasadnienie: `docs/PLAN_LAKIERY.md`.
