@@ -6,8 +6,10 @@ import {
   Bold,
   Calculator,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Copy,
   ExternalLink,
   HelpCircle,
@@ -47,11 +49,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/
 type Row = Record<string, string | number | boolean | null> & { id: number };
 type MediaRow = { model_id: number; media_id: number; role: string; sort_order: number; storage_path: string; alt_text: string };
 type FrameMediaRow = { frame_id: number; media_id: number; role: string; sort_order: number; storage_path: string; alt_text: string };
+type ProjectMediaRow = { project_id: number; media_id: number; role: string; sort_order: number; storage_path: string; alt_text: string };
 type ModelPartRow = { model_id: number; part_id: number; group_id: number; group_slug: string; is_default: number | boolean; is_customer_configurable: number | boolean; customer_supplied_allowed: number | boolean; customer_supplied_gross_price: string | number; gross_price_override: string | number | null; sort_order: number; notes: string | null };
 type GroupSettingsRow = { model_id: number; group_id: number; group_slug: string; selection_mode: string; customer_part_allowed: number | boolean; customer_part_gross_price: string | number; customer_part_label: string; helper_text: string | null };
 type PricingLine = { groupSlug: string; groupName: string; name: string; grossPrice: number };
 type ModelPricing = { modelId: number; framePriceGross: number; batteryPriceGross: number; componentsPriceGross: number; assemblyPriceGross: number; marginPercent: number; marginAmountGross: number; grossTotal: number; issues: string[]; notes: string[]; lines: PricingLine[] };
-type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; frames: Row[]; frameMedia: FrameMediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null; chatbotPrompt: { instructions?: string; extra_context?: string; default_instructions?: string } | null; mailRouting: { order_email: string; contact_email: string; service_email: string }; configurationEmailTemplate: { subject: string; body_html: string }; modelSpecifications: Record<number, { facts?: string[]; [key: string]: unknown }> };
+type Catalog = { categories: Row[]; models: Row[]; parts: Row[]; partGroups: Row[]; modelParts: ModelPartRow[]; modelGroupSettings: GroupSettingsRow[]; modelSizes: Row[]; modelPricing: Record<string, ModelPricing>; batteries: Row[]; inquiries: Row[]; pages: Row[]; modelMedia: MediaRow[]; frames: Row[]; frameMedia: FrameMediaRow[]; projects: Row[]; projectMedia: ProjectMediaRow[]; theme: Record<string, string>; copy: Record<string, unknown> | null; chatbotPrompt: { instructions?: string; extra_context?: string; default_instructions?: string } | null; mailRouting: { order_email: string; contact_email: string; service_email: string }; configurationEmailTemplate: { subject: string; body_html: string }; modelSpecifications: Record<number, { facts?: string[]; [key: string]: unknown }> };
 type ActivityLogEntry = { id: number; event_type: string; actor_type: 'customer' | 'admin' | 'system'; actor_label: string | null; ip_address: string | null; summary: string; details: Record<string, unknown> | null; created_at: string };
 
 export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
@@ -130,7 +133,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
   if (!token || !catalog) return <main className="grid min-h-screen place-items-center bg-[#111] px-4"><Toaster /><form onSubmit={login} className="w-full max-w-sm rounded-3xl bg-white p-7"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" /><p className="eyebrow mt-10">Panel administracyjny</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Zaloguj się</h1><div className="mt-6 grid gap-4"><div className="grid gap-1.5"><Label htmlFor="admin-email">E-mail</Label><Input id="admin-email" type="email" required className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} /></div><div className="grid gap-1.5"><Label htmlFor="admin-password">Hasło</Label><Input id="admin-password" type="password" required className="h-11" value={password} onChange={(event) => setPassword(event.target.value)} /></div><Button type="submit" className="h-11 rounded-full bg-ink text-white">Zaloguj</Button>{message && <p className="text-center text-sm text-ink-muted">{message}</p>}</div></form></main>;
 
   return <div className="min-h-screen bg-[#f4f5f2]"><Toaster /><header className="border-b border-line bg-white"><div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8"><a href="/"><img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" /></a><div className="flex items-center gap-2"><RefreshButton onRefresh={refreshCatalog} /><Button variant="ghost" size="sm" onClick={logout}><LogOut /> Wyloguj</Button></div></div></header><main className="mx-auto max-w-[1500px] px-4 py-8 sm:px-8"><div className="mb-8"><p className="eyebrow">Rexor CMS</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em]">Treść, oferta i wygląd</h1>{message && <p className="mt-3 text-sm text-ink-muted" role="status">{message}</p>}</div>
-    <Tabs value={activeTab} onValueChange={(value) => { const tab = String(value); if (isAdminTabSlug(tab)) { setActiveTab(tab); window.history.pushState(null, '', `/admin/${tab}`); } }}><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="frames" className="rounded-full px-4 py-2">Ramy</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Strony</TabsTrigger><TabsTrigger value="texts" className="rounded-full px-4 py-2">Teksty</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="chatbot" className="rounded-full px-4 py-2">Chatbot AI</TabsTrigger><TabsTrigger value="mail" className="rounded-full px-4 py-2">Poczta</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity-log" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
+    <Tabs value={activeTab} onValueChange={(value) => { const tab = String(value); if (isAdminTabSlug(tab)) { setActiveTab(tab); window.history.pushState(null, '', `/admin/${tab}`); } }}><TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1"><TabsTrigger value="models" className="rounded-full px-4 py-2">Modele i zdjęcia</TabsTrigger><TabsTrigger value="frames" className="rounded-full px-4 py-2">Ramy</TabsTrigger><TabsTrigger value="categories" className="rounded-full px-4 py-2">Kategorie</TabsTrigger><TabsTrigger value="equipment" className="rounded-full px-4 py-2">Osprzęt i cena modelu</TabsTrigger><TabsTrigger value="parts" className="rounded-full px-4 py-2">Części i ceny</TabsTrigger><TabsTrigger value="batteries" className="rounded-full px-4 py-2">Baterie</TabsTrigger><TabsTrigger value="service" className="rounded-full px-4 py-2">Strony</TabsTrigger><TabsTrigger value="projects" className="rounded-full px-4 py-2">Realizacje</TabsTrigger><TabsTrigger value="texts" className="rounded-full px-4 py-2">Teksty</TabsTrigger><TabsTrigger value="theme" className="rounded-full px-4 py-2">Kolory</TabsTrigger><TabsTrigger value="chatbot" className="rounded-full px-4 py-2">Chatbot AI</TabsTrigger><TabsTrigger value="mail" className="rounded-full px-4 py-2">Poczta</TabsTrigger><TabsTrigger value="inquiries" className="rounded-full px-4 py-2">Zapytania</TabsTrigger><TabsTrigger value="activity-log" className="rounded-full px-4 py-2">Dziennik aktywności</TabsTrigger></TabsList>
       <TabsContent value="models"><ModelsEditor rows={catalog.models} media={catalog.modelMedia} categories={catalog.categories} specifications={catalog.modelSpecifications} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="frames"><FramesEditor rows={catalog.frames ?? []} media={catalog.frameMedia ?? []} categories={catalog.categories} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="categories"><CategoriesEditor rows={catalog.categories} patch={patch} request={request} setMessage={setMessage} /></TabsContent>
@@ -138,6 +141,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
       <TabsContent value="parts"><PartsEditor rows={catalog.parts} partGroups={catalog.partGroups} models={catalog.models} modelParts={catalog.modelParts} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="batteries"><BatteriesEditor batteries={catalog.batteries ?? []} models={catalog.models} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="service"><PagesEditor pages={catalog.pages} patch={patch} request={request} /></TabsContent>
+      <TabsContent value="projects"><ProjectsEditor rows={catalog.projects ?? []} media={catalog.projectMedia ?? []} categories={catalog.categories} patch={patch} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="texts"><CopyEditor copy={catalog.copy} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="theme"><ThemeEditor theme={catalog.theme} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
       <TabsContent value="chatbot"><ChatbotPromptEditor chatbotPrompt={catalog.chatbotPrompt} request={request} reload={loadCatalog} setMessage={setMessage} /></TabsContent>
@@ -1114,6 +1118,197 @@ function FramesEditor({ rows, media, categories, patch, request, reload, setMess
             <Button size="sm" onClick={() => void saveFrame(row)}><Save /> Zapisz ramę</Button>
             <Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie do galerii<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0], 'gallery')} /></Label>
             <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => void deleteFrame(row)}><Trash2 /> Usuń ramę</Button>
+          </div>
+        </div>
+      </article>;
+    })}</div>
+  </Panel>;
+}
+
+type SpecificationRow = { label: string; value: string };
+
+function projectSpecifications(rows: Row[]): Record<number, SpecificationRow[]> {
+  return Object.fromEntries(rows.map((row) => [row.id, parseJsonField<SpecificationRow[]>(row.specification, []).map((item) => ({ label: String(item?.label ?? ''), value: String(item?.value ?? '') }))]));
+}
+
+function ProjectsEditor({ rows, media, categories, patch, request, reload, setMessage }: { rows: Row[]; media: ProjectMediaRow[]; categories: Row[]; patch: (resource: string, id: number, fields: Record<string, unknown>) => Promise<void>; request: (path: string, options?: RequestInit) => Promise<any>; reload: () => Promise<void>; setMessage: (value: string) => void }) {
+  const [drafts, setDrafts] = useState<Record<number, Row>>(() => Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+  // Spis komponentów to lista par, a nie pojedyncza wartość - nie mieści się
+  // w `Row` (same skalary), więc trzymamy go w osobnym stanie obok draftów.
+  const [specs, setSpecs] = useState<Record<number, SpecificationRow[]>>(() => projectSpecifications(rows));
+  const contentRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [newProject, setNewProject] = useState<{ title: string; short_description: string }>({ title: '', short_description: '' });
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
+    setSpecs(projectSpecifications(rows));
+  }, [rows]);
+
+  function imageSrc(path: string) { return path.startsWith('http') ? path : `${API_BASE}${path}`; }
+
+  async function upload(project: Row, file: File | undefined, role: 'cover' | 'gallery') {
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    form.append('altText', String(project.title));
+    setMessage('Wysyłam zdjęcie…');
+    try {
+      const result = await request('/admin/media', { method: 'POST', body: form });
+      await request(`/admin/projects/${project.id}/media`, { method: 'POST', body: JSON.stringify({ mediaId: Number(result.id), role }) });
+      if (role === 'cover') await patch('projects', project.id, { cover_image_path: `${API_BASE}${result.url}` });
+      await reload();
+      setMessage(role === 'cover' ? 'Zdjęcie główne zapisane.' : 'Zdjęcie dodane do galerii.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się dodać zdjęcia.');
+    }
+  }
+
+  async function removePhoto(project: Row, mediaId: number) {
+    if (!window.confirm('Usunąć to zdjęcie z realizacji?')) return;
+    setMessage('Usuwam zdjęcie…');
+    try {
+      await request(`/admin/projects/${project.id}/media/${mediaId}`, { method: 'DELETE' });
+      await reload();
+      setMessage('Zdjęcie usunięte.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się usunąć zdjęcia.');
+    }
+  }
+
+  async function moveMedia(project: Row, orderedIds: number[], mediaId: number, direction: -1 | 1) {
+    const index = orderedIds.indexOf(mediaId);
+    const targetIndex = index + direction;
+    if (index === -1 || targetIndex < 0 || targetIndex >= orderedIds.length) return;
+    const reordered = [...orderedIds];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    setMessage('Zapisuję kolejność…');
+    try {
+      await request(`/admin/projects/${project.id}/media/reorder`, { method: 'PATCH', body: JSON.stringify({ mediaIds: reordered }) });
+      await reload();
+      setMessage('Kolejność zdjęć zapisana.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się zapisać kolejności.');
+    }
+  }
+
+  async function addProject() {
+    if (!newProject.title.trim()) { setMessage('Podaj tytuł nowej realizacji.'); return; }
+    setMessage('Dodaję realizację…');
+    try {
+      await request('/admin/projects', { method: 'POST', body: JSON.stringify({ title: newProject.title.trim(), short_description: newProject.short_description.trim() || null }) });
+      setNewProject({ title: '', short_description: '' });
+      await reload();
+      setMessage('Realizacja dodana. Uzupełnij treść, zdjęcia i spis komponentów poniżej.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się dodać realizacji.');
+    }
+  }
+
+  async function deleteProject(project: Row) {
+    if (!window.confirm(`Usunąć realizację „${String(project.title)}"? Tej operacji nie można cofnąć.`)) return;
+    setMessage('Usuwam realizację…');
+    try {
+      await request(`/admin/projects/${project.id}`, { method: 'DELETE' });
+      await reload();
+      setMessage('Realizacja usunięta.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nie udało się usunąć realizacji.');
+    }
+  }
+
+  function setSpecRows(id: number, next: SpecificationRow[]) { setSpecs({ ...specs, [id]: next }); }
+
+  function moveSpecRow(id: number, index: number, direction: -1 | 1) {
+    const current = specs[id] ?? [];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= current.length) return;
+    const next = [...current];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    setSpecRows(id, next);
+  }
+
+  async function saveProject(row: Row) {
+    const draft = drafts[row.id] ?? row;
+    const specification = (specs[row.id] ?? []).map((item) => ({ label: item.label.trim(), value: item.value.trim() })).filter((item) => item.label !== '' || item.value !== '');
+    await patch('projects', row.id, {
+      title: draft.title ?? row.title,
+      short_description: optionalText(draft.short_description),
+      category_id: String(draft.category_id ?? '') === '' ? null : Number(draft.category_id),
+      completed_at: optionalText(draft.completed_at),
+      is_published: Boolean(draft.is_published),
+      sort_order: Number(draft.sort_order ?? row.sort_order ?? 0),
+      content_html: contentRefs.current[row.id]?.innerHTML ?? String(draft.content_html ?? ''),
+      specification,
+    });
+  }
+
+  return <Panel title="Realizacje" description="Rowery i pojazdy zbudowane przez Rexor: redagowana strona ze zdjęciami i spisem użytych komponentów. Zdjęcia mają być prawdziwe, nie rendery.">
+    <div className="mb-6 rounded-2xl border border-line bg-white p-5 sm:p-6">
+      <h3 className="text-sm font-semibold tracking-tight text-ink">Dodaj nową realizację</h3>
+      <Input placeholder="Tytuł (np. E82 dla klienta z Gdańska)" value={newProject.title} onChange={(e) => setNewProject({ ...newProject, title: e.target.value })} className="mt-3 h-9 text-sm" />
+      <Input placeholder="Krótki opis (widoczny na liście realizacji)" value={newProject.short_description} onChange={(e) => setNewProject({ ...newProject, short_description: e.target.value })} className="mt-3 h-9 text-sm" />
+      <Button size="sm" className="mt-3" onClick={addProject}><Plus /> Dodaj realizację</Button>
+    </div>
+    {rows.length === 0 && <p className="text-sm text-ink-muted">Nie ma jeszcze żadnej realizacji. Dodaj pierwszą powyżej.</p>}
+    <div className="grid gap-6">{rows.map((row) => {
+      const projectMedia = media.filter((item) => item.project_id === row.id);
+      const cover = projectMedia.find((item) => item.role === 'cover');
+      const gallery = projectMedia.filter((item) => item.role !== 'cover');
+      const galleryIds = gallery.map((item) => item.media_id);
+      const draft = drafts[row.id] ?? row;
+      const specRows = specs[row.id] ?? [];
+      return <article key={row.id} className="min-w-0 rounded-2xl border border-line p-5 sm:p-6">
+        <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+          <div className="grid gap-2">
+            <Label className="flex items-center gap-1.5 text-xs text-ink-muted">Zdjęcie główne <InfoTooltip text="Kafelek realizacji na liście /realizacje i obraz otwierający jej stronę." /></Label>
+            <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--muted)]">
+              {cover ? <img src={imageSrc(cover.storage_path)} alt={cover.alt_text} className="size-full object-cover" /> : row.cover_image_path ? <img src={imageSrc(String(row.cover_image_path))} alt="" className="size-full object-cover" /> : <div className="grid size-full place-items-center text-center text-xs text-ink-subtle">Brak zdjęcia</div>}
+            </div>
+            <div className="flex gap-1.5">
+              <Label className="inline-flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium"><Upload className="size-3.5" /> Zmień<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0], 'cover')} /></Label>
+              {cover && <Button type="button" size="sm" variant="outline" className="h-8 px-2" onClick={() => void removePhoto(row, cover.media_id)}><Trash2 className="size-3.5" /></Button>}
+            </div>
+          </div>
+          <div className="grid min-w-0 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`project-title-${row.id}`}>Tytuł</Label><Input id={`project-title-${row.id}`} value={String(draft.title ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...draft, title: event.target.value } })} /></div>
+              <div className="grid gap-1"><Label className="flex items-center gap-1.5 text-xs text-ink-muted" htmlFor={`project-slug-${row.id}`}>Adres strony <InfoTooltip text="Adres powstaje automatycznie z tytułu przy dodaniu realizacji i celowo nie zmienia się później - dzięki temu raz opublikowany link nie przestaje działać." /></Label><div className="flex h-9 items-center gap-1.5 overflow-hidden rounded-lg border bg-[var(--muted)] px-3 text-sm text-ink-muted"><span id={`project-slug-${row.id}`} className="truncate">/realizacje/{String(row.slug ?? '')}</span>{Boolean(Number(row.is_published ?? 0)) && <a href={`/realizacje/${String(row.slug ?? '')}`} target="_blank" rel="noopener noreferrer" aria-label="Otwórz stronę realizacji" className="ml-auto text-ink hover:text-ink-muted"><ExternalLink className="size-3.5" /></a>}</div></div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-1"><Label className="flex items-center gap-1.5 text-xs text-ink-muted" htmlFor={`project-cat-${row.id}`}>Kategoria <InfoTooltip text="Opcjonalna. Gdy ustawiona, realizacja wpada pod ten sam filtr kategorii co rowery i ramy." /></Label><NativeSelect id={`project-cat-${row.id}`} value={String(draft.category_id ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...draft, category_id: event.target.value } })} className="w-full"><NativeSelectOption value="">Bez kategorii</NativeSelectOption>{categories.map((category) => <NativeSelectOption key={category.id} value={category.id}>{String(category.name)}</NativeSelectOption>)}</NativeSelect></div>
+              <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`project-date-${row.id}`}>Data ukończenia</Label><Input id={`project-date-${row.id}`} type="date" value={String(draft.completed_at ?? '').slice(0, 10)} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...draft, completed_at: event.target.value } })} /></div>
+              <div className="grid gap-1"><Label className="flex items-center gap-1.5 text-xs text-ink-muted" htmlFor={`project-order-${row.id}`}>Kolejność <InfoTooltip text="Mniejsza liczba = wyżej na liście realizacji. Przy równych wartościach decyduje tytuł." /></Label><Input id={`project-order-${row.id}`} type="number" value={String(draft.sort_order ?? 0)} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...draft, sort_order: event.target.value } })} className="tabular-nums" /></div>
+            </div>
+            <div className="grid gap-1"><Label className="text-xs text-ink-muted" htmlFor={`project-short-${row.id}`}>Krótki opis (widoczny na liście realizacji)</Label><Input id={`project-short-${row.id}`} value={String(draft.short_description ?? '')} onChange={(event) => setDrafts({ ...drafts, [row.id]: { ...draft, short_description: event.target.value } })} /></div>
+            <label className="flex w-fit items-center gap-2 text-sm"><Switch checked={Boolean(Number(draft.is_published ?? 0))} onCheckedChange={(checked) => setDrafts({ ...drafts, [row.id]: { ...draft, is_published: checked } })} /> Opublikowana</label>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-4">
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {gallery.length === 0 && <div className="grid h-28 w-40 shrink-0 place-items-center rounded-xl bg-[var(--muted)] text-center text-xs text-ink-subtle">Galeria pusta</div>}
+            {gallery.map((item, itemIdx) => <div key={item.media_id} className="group/photo relative h-28 w-40 shrink-0"><a href={imageSrc(item.storage_path)} target="_blank" rel="noopener noreferrer"><img src={imageSrc(item.storage_path)} alt={item.alt_text} className="size-full rounded-xl bg-[var(--muted)] object-contain" /></a><button type="button" onClick={() => removePhoto(row, item.media_id)} aria-label="Usuń zdjęcie" className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 shadow transition-opacity group-hover/photo:opacity-100 hover:bg-white"><Trash2 className="size-3.5" /></button><div className="absolute inset-x-1 bottom-1 flex items-center justify-between opacity-0 transition-opacity group-hover/photo:opacity-100"><button type="button" onClick={() => moveMedia(row, galleryIds, item.media_id, -1)} disabled={itemIdx === 0} aria-label="Przesuń zdjęcie w lewo" className="grid size-6 place-items-center rounded-full bg-white/90 text-ink shadow hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronLeft className="size-3.5" /></button><button type="button" onClick={() => moveMedia(row, galleryIds, item.media_id, 1)} disabled={itemIdx === gallery.length - 1} aria-label="Przesuń zdjęcie w prawo" className="grid size-6 place-items-center rounded-full bg-white/90 text-ink shadow hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronRight className="size-3.5" /></button></div></div>)}
+          </div>
+          <details className="rounded-xl border border-line p-3" open><summary className="cursor-pointer text-sm font-semibold text-ink">Treść strony realizacji (edytor WYSIWYG)</summary><div className="mt-3"><WysiwygEditor value={String(draft.content_html ?? '')} onRef={(el) => { contentRefs.current[row.id] = el; }} onUploadImage={async (file) => { const form = new FormData(); form.append('file', file); form.append('altText', `Zdjęcie w opisie realizacji ${String(row.title)}`); const result = await request('/admin/media', { method: 'POST', body: form }); return `${API_BASE}${result.url}`; }} onAiEdit={async (instruction, html) => { const result = await request('/admin/ai/rich-content', { method: 'POST', body: JSON.stringify({ html, instruction }) }); return String(result.html ?? ''); }} minHeight="min-h-56" /></div></details>
+          <div className="rounded-xl border border-line p-3">
+            <Label className="flex items-center gap-1.5 text-sm font-semibold text-ink">Spis komponentów <InfoTooltip text="Lista par „etykieta - wartość”, np. silnik / M620 CAN. Celowo nie jest to swobodny tekst: dzięki temu każda realizacja wyświetla tabelkę w tym samym układzie." /></Label>
+            <div className="mt-3 grid gap-2">
+              {specRows.length === 0 && <p className="text-xs text-ink-muted">Brak pozycji. Dodaj pierwszą poniżej.</p>}
+              {specRows.map((item, index) => <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
+                <Input placeholder="Etykieta (np. silnik)" value={item.label} onChange={(event) => setSpecRows(row.id, specRows.map((entry, entryIdx) => entryIdx === index ? { ...entry, label: event.target.value } : entry))} className="h-9 text-sm" />
+                <Input placeholder="Wartość (np. Bafang M620 CAN)" value={item.value} onChange={(event) => setSpecRows(row.id, specRows.map((entry, entryIdx) => entryIdx === index ? { ...entry, value: event.target.value } : entry))} className="h-9 text-sm" />
+                <div className="flex items-center gap-1">
+                  <Button type="button" size="icon-sm" variant="outline" aria-label="Przesuń w górę" disabled={index === 0} onClick={() => moveSpecRow(row.id, index, -1)}><ChevronUp className="size-3.5" /></Button>
+                  <Button type="button" size="icon-sm" variant="outline" aria-label="Przesuń w dół" disabled={index === specRows.length - 1} onClick={() => moveSpecRow(row.id, index, 1)}><ChevronDown className="size-3.5" /></Button>
+                  <Button type="button" size="icon-sm" variant="ghost" aria-label="Usuń wiersz" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setSpecRows(row.id, specRows.filter((_, entryIdx) => entryIdx !== index))}><Trash2 className="size-3.5" /></Button>
+                </div>
+              </div>)}
+              <Button type="button" size="sm" variant="outline" className="w-fit" onClick={() => setSpecRows(row.id, [...specRows, { label: '', value: '' }])}><Plus /> Dodaj wiersz</Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => void saveProject(row)}><Save /> Zapisz realizację</Button>
+            <Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium"><Upload className="size-4" /> Dodaj zdjęcie do galerii<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(event) => void upload(row, event.target.files?.[0], 'gallery')} /></Label>
+            <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => void deleteProject(row)}><Trash2 /> Usuń realizację</Button>
           </div>
         </div>
       </article>;
