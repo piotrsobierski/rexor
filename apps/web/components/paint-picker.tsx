@@ -130,15 +130,30 @@ export function PaintSection({
   </>;
 }
 
-/** Próbka koloru: render produktu, jeśli jest, inaczej płaska plama lakieru. */
-function ColorPreview({ color, className }: { color: PaintColor; className?: string }) {
+/**
+ * Próbka koloru: render produktu, jeśli jest, inaczej płaska plama lakieru.
+ *
+ * `full` przełącza próbkę w podgląd całego zdjęcia. Miniatura renderu ma 96x96
+ * i jest ciasnym wycinkiem rury ramy - jako próbka lakieru to działa, ale
+ * rozciągnięta do szerokości panelu dawała rozmyte zbliżenie, na którym nie
+ * dało się zobaczyć roweru. W tym trybie bierzemy pełny render (1184x912 albo
+ * 1024x1024) i mieścimy go w całości, na białym tle studyjnym renderu -
+ * kolorem lakieru nie podmalowujemy, bo dałby kolorowe pasy wokół zdjęcia.
+ */
+function ColorPreview({ color, className, full = false }: { color: PaintColor; className?: string; full?: boolean }) {
   const render = bestRender(color);
-  const thumb = render?.thumb ?? render?.image ?? null;
+  const source = full ? render?.image ?? render?.thumb ?? null : render?.thumb ?? render?.image ?? null;
+  const showsRender = full && source !== null;
   return <span
-    className={`relative block overflow-hidden border border-line ${className ?? ''}`}
-    style={{ backgroundColor: color.hex }}
+    className={`relative block overflow-hidden border border-line ${showsRender ? 'bg-white' : ''} ${className ?? ''}`}
+    style={showsRender ? undefined : { backgroundColor: color.hex }}
   >
-    {thumb && <img src={paintImageUrl(thumb)} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />}
+    {source && <img
+      src={paintImageUrl(source)}
+      alt=""
+      loading="lazy"
+      className={`absolute inset-0 size-full ${showsRender ? 'object-contain' : 'object-cover'}`}
+    />}
   </span>;
 }
 
@@ -172,6 +187,7 @@ function PaintDialog({
 
   const results = useMemo(() => searchColors(palettes, query, paletteFilter), [palettes, query, paletteFilter]);
   const previewed = findColor(palettes, preview);
+  const previewHasRender = previewed !== null && bestRender(previewed.color) !== null;
 
   // Sekcje po grupie kolorystycznej palety ("Czerwienie", "Błękity").
   // Przy wyszukiwaniu grupujemy po palecie, bo wynik i tak jest przemieszany.
@@ -264,9 +280,17 @@ function PaintDialog({
         </div>
 
         <aside className="shrink-0 border-b border-line bg-[#fafbfa] p-4 sm:w-[340px] sm:border-b-0 sm:border-l sm:p-5">
-          {previewed ? <div className="flex gap-4 sm:block">
-            <ColorPreview color={previewed.color} className="aspect-square w-24 shrink-0 rounded-2xl sm:w-full" />
-            <div className="min-w-0 flex-1 sm:mt-4">
+          {previewed ? <div className={previewHasRender ? 'block' : 'flex gap-4 sm:block'}>
+            {/* Gdy jest render, zdjęcie idzie na pełną szerokość panelu także
+                na telefonie - przy 96 px obok tekstu roweru nie było widać. */}
+            <ColorPreview
+              color={previewed.color}
+              full={previewHasRender}
+              className={previewHasRender
+                ? 'aspect-[4/3] w-full rounded-2xl'
+                : 'aspect-square w-24 shrink-0 rounded-2xl sm:w-full'}
+            />
+            <div className={previewHasRender ? 'mt-4 min-w-0' : 'min-w-0 flex-1 sm:mt-4'}>
               <p className="text-lg font-semibold leading-tight tracking-tight">{previewed.color.name}</p>
               <p className="mt-1 text-sm text-ink-muted">
                 {previewed.palette.name}
