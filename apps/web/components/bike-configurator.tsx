@@ -38,6 +38,10 @@ function logConfiguratorEvent(modelSlug: string, parameter: string, value: strin
 }
 const defaultBatteryCode = (model: BikeModel): string => (model.batteries.find((item) => item.isDefault) ?? model.batteries[0])?.code ?? '';
 const formatEnergy = (wh: number) => `${new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 1 }).format(wh)} Wh`;
+// Oświetlenie zawsze jest dodatkiem — również dla starszych danych, w których
+// ustawienie grupy mogło jeszcze pozostać jako "select_one".
+const optionalLightingGroups = new Set(['front-light', 'rear-light']);
+const allowsNoneChoice = (group: OptionGroup) => group.selectionMode === 'optional' || optionalLightingGroups.has(group.slug);
 // Grupa bez pozycji katalogowej, ale z dopuszczoną częścią klienta (np. damper
 // E55 w jedynym zgodnym wymiarze) startuje z wyborem „własna część”.
 const initialSelections = (model: BikeModel): Selections => Object.fromEntries(model.groups
@@ -54,7 +58,7 @@ function groupChoices(group: OptionGroup, t: SiteCopy['configurator']) {
   const catalogChoices = group.options
     .filter((option) => option.configurable || option.isDefault)
     .map((option) => ({ sku: option.sku, name: option.name, detail: option.detail, price: option.price, imagePath: publicMediaUrl(option.imagePath), customerSupplied: false }));
-  const withNoneChoice = group.selectionMode === 'optional'
+  const withNoneChoice = allowsNoneChoice(group)
     ? [{ sku: NONE_SKU, name: t.noneOptionName, detail: t.noneOptionDetail, price: 0, imagePath: '', customerSupplied: false }, ...catalogChoices]
     : catalogChoices;
   if (!group.customerPartAllowed) return withNoneChoice;
