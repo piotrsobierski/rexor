@@ -17,3 +17,9 @@ storage/backups/*
 !storage/backups/.gitkeep
 storage/media/*
 !storage/media/.gitkeep
+
+# Zdjęcia referencyjne lakierów: cudze materiały z galerii Rennbow, trzymane
+# wyłącznie lokalnie jako referencja w panelu (docs/PLAN_LAKIERY.md, decyzja 6).
+# Nie trafiają ani do repozytorium, ani do paczki wdrożeniowej.
+storage/paint-reference/*
+!storage/paint-reference/.gitkeep
