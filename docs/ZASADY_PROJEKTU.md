@@ -23,7 +23,7 @@ Ustalone 11 września 2026 r.
 19. Ceny znalezione w sklepach internetowych są wyłącznie danymi roboczymi do preseedu i muszą być zatwierdzone lub zastąpione cennikiem Rexor przed publikacją.
 20. Na etapie lokalnym backup jest przygotowany, ale nie jest podłączony do CRON. Produkcyjne uruchomienie wymaga wskazania miejsca przechowywania, retencji i testu odtworzenia.
 21. Zdjęcia kategorii, modeli i części nie są zaszyte w interfejsie. Administrator zarządza zdjęciem głównym, galerią, kolejnością, podpisem i tekstem alternatywnym.
-22. Główne menu zawiera: Rowery, Ramy, Części i Serwis oraz wyróżnione przejście do konfiguratora. Nie tworzymy osobnej pozycji „Pojazdy elektryczne”, ponieważ dublowałaby ofertę rowerów.
+22. Główne menu zawiera: Rowery, Ramy, Realizacje, Części i Serwis oraz wyróżnione przejście do konfiguratora. „Realizacje” doszły wraz z osobnym bytem realizacji (patrz `docs/PLAN_RAMY_REALIZACJE.md`). Nie tworzymy osobnej pozycji „Pojazdy elektryczne”, ponieważ dublowałaby ofertę rowerów.
 23. Kolory motywu są zmiennymi systemu projektowego zapisanymi w `site_settings` i edytowanymi w panelu, bez ręcznego poprawiania każdego komponentu.
 24. Podstrona Serwis jest normalną edytowalną stroną w `site_pages`; jej treść korzysta z tego samego WYSIWYG z obrazami co opisy modeli i kategorii.
 25. Do typowych interakcji używamy sprawdzonych komponentów systemu projektowego: przycisków, menu, karuzeli, dialogów, formularzy i tabel. Kod własny służy układowi oraz funkcjom specyficznym dla konfiguratora.
