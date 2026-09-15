@@ -138,6 +138,13 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
         } elseif ($value === '' && in_array($field, $definition['nullable'] ?? [], true)) {
             $value = null;
         }
+        // PDO bez jawnego typu wiąże PHP-owe false jako pusty ciąg, a MySQL w
+        // trybie ścisłym odrzuca '' dla kolumny TINYINT(1). Przez to KAŻDY
+        // zapis odznaczonego pola wyboru wywracał cały UPDATE (nie tylko to
+        // jedno pole), a panel pokazywał błąd SQL zamiast zapisać zmianę.
+        if (is_bool($value)) {
+            $value = $value ? 1 : 0;
+        }
         $updates[] = "{$field} = :{$field}";
         $parameters[$field] = $value;
     }
