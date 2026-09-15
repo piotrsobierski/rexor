@@ -1,4 +1,10 @@
 Options -Indexes
+DirectoryIndex index.html
+
+# Eksport statyczny tworzy jednocześnie rowery.html i katalog rowery/ (podstrony).
+# Z domyślnym DirectorySlash Apache przechwytuje /rowery i robi 301 na /rowery/,
+# czyli na katalog bez index.html -> 403, zanim reguła mapująca na .html zdąży zadziałać.
+DirectorySlash Off
 
 RewriteEngine On
 
@@ -29,7 +35,8 @@ RewriteRule ^admin/konfiguracje/[^/]+/?$ admin/konfiguracje/_.html [L]
 RewriteRule ^rowery/[^/]+/[^/]+/?$ rowery/_/_.html [L]
 
 # Trasy eksportu statycznego są zapisane jako nazwa.html.
-RewriteCond %{REQUEST_FILENAME}.html -f
+# DOCUMENT_ROOT zamiast REQUEST_FILENAME, żeby /trasa i /trasa/ trafiały tak samo.
+RewriteCond %{DOCUMENT_ROOT}/$1.html -f
 RewriteRule ^(.+?)/?$ $1.html [L]
 
 RewriteCond %{REQUEST_FILENAME} -f [OR]
