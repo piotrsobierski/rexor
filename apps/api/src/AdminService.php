@@ -87,6 +87,10 @@ function adminCatalog(PDO $pdo): array
                 'default_instructions' => defaultChatbotInstructions(),
             ];
         })(),
+        'frames' => adminFrames($pdo),
+        'frameMedia' => adminFrameMedia($pdo),
+        'projects' => adminProjects($pdo),
+        'projectMedia' => adminProjectMedia($pdo),
         'mailRouting' => getMailRouting($pdo),
         'configurationEmailTemplate' => getConfigurationEmailTemplate($pdo),
     ];
@@ -100,6 +104,18 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
         'parts' => ['table' => 'parts', 'fields' => ['name', 'group_id', 'description', 'gross_price', 'price_status', 'image_path', 'is_active']],
         'sizes' => ['table' => 'model_sizes', 'fields' => ['label', 'price_delta_gross', 'sort_order', 'is_active']],
         'pages' => ['table' => 'site_pages', 'fields' => ['title', 'navigation_label', 'excerpt', 'content_html', 'hero_image_path', 'is_published']],
+        'frames' => [
+            'table' => 'frames',
+            'fields' => ['category_id', 'name', 'manufacturer', 'short_description', 'description_html', 'geometry_html', 'specifications', 'price_gross', 'currency', 'paint_available', 'is_recommended', 'source_url', 'default_image_path', 'status', 'sort_order'],
+            // Puste pole w panelu znaczy "brak wartości", nie pusty tekst:
+            // price_gross = NULL to "wymaga wyceny", nie cena zerowa.
+            'nullable' => ['manufacturer', 'short_description', 'price_gross', 'source_url', 'default_image_path'],
+        ],
+        'projects' => [
+            'table' => 'projects',
+            'fields' => ['title', 'short_description', 'content_html', 'specification', 'category_id', 'completed_at', 'cover_image_path', 'is_published', 'sort_order'],
+            'nullable' => ['short_description', 'category_id', 'completed_at', 'cover_image_path'],
+        ],
     ];
     if (!isset($definitions[$resource])) {
         throw new InvalidArgumentException('Nieznany typ danych.');
@@ -112,10 +128,15 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
             continue;
         }
         $value = $input[$field];
-        if ($field === 'description_html') {
+        if (in_array($field, ['description_html', 'geometry_html', 'content_html'], true)) {
             $value = sanitizeRichHtml((string) $value);
-        } elseif ($field === 'specifications') {
-            $value = json_encode((array) $value, JSON_THROW_ON_ERROR);
+        } elseif (in_array($field, ['specifications', 'specification'], true)) {
+            // `frames.specifications` to obiekt { facts: [...] }, a
+            // `projects.specification` lista par - json_encode zachowuje
+            // jedno i drugie, bo (array) nie zmienia kształtu tablicy.
+            $value = $value === null ? null : json_encode((array) $value, JSON_THROW_ON_ERROR);
+        } elseif ($value === '' && in_array($field, $definition['nullable'] ?? [], true)) {
+            $value = null;
         }
         $updates[] = "{$field} = :{$field}";
         $parameters[$field] = $value;
@@ -709,31 +730,11 @@ function deleteModelMedia(PDO $pdo, int $modelId, int $mediaId): array
             throw new InvalidArgumentException('To zdjęcie nie jest już przypisane do tego modelu.');
         }
 
-        $stillLinked = false;
-        foreach (['category_media', 'model_media', 'part_media'] as $joinTable) {
-            $count = $pdo->prepare("SELECT COUNT(*) FROM {$joinTable} WHERE media_id = :media");
-            $count->execute(['media' => $mediaId]);
-            if ((int) $count->fetchColumn() > 0) {
-                $stillLinked = true;
-                break;
-            }
-        }
-
-        if (!$stillLinked) {
-            $media = $pdo->prepare('SELECT storage_path FROM media WHERE id = :id');
-            $media->execute(['id' => $mediaId]);
-            $storagePath = $media->fetchColumn();
-            $pdo->prepare('DELETE FROM media WHERE id = :id')->execute(['id' => $mediaId]);
-            // Tylko pliki wgrane przez panel (pod /uploads) mają fizyczną
-            // kopię w storage/media — zdjęcia z preseedu (/media/...) są
-            // współdzielonym zasobem statycznym i nie są tu kasowane.
-            if (is_string($storagePath) && str_starts_with($storagePath, '/uploads/')) {
-                $file = projectRoot() . '/storage/media/' . substr($storagePath, strlen('/uploads/'));
-                if (is_file($file)) {
-                    unlink($file);
-                }
-            }
-        }
+        // Sprzątanie osieroconego wiersza `media` i pliku jest wspólne dla
+        // wszystkich bytów (MediaLinkService) - lista tabel łączących musi
+        // obejmować też frame_media i project_media, inaczej skasowalibyśmy
+        // zdjęcie nadal używane przez ramę albo realizację.
+        deleteOrphanMedia($pdo, $mediaId);
         $pdo->commit();
     } catch (Throwable $error) {
         $pdo->rollBack();

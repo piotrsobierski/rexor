@@ -7,6 +7,9 @@ require dirname(__DIR__) . '/src/PricingService.php';
 require dirname(__DIR__) . '/src/ConfigurationService.php';
 require dirname(__DIR__) . '/src/AdminService.php';
 require dirname(__DIR__) . '/src/CatalogService.php';
+require dirname(__DIR__) . '/src/MediaLinkService.php';
+require dirname(__DIR__) . '/src/FramesService.php';
+require dirname(__DIR__) . '/src/ProjectsService.php';
 require dirname(__DIR__) . '/src/ChatService.php';
 require dirname(__DIR__) . '/src/AiContentService.php';
 require dirname(__DIR__) . '/src/MailService.php';
@@ -51,6 +54,31 @@ if ($method === 'GET' && $path === '/health') {
 
 if ($method === 'GET' && $path === '/catalog') {
     jsonResponse(publicCatalog($pdo));
+}
+
+// Ramy i realizacje: publicznie widoczne są wyłącznie pozycje opublikowane.
+if ($method === 'GET' && $path === '/frames') {
+    jsonResponse(publicFrames($pdo));
+}
+
+if ($method === 'GET' && preg_match('~^/frames/([a-z0-9-]+)$~', $path, $matches)) {
+    $frame = publicFrame($pdo, $matches[1]);
+    if (!$frame) {
+        jsonResponse(['error' => 'Nie znaleziono ramy.'], 404);
+    }
+    jsonResponse($frame);
+}
+
+if ($method === 'GET' && $path === '/projects') {
+    jsonResponse(publicProjects($pdo));
+}
+
+if ($method === 'GET' && preg_match('~^/projects/([a-z0-9-]+)$~', $path, $matches)) {
+    $project = publicProject($pdo, $matches[1]);
+    if (!$project) {
+        jsonResponse(['error' => 'Nie znaleziono realizacji.'], 404);
+    }
+    jsonResponse($project);
 }
 
 if ($method === 'POST' && $path === '/chat') {
@@ -113,7 +141,7 @@ if ($method === 'GET' && $path === '/admin/activity-log') {
     jsonResponse(activityLog($pdo, $limit, $beforeId, $eventType));
 }
 
-if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts|sizes)/(\d+)$~', $path, $matches)) {
+if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts|sizes|frames|projects)/(\d+)$~', $path, $matches)) {
     requireAdmin($pdo);
     jsonResponse(updateAdminRecord($pdo, $matches[1], (int) $matches[2], requestJson()));
 }
@@ -215,6 +243,62 @@ if ($method === 'PATCH' && preg_match('~^/admin/models/(\d+)/media/reorder$~', $
     requireAdmin($pdo);
     $payload = requestJson();
     jsonResponse(reorderModelMedia($pdo, (int) $matches[1], (array) ($payload['mediaIds'] ?? [])));
+}
+
+// Ramy i realizacje w panelu. Wgrywanie pliku zostaje osobnym wywołaniem
+// (POST /admin/media), tutaj przypisujemy istniejące media i ustawiamy rolę.
+if ($method === 'POST' && $path === '/admin/frames') {
+    requireAdmin($pdo);
+    jsonResponse(createAdminFrame($pdo, requestJson()), 201);
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/frames/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminFrame($pdo, (int) $matches[1]));
+}
+
+if ($method === 'POST' && preg_match('~^/admin/frames/(\d+)/media$~', $path, $matches)) {
+    requireAdmin($pdo);
+    $payload = requestJson();
+    jsonResponse(attachEntityMedia($pdo, 'frames', (int) $matches[1], (int) ($payload['mediaId'] ?? 0), (string) ($payload['role'] ?? 'gallery')), 201);
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/frames/(\d+)/media/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteEntityMedia($pdo, 'frames', (int) $matches[1], (int) $matches[2]));
+}
+
+if ($method === 'PATCH' && preg_match('~^/admin/frames/(\d+)/media/reorder$~', $path, $matches)) {
+    requireAdmin($pdo);
+    $payload = requestJson();
+    jsonResponse(reorderEntityMedia($pdo, 'frames', (int) $matches[1], (array) ($payload['mediaIds'] ?? [])));
+}
+
+if ($method === 'POST' && $path === '/admin/projects') {
+    requireAdmin($pdo);
+    jsonResponse(createAdminProject($pdo, requestJson()), 201);
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/projects/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminProject($pdo, (int) $matches[1]));
+}
+
+if ($method === 'POST' && preg_match('~^/admin/projects/(\d+)/media$~', $path, $matches)) {
+    requireAdmin($pdo);
+    $payload = requestJson();
+    jsonResponse(attachEntityMedia($pdo, 'projects', (int) $matches[1], (int) ($payload['mediaId'] ?? 0), (string) ($payload['role'] ?? 'gallery')), 201);
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/projects/(\d+)/media/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteEntityMedia($pdo, 'projects', (int) $matches[1], (int) $matches[2]));
+}
+
+if ($method === 'PATCH' && preg_match('~^/admin/projects/(\d+)/media/reorder$~', $path, $matches)) {
+    requireAdmin($pdo);
+    $payload = requestJson();
+    jsonResponse(reorderEntityMedia($pdo, 'projects', (int) $matches[1], (array) ($payload['mediaIds'] ?? [])));
 }
 
 if ($method === 'GET' && preg_match('~^/admin/configurations/([A-Za-z0-9]{20,32})$~', $path, $matches)) {
