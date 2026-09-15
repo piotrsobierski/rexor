@@ -201,61 +201,25 @@ function getMailRouting(PDO $pdo): array
 }
 
 /**
- * Prosty konwerter Markdown -> HTML, tylko pod potrzeby szablonów maili
- * edytowanych w panelu (nagłówki #/##, **pogrubienie**, [link](url),
- * akapity). Escapujemy CAŁY tekst przed rozpoznaniem składni, więc HTML
- * wklejony przez admina (albo w danych klienta podstawionych w placeholdery)
- * nigdy nie wykona się jako znacznik - to jedyna bariera przed XSS w mailu.
- */
-function renderMarkdownToHtml(string $markdown): string
-{
-    $escaped = htmlspecialchars($markdown, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    $escaped = preg_replace('/\[([^\]]+)\]\(([^)\s]+)\)/', '<a href="$2">$1</a>', $escaped);
-    $escaped = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped);
-
-    $blocks = preg_split('/\n{2,}/', trim($escaped)) ?: [];
-    $html = [];
-    foreach ($blocks as $block) {
-        $block = trim($block);
-        if ($block === '') {
-            continue;
-        }
-        if (preg_match('/^(#{1,3})\s+(.*)$/s', $block, $matches)) {
-            $level = strlen($matches[1]) + 1; // # -> h2, żeby nie kolidować z domyślnym <h1> w layoucie maila
-            $html[] = "<h{$level}>{$matches[2]}</h{$level}>";
-        } else {
-            $html[] = '<p>' . nl2br($block) . '</p>';
-        }
-    }
-    return implode('', $html);
-}
-
-/**
  * Szablon maila potwierdzającego zapisanie konfiguracji przez klienta -
- * edytowalny w panelu (Markdown + placeholdery), z sensownym domyślnym
- * tekstem, gdyby admin nic nie ustawił.
+ * edytowalny w panelu tym samym edytorem WYSIWYG co strony CMS (site_pages),
+ * więc treść to gotowy HTML, nie Markdown; z sensownym domyślnym tekstem,
+ * gdyby admin nic nie ustawił.
  */
 function getConfigurationEmailTemplate(PDO $pdo): array
 {
     $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'configuration_email_template'")->fetchColumn();
     $stored = $value ? json_decode((string) $value, true, 8, JSON_THROW_ON_ERROR) : [];
     $defaultSubject = 'Twój projekt {{modelName}} — Rexor Bikes';
-    $defaultBody = <<<MKD
-# Dziękujemy, {{customerName}}
-
-Konfiguracja **{{modelName}}** została zapisana.
-
-Aktualna cena: **{{price}}**.
-
-[Otwórz podsumowanie]({{shareUrl}})
-
-[Wróć do konfiguratora]({{resumeUrl}})
-
-Przed realizacją Rexor potwierdzi kompatybilność i ostateczny zakres.
-MKD;
+    $defaultBody = '<h1>Dziękujemy, {{customerName}}</h1>'
+        . '<p>Konfiguracja <strong>{{modelName}}</strong> została zapisana.</p>'
+        . '<p>Aktualna cena: <strong>{{price}}</strong>.</p>'
+        . '<p><a href="{{shareUrl}}">Otwórz podsumowanie</a></p>'
+        . '<p><a href="{{resumeUrl}}">Wróć do konfiguratora</a></p>'
+        . '<p>Przed realizacją Rexor potwierdzi kompatybilność i ostateczny zakres.</p>';
     return [
         'subject' => trim((string) ($stored['subject'] ?? '')) ?: $defaultSubject,
-        'body_markdown' => trim((string) ($stored['body_markdown'] ?? '')) ?: $defaultBody,
+        'body_html' => trim((string) ($stored['body_html'] ?? '')) ?: $defaultBody,
     ];
 }
 
@@ -263,9 +227,9 @@ function updateConfigurationEmailTemplate(PDO $pdo, array $input): array
 {
     $template = [
         'subject' => trim((string) ($input['subject'] ?? '')),
-        'body_markdown' => trim((string) ($input['body_markdown'] ?? '')),
+        'body_html' => trim((string) ($input['body_html'] ?? '')),
     ];
-    if ($template['subject'] === '' || $template['body_markdown'] === '') {
+    if ($template['subject'] === '' || $template['body_html'] === '') {
         throw new InvalidArgumentException('Temat i treść szablonu nie mogą być puste.');
     }
     $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('configuration_email_template', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
@@ -274,13 +238,22 @@ function updateConfigurationEmailTemplate(PDO $pdo, array $input): array
     return $template;
 }
 
-/** Podstawia placeholdery {{klucz}} w temacie/treści szablonu i renderuje treść z Markdown do HTML. */
+/**
+ * Podstawia placeholdery {{klucz}} w temacie i treści szablonu. Treść to
+ * zaufany HTML z panelu (jak site_pages.content_html) - podstawiane wartości
+ * same w sobie są jednak escapowane, żeby np. imię klienta z formularza nie
+ * mogło wstrzyknąć znaczników do wysyłanej wiadomości.
+ */
 function renderConfigurationEmail(PDO $pdo, array $vars): array
 {
     $template = getConfigurationEmailTemplate($pdo);
+    $escapedVars = [];
+    foreach ($vars as $key => $value) {
+        $escapedVars[$key] = htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
     return [
         'subject' => strtr($template['subject'], $vars),
-        'html' => renderMarkdownToHtml(strtr($template['body_markdown'], $vars)),
+        'html' => strtr($template['body_html'], $escapedVars),
     ];
 }
 
