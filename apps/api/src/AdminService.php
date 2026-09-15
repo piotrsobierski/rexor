@@ -351,16 +351,227 @@ function deleteAdminPart(PDO $pdo, int $id): array
     // CASCADE - czyszczą się same. model_parts ma RESTRICT (sprawdzone wyżej),
     // a configuration_items ustawia part_id na NULL, więc historyczne
     // zapytania klientów zachowują swoją treść nawet po usunięciu części.
-    $statement = $pdo->prepare('DELETE FROM parts WHERE id = :id');
-    $statement->execute(['id' => $id]);
-    if ($statement->rowCount() === 0) {
-        throw new InvalidArgumentException('Nie znaleziono części.');
+    $pdo->beginTransaction();
+    try {
+        $media = $pdo->prepare('SELECT media_id FROM part_media WHERE part_id = :id');
+        $media->execute(['id' => $id]);
+        $mediaIds = array_map('intval', $media->fetchAll(PDO::FETCH_COLUMN));
+
+        $statement = $pdo->prepare('DELETE FROM parts WHERE id = :id');
+        $statement->execute(['id' => $id]);
+        if ($statement->rowCount() === 0) {
+            throw new InvalidArgumentException('Nie znaleziono części.');
+        }
+        // Kaskada zdejmuje powiązania part_media, ale o wierszach `media`
+        // i plikach w storage nie wie - tak samo jak przy ramach.
+        foreach ($mediaIds as $mediaId) {
+            deleteOrphanMedia($pdo, $mediaId);
+        }
+        $pdo->commit();
+    } catch (Throwable $error) {
+        $pdo->rollBack();
+        throw $error;
     }
 
     logActivity($pdo, 'part_deleted', 'admin', currentAdmin()['email'] ?? null, "Usunięto część #{$id}.", ['id' => $id]);
 
     return ['id' => $id, 'deleted' => true];
 }
+
+/**
+ * Usuwanie modelu. Kaskady w bazie sprzątają wszystko, co należy wyłącznie do
+ * modelu (rozmiary, baterie, osprzęt, ustawienia grup, korekty ceny, powiązania
+ * zdjęć), ale `configurations.model_id` ma RESTRICT - zapytania klientów są
+ * dokumentem i nie mogą zniknąć razem z modelem. Dlatego zamiast pozwolić
+ * bazie rzucić surowy błąd FK, sprawdzamy to wcześniej i mówimy, co zrobić.
+ */
+function deleteAdminModel(PDO $pdo, int $id): array
+{
+    $model = $pdo->prepare('SELECT name FROM bike_models WHERE id = :id');
+    $model->execute(['id' => $id]);
+    $name = $model->fetchColumn();
+    if ($name === false) {
+        throw new InvalidArgumentException('Nie znaleziono modelu.');
+    }
+
+    $usage = $pdo->prepare('SELECT COUNT(*) FROM configurations WHERE model_id = :id');
+    $usage->execute(['id' => $id]);
+    $configurationCount = (int) $usage->fetchColumn();
+    if ($configurationCount > 0) {
+        throw new InvalidArgumentException(
+            "Model ma {$configurationCount} " . ($configurationCount === 1 ? 'zapisaną konfigurację klienta' : 'zapisanych konfiguracji klientów')
+            . '. Usunięcie modelu skasowałoby historię zapytań, więc zamiast tego ustaw status „archived” - model zniknie ze strony, a zapytania zostaną.'
+        );
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $media = $pdo->prepare('SELECT media_id FROM model_media WHERE model_id = :id');
+        $media->execute(['id' => $id]);
+        $mediaIds = array_map('intval', $media->fetchAll(PDO::FETCH_COLUMN));
+
+        $pdo->prepare('DELETE FROM bike_models WHERE id = :id')->execute(['id' => $id]);
+        foreach ($mediaIds as $mediaId) {
+            deleteOrphanMedia($pdo, $mediaId);
+        }
+        $pdo->commit();
+    } catch (Throwable $error) {
+        $pdo->rollBack();
+        throw $error;
+    }
+
+    logActivity($pdo, 'model_deleted', 'admin', currentAdmin()['email'] ?? null, "Usunięto model \"{$name}\" (#{$id}).", ['id' => $id, 'name' => $name]);
+
+    return ['id' => $id, 'deleted' => true];
+}
+
+/**
+ * Usuwanie kategorii. Modele i ramy wskazują na kategorię przez RESTRICT
+ * (kategoria jest ich wymaganą częścią), realizacje przez SET NULL - te
+ * ostatnie przeżyją usunięcie, tylko wypadną z filtrów, więc liczymy je
+ * w ostrzeżeniu zamiast blokować.
+ */
+function deleteAdminCategory(PDO $pdo, int $id): array
+{
+    $category = $pdo->prepare('SELECT name FROM bike_categories WHERE id = :id');
+    $category->execute(['id' => $id]);
+    $name = $category->fetchColumn();
+    if ($name === false) {
+        throw new InvalidArgumentException('Nie znaleziono kategorii.');
+    }
+
+    foreach ([['bike_models', 'modeli', 'model'], ['frames', 'ram', 'ramę']] as [$table, $plural, $singular]) {
+        $usage = $pdo->prepare("SELECT COUNT(*) FROM {$table} WHERE category_id = :id");
+        $usage->execute(['id' => $id]);
+        $count = (int) $usage->fetchColumn();
+        if ($count > 0) {
+            throw new InvalidArgumentException(
+                "Kategoria zawiera {$count} " . ($count === 1 ? $singular : $plural)
+                . '. Przenieś je najpierw do innej kategorii albo usuń.'
+            );
+        }
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $media = $pdo->prepare('SELECT media_id FROM category_media WHERE category_id = :id');
+        $media->execute(['id' => $id]);
+        $mediaIds = array_map('intval', $media->fetchAll(PDO::FETCH_COLUMN));
+
+        $pdo->prepare('DELETE FROM bike_categories WHERE id = :id')->execute(['id' => $id]);
+        foreach ($mediaIds as $mediaId) {
+            deleteOrphanMedia($pdo, $mediaId);
+        }
+        $pdo->commit();
+    } catch (Throwable $error) {
+        $pdo->rollBack();
+        throw $error;
+    }
+
+    logActivity($pdo, 'category_deleted', 'admin', currentAdmin()['email'] ?? null, "Usunięto kategorię \"{$name}\" (#{$id}).", ['id' => $id, 'name' => $name]);
+
+    return ['id' => $id, 'deleted' => true];
+}
+
+/**
+ * Usuwanie rozmiaru ramy. Zapisane konfiguracje mają `model_size_id` z SET
+ * NULL i własną migawkę z etykietą rozmiaru, więc nie tracą treści. Ostatniego
+ * rozmiaru nie usuwamy: model bez rozmiaru nie da się skonfigurować.
+ */
+function deleteAdminSize(PDO $pdo, int $id): array
+{
+    $size = $pdo->prepare('SELECT model_id, code, label FROM model_sizes WHERE id = :id');
+    $size->execute(['id' => $id]);
+    $row = $size->fetch();
+    if (!$row) {
+        throw new InvalidArgumentException('Nie znaleziono rozmiaru.');
+    }
+
+    $siblings = $pdo->prepare('SELECT COUNT(*) FROM model_sizes WHERE model_id = :model');
+    $siblings->execute(['model' => $row['model_id']]);
+    if ((int) $siblings->fetchColumn() <= 1) {
+        throw new InvalidArgumentException('To jedyny rozmiar tego modelu. Dodaj inny, zanim usuniesz ten - bez rozmiaru modelu nie da się skonfigurować.');
+    }
+
+    $pdo->prepare('DELETE FROM model_sizes WHERE id = :id')->execute(['id' => $id]);
+    logActivity(
+        $pdo,
+        'size_deleted',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Usunięto rozmiar \"{$row['label']}\" (#{$id}) modelu #{$row['model_id']}.",
+        ['id' => $id, 'modelId' => (int) $row['model_id'], 'code' => $row['code']]
+    );
+
+    return ['id' => $id, 'deleted' => true, 'basePriceGross' => recomputeModelBasePrice($pdo, (int) $row['model_id'])];
+}
+
+/**
+ * Usuwanie pakietu baterii. Konfiguracje trzymają `model_battery_id` z SET
+ * NULL i pełną specyfikację w migawce. Bateria domyślna jest składnikiem ceny
+ * „od”, więc po usunięciu przeliczamy cenę modelu.
+ */
+function deleteAdminBattery(PDO $pdo, int $id): array
+{
+    $battery = $pdo->prepare('SELECT model_id, code, name, is_default FROM model_batteries WHERE id = :id');
+    $battery->execute(['id' => $id]);
+    $row = $battery->fetch();
+    if (!$row) {
+        throw new InvalidArgumentException('Nie znaleziono pakietu baterii.');
+    }
+
+    $siblings = $pdo->prepare('SELECT COUNT(*) FROM model_batteries WHERE model_id = :model');
+    $siblings->execute(['model' => $row['model_id']]);
+    if ((int) $siblings->fetchColumn() <= 1) {
+        throw new InvalidArgumentException('To jedyny pakiet baterii tego modelu. Dodaj inny, zanim usuniesz ten.');
+    }
+    if ((int) $row['is_default'] === 1) {
+        throw new InvalidArgumentException('To pakiet domyślny - wskaż najpierw inny jako domyślny, bo od niego liczy się cena modelu.');
+    }
+
+    $pdo->prepare('DELETE FROM model_batteries WHERE id = :id')->execute(['id' => $id]);
+    logActivity(
+        $pdo,
+        'battery_deleted',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Usunięto pakiet baterii \"{$row['name']}\" (#{$id}) modelu #{$row['model_id']}.",
+        ['id' => $id, 'modelId' => (int) $row['model_id'], 'code' => $row['code']]
+    );
+
+    return ['id' => $id, 'deleted' => true, 'basePriceGross' => recomputeModelBasePrice($pdo, (int) $row['model_id'])];
+}
+
+/**
+ * Usuwanie strony treściowej. `site_pages` nie ma relacji przychodzących, ale
+ * strony wpisane w nawigację (regulamin, polityka) mają swoje trasy w kodzie
+ * frontendu i po usunięciu wiersza zwracałyby 404 - stąd blokada na slugach
+ * systemowych, zamiast cichego rozsypania menu.
+ */
+function deleteAdminPage(PDO $pdo, int $id): array
+{
+    $page = $pdo->prepare('SELECT slug, title FROM site_pages WHERE id = :id');
+    $page->execute(['id' => $id]);
+    $row = $page->fetch();
+    if (!$row) {
+        throw new InvalidArgumentException('Nie znaleziono strony.');
+    }
+    if (in_array($row['slug'], systemPageSlugs(), true)) {
+        throw new InvalidArgumentException("Strona „{$row['title']}” jest wpisana w stopkę i nawigację serwisu. Możesz ją ukryć przełącznikiem „Opublikowana”, ale nie usunąć.");
+    }
+
+    $pdo->prepare('DELETE FROM site_pages WHERE id = :id')->execute(['id' => $id]);
+    logActivity($pdo, 'page_deleted', 'admin', currentAdmin()['email'] ?? null, "Usunięto stronę \"{$row['title']}\" (#{$id}).", ['id' => $id, 'slug' => $row['slug']]);
+
+    return ['id' => $id, 'deleted' => true];
+}
+
+/** Slugi stron, do których prowadzą trasy zaszyte w kodzie frontendu. */
+function systemPageSlugs(): array
+{
+    return ['regulamin', 'polityka-prywatnosci', 'serwis', 'kontakt'];
+}
+
 
 /**
  * Bateria ma pola wyliczalne: pojemność pakietu wynika z liczby gałęzi

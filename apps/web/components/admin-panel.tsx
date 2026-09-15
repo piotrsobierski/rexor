@@ -493,6 +493,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
               rows={catalog.categories}
               patch={patch}
               request={request}
+              reload={loadCatalog}
               setMessage={setMessage}
             />
           </TabsContent>
@@ -531,6 +532,8 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
               pages={catalog.pages}
               patch={patch}
               request={request}
+              reload={loadCatalog}
+              setMessage={setMessage}
             />
           </TabsContent>
           <TabsContent value="projects">
@@ -1319,6 +1322,7 @@ function CategoriesEditor({
   rows,
   patch,
   request,
+  reload,
   setMessage,
 }: {
   rows: Row[];
@@ -1328,8 +1332,30 @@ function CategoriesEditor({
     fields: Record<string, unknown>,
   ) => Promise<void>;
   request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
   setMessage: (value: string) => void;
 }) {
+  async function deleteCategory(row: Row) {
+    if (
+      !window.confirm(
+        `Usunąć kategorię „${String(row.name)}"? Musi być pusta - modele i ramy trzeba wcześniej przenieść gdzie indziej. Trasa /rowery/${String(row.slug)} zniknie dopiero po kolejnym buildzie strony.`,
+      )
+    )
+      return;
+    setMessage('Usuwam kategorię…');
+    try {
+      await request(`/admin/categories/${row.id}`, { method: 'DELETE' });
+      await reload();
+      setMessage('Kategoria usunięta.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Nie udało się usunąć kategorii.',
+      );
+    }
+  }
+
   const [drafts, setDrafts] = useState<Record<number, Row>>(() =>
     Object.fromEntries(rows.map((row) => [row.id, { ...row }])),
   );
@@ -1477,20 +1503,30 @@ function CategoriesEditor({
                 />{' '}
                 Widoczna na stronie głównej
               </label>
-              <Button
-                size="sm"
-                className="w-fit"
-                onClick={() =>
-                  patch('categories', row.id, {
-                    name: drafts[row.id]?.name ?? row.name,
-                    short_description:
-                      drafts[row.id]?.short_description ??
-                      row.short_description,
-                  })
-                }
-              >
-                <Save /> Zapisz
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  className="w-fit"
+                  onClick={() =>
+                    patch('categories', row.id, {
+                      name: drafts[row.id]?.name ?? row.name,
+                      short_description:
+                        drafts[row.id]?.short_description ??
+                        row.short_description,
+                    })
+                  }
+                >
+                  <Save /> Zapisz
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-fit text-red-600"
+                  onClick={() => void deleteCategory(row)}
+                >
+                  <Trash2 className="size-3.5" /> Usuń
+                </Button>
+              </div>
             </div>
           </article>
         ))}
@@ -1610,6 +1646,9 @@ function WysiwygEditor({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiProposal, setAiProposal] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(
+    null,
+  );
 
   useEffect(() => {
     try {
@@ -1620,6 +1659,7 @@ function WysiwygEditor({
   useEffect(() => {
     if (localRef.current && localRef.current.innerHTML !== content) {
       localRef.current.innerHTML = content;
+      setSelectedImage(null);
     }
   }, [content]);
 
@@ -1646,6 +1686,44 @@ function WysiwygEditor({
 
   async function handleImages(files?: FileList | null) {
     for (const file of Array.from(files ?? [])) await handleImage(file);
+  }
+
+  function selectImage(img: HTMLImageElement | null) {
+    setSelectedImage((prev) => {
+      if (prev && prev !== img) {
+        prev.style.outline = '';
+        prev.style.outlineOffset = '';
+      }
+      if (img) {
+        img.style.outline = '2px solid var(--ring)';
+        img.style.outlineOffset = '2px';
+      }
+      return img;
+    });
+  }
+
+  /** Odczytuje HTML edytora bez podglądu zaznaczenia zdjęcia, żeby obramowanie wyboru nie trafiło do zapisu. */
+  function emitChange() {
+    if (!localRef.current) return;
+    if (selectedImage) selectedImage.style.outline = '';
+    const html = localRef.current.innerHTML;
+    if (selectedImage) {
+      selectedImage.style.outline = '2px solid var(--ring)';
+      selectedImage.style.outlineOffset = '2px';
+    }
+    onChange?.(html);
+  }
+
+  function setSelectedImageWidth(percent: number | null) {
+    if (!selectedImage) return;
+    if (percent === null) {
+      selectedImage.style.removeProperty('width');
+      selectedImage.style.removeProperty('height');
+    } else {
+      selectedImage.style.width = `${percent}%`;
+      selectedImage.style.height = 'auto';
+    }
+    emitChange();
   }
 
   async function generateAiProposal() {
@@ -1807,6 +1885,35 @@ function WysiwygEditor({
         </div>
       )}
 
+      {selectedImage && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border bg-[var(--muted)] p-1.5 text-xs">
+          <span className="px-1.5 font-medium text-ink-muted">
+            Rozmiar zaznaczonego zdjęcia:
+          </span>
+          {[25, 50, 75, 100].map((percent) => (
+            <Button
+              key={percent}
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              onClick={() => setSelectedImageWidth(percent)}
+            >
+              {percent}%
+            </Button>
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            onClick={() => setSelectedImageWidth(null)}
+          >
+            Oryginalny
+          </Button>
+        </div>
+      )}
+
       {aiProposal !== null && (
         <div className="grid gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3 shadow-sm">
           <div className="flex items-center justify-between">
@@ -1845,8 +1952,14 @@ function WysiwygEditor({
         contentEditable
         suppressContentEditableWarning
         className={`rich-content ${minHeight} max-h-[460px] overflow-y-auto rounded-2xl border bg-white p-4 text-sm outline-none focus:border-[var(--ring)] focus:ring-2 focus:ring-[var(--ring)]/20`}
-        onInput={(e) => {
-          onChange?.(e.currentTarget.innerHTML);
+        onInput={() => emitChange()}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'IMG') {
+            selectImage(target as HTMLImageElement);
+          } else if (selectedImage) {
+            selectImage(null);
+          }
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -2006,6 +2119,25 @@ function ModelsEditor({
     category_id: String(categories[0]?.id ?? ''),
     short_description: '',
   });
+  async function deleteModel(model: Row) {
+    if (
+      !window.confirm(
+        `Usunąć model „${String(model.name)}"? Znikną razem z nim rozmiary, baterie, przypisany osprzęt i galeria. Tej operacji nie można cofnąć.`,
+      )
+    )
+      return;
+    setMessage('Usuwam model…');
+    try {
+      await request(`/admin/models/${model.id}`, { method: 'DELETE' });
+      await reload();
+      setMessage('Model usunięty.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Nie udało się usunąć modelu.',
+      );
+    }
+  }
+
   async function addModel() {
     if (!newModel.name.trim() || !newModel.category_id) {
       setMessage('Podaj nazwę i kategorię nowego modelu.');
@@ -2399,6 +2531,14 @@ function ModelsEditor({
                       onChange={(event) => void upload(row, event.target.files)}
                     />
                   </Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto text-red-600"
+                    onClick={() => void deleteModel(row)}
+                  >
+                    <Trash2 className="size-4" /> Usuń model
+                  </Button>
                 </div>
               </div>
             </article>
@@ -4159,6 +4299,27 @@ function BatteriesEditor({
     setDrafts(Object.fromEntries(batteries.map((row) => [row.id, { ...row }])));
   }, [batteries]);
 
+  async function remove(row: Row) {
+    if (
+      !window.confirm(
+        `Usunąć pakiet „${String(row.name)}"? Zapisane konfiguracje klientów zachowają swoją treść, ale stracą powiązanie z tym pakietem.`,
+      )
+    )
+      return;
+    setMessage('Usuwam pakiet…');
+    try {
+      await request(`/admin/batteries/${row.id}`, { method: 'DELETE' });
+      await reload();
+      setMessage('Pakiet usunięty.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Nie udało się usunąć pakietu.',
+      );
+    }
+  }
+
   async function save(id: number) {
     setMessage('Zapisuję baterię…');
     try {
@@ -4343,9 +4504,20 @@ function BatteriesEditor({
                             Widoczna w konfiguratorze
                           </label>
                         </div>
-                        <Button size="sm" onClick={() => save(row.id)}>
-                          <Save /> Zapisz pakiet
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" onClick={() => save(row.id)}>
+                            <Save /> Zapisz pakiet
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600"
+                            aria-label={`Usuń pakiet ${String(row.name)}`}
+                            onClick={() => void remove(row)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -4497,10 +4669,25 @@ function BatteriesEditor({
   );
 }
 
+/**
+ * Strony wpisane w nawigację i stopkę mają własne trasy w kodzie frontendu -
+ * usunięcie wiersza zostawiłoby martwy link, więc dla nich nie pokazujemy
+ * przycisku (API blokuje to samo po swojej stronie). Lustro systemPageSlugs()
+ * z apps/api/src/AdminService.php.
+ */
+const systemPageSlugs = new Set([
+  'regulamin',
+  'polityka-prywatnosci',
+  'serwis',
+  'kontakt',
+]);
+
 function PageEditor({
   page,
   patch,
   request,
+  reload,
+  setMessage,
 }: {
   page?: Row;
   patch: (
@@ -4509,6 +4696,8 @@ function PageEditor({
     fields: Record<string, unknown>,
   ) => Promise<void>;
   request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
 }) {
   const [title, setTitle] = useState(String(page?.title ?? ''));
   const [contentHtml, setContentHtml] = useState(
@@ -4575,17 +4764,49 @@ function PageEditor({
             <Switch checked={published} onCheckedChange={setPublished} />{' '}
             Opublikowana
           </label>
-          <Button
-            onClick={() =>
-              patch('pages', page.id, {
-                title,
-                content_html: contentHtml,
-                is_published: published,
-              })
-            }
-          >
-            <Save /> Zapisz stronę
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() =>
+                patch('pages', page.id, {
+                  title,
+                  content_html: contentHtml,
+                  is_published: published,
+                })
+              }
+            >
+              <Save /> Zapisz stronę
+            </Button>
+            {!systemPageSlugs.has(String(page.slug)) && (
+              <Button
+                variant="outline"
+                className="text-red-600"
+                onClick={async () => {
+                  if (
+                    !window.confirm(
+                      `Usunąć stronę „${title}"? Tej operacji nie można cofnąć.`,
+                    )
+                  )
+                    return;
+                  setMessage('Usuwam stronę…');
+                  try {
+                    await request(`/admin/pages/${page.id}`, {
+                      method: 'DELETE',
+                    });
+                    await reload();
+                    setMessage('Strona usunięta.');
+                  } catch (error) {
+                    setMessage(
+                      error instanceof Error
+                        ? error.message
+                        : 'Nie udało się usunąć strony.',
+                    );
+                  }
+                }}
+              >
+                <Trash2 className="size-4" /> Usuń stronę
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </Panel>
@@ -4597,6 +4818,8 @@ function PagesEditor({
   pages,
   patch,
   request,
+  reload,
+  setMessage,
 }: {
   pages: Row[];
   patch: (
@@ -4605,6 +4828,8 @@ function PagesEditor({
     fields: Record<string, unknown>,
   ) => Promise<void>;
   request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
 }) {
   const [selectedSlug, setSelectedSlug] = useState<string>(
     String(pages[0]?.slug ?? ''),
@@ -4633,7 +4858,13 @@ function PagesEditor({
           </Button>
         ))}
       </div>
-      <PageEditor page={page} patch={patch} request={request} />
+      <PageEditor
+        page={page}
+        patch={patch}
+        request={request}
+        reload={reload}
+        setMessage={setMessage}
+      />
     </div>
   );
 }
@@ -6167,14 +6398,21 @@ function ModelEquipmentEditor({
             <TableRow>
               <TableHead>Rozmiar</TableHead>
               <TableHead className="w-40">Dopłata brutto (zł)</TableHead>
-              <TableHead className="w-28">Akcja</TableHead>
+              <TableHead className="w-40">Akcja</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {catalog.modelSizes
               .filter((row) => Number(row.model_id) === modelId)
               .map((row) => (
-                <SizeRow key={row.id} row={row} patch={patch} />
+                <SizeRow
+                  key={row.id}
+                  row={row}
+                  patch={patch}
+                  request={request}
+                  reload={reload}
+                  setMessage={setMessage}
+                />
               ))}
           </TableBody>
         </Table>
@@ -6186,6 +6424,9 @@ function ModelEquipmentEditor({
 function SizeRow({
   row,
   patch,
+  request,
+  reload,
+  setMessage,
 }: {
   row: Row;
   patch: (
@@ -6193,8 +6434,33 @@ function SizeRow({
     id: number,
     fields: Record<string, unknown>,
   ) => Promise<void>;
+  request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
 }) {
   const [delta, setDelta] = useState(String(row.price_delta_gross ?? 0));
+
+  async function remove() {
+    if (
+      !window.confirm(
+        `Usunąć rozmiar „${String(row.label ?? row.code)}"? Zapisane konfiguracje klientów zachowają swoją treść, ale stracą powiązanie z tym rozmiarem.`,
+      )
+    )
+      return;
+    setMessage('Usuwam rozmiar…');
+    try {
+      await request(`/admin/sizes/${row.id}`, { method: 'DELETE' });
+      await reload();
+      setMessage('Rozmiar usunięty.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Nie udało się usunąć rozmiaru.',
+      );
+    }
+  }
+
   return (
     <TableRow>
       <TableCell>{String(row.label ?? row.code)}</TableCell>
@@ -6207,13 +6473,24 @@ function SizeRow({
         />
       </TableCell>
       <TableCell>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => patch('sizes', row.id, { price_delta_gross: delta })}
-        >
-          <Save /> Zapisz
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => patch('sizes', row.id, { price_delta_gross: delta })}
+          >
+            <Save /> Zapisz
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-red-600"
+            aria-label={`Usuń rozmiar ${String(row.label ?? row.code)}`}
+            onClick={() => void remove()}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   );

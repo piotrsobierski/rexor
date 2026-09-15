@@ -167,6 +167,21 @@ if ($method === 'DELETE' && preg_match('~^/admin/parts/(\d+)$~', $path, $matches
     jsonResponse(deleteAdminPart($pdo, (int) $matches[1]));
 }
 
+if ($method === 'DELETE' && preg_match('~^/admin/models/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminModel($pdo, (int) $matches[1]));
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/categories/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminCategory($pdo, (int) $matches[1]));
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/sizes/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminSize($pdo, (int) $matches[1]));
+}
+
 if ($method === 'POST' && $path === '/admin/model-parts') {
     requireAdmin($pdo);
     jsonResponse(saveModelPart($pdo, requestJson()));
@@ -201,6 +216,16 @@ if ($method === 'PATCH' && preg_match('~^/admin/batteries/(\d+)$~', $path, $matc
 if ($method === 'PATCH' && preg_match('~^/admin/pages/(\d+)$~', $path, $matches)) {
     requireAdmin($pdo);
     jsonResponse(updateAdminRecord($pdo, 'pages', (int) $matches[1], requestJson()));
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/batteries/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminBattery($pdo, (int) $matches[1]));
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/pages/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminPage($pdo, (int) $matches[1]));
 }
 
 if ($method === 'PATCH' && $path === '/admin/settings/theme') {
