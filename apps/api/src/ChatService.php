@@ -41,6 +41,15 @@ ZASADY:
 PROMPT;
 }
 
+/**
+ * Treści redagowane w WYSIWYG trafiają do promptu jako czysty tekst -
+ * znaczniki HTML byłyby dla modelu tylko szumem zjadającym kontekst.
+ */
+function plainTextFromHtml(string $html): string
+{
+    return trim((string) preg_replace('/\s+/', ' ', strip_tags($html)));
+}
+
 function buildChatbotSystemPromptFromDb(PDO $pdo): string
 {
     $catalog = publicCatalog($pdo);
@@ -158,7 +167,75 @@ function buildChatbotSystemPromptFromDb(PDO $pdo): string
         $sections[] = implode("\n", $lines);
     }
 
-    // 3. WIEDZA O ZASIĘGACH NA WATOGODZINĘ
+    // 3. RAMY SPRZEDAWANE OSOBNO
+    // Rama nie jest modelem konfiguratora (osobna tabela, własna cena), więc
+    // czatbot musi dostać ją osobno - inaczej na pytanie "co macie w ramach"
+    // odpowiadałby wyłącznie rowerami w całości.
+    $frames = publicFrames($pdo)['frames'];
+    if ($frames !== []) {
+        $frameLines = [];
+        foreach ($frames as $frame) {
+            $price = $frame['price_gross'] !== null
+                ? number_format((float) $frame['price_gross'], 0, ',', ' ') . ' zł brutto'
+                : 'Wycena indywidualna';
+            $frameLines[] = "\n#### RAMA: {$frame['name']} (slug: {$frame['slug']})";
+            if (!empty($frame['manufacturer'])) {
+                $frameLines[] = "- Producent: {$frame['manufacturer']}";
+            }
+            $frameLines[] = "- Kategoria: {$frame['category_slug']}";
+            $frameLines[] = "- Cena: {$price}";
+            if (!empty($frame['short_description'])) {
+                $frameLines[] = '- Opis: ' . plainTextFromHtml((string) $frame['short_description']);
+            }
+            if (!empty($frame['specifications']['facts']) && is_array($frame['specifications']['facts'])) {
+                foreach ($frame['specifications']['facts'] as $fact) {
+                    $frameLines[] = '- Parametr: ' . plainTextFromHtml((string) $fact);
+                }
+            }
+            $frameLines[] = '- Malowanie wg projektu klienta: ' . ($frame['paint_available'] ? 'dostępne' : 'niedostępne');
+            if (!empty($frame['is_recommended'])) {
+                $frameLines[] = '- Wyróżnienie: NASZA REKOMENDACJA';
+            }
+            $frameLines[] = "- Strona ramy: /ramy/{$frame['slug']}";
+        }
+        $sections[] = "### RAMY DOSTĘPNE OSOBNO:\nTe ramy sprzedajemy samodzielnie, poza konfiguratorem roweru w całości. "
+            . "Zapytanie o ramę klient składa formularzem na stronie ramy.\n" . implode("\n", $frameLines);
+    }
+
+    // 4. ZREALIZOWANE PROJEKTY
+    // Portfolio faktycznie zbudowanych rowerów - najlepsza odpowiedź na
+    // pytanie "czy zbudujecie mi coś takiego", bo zawiera realne składy.
+    $projects = publicProjects($pdo)['projects'];
+    if ($projects !== []) {
+        $projectLines = [];
+        foreach ($projects as $project) {
+            $projectLines[] = "\n#### REALIZACJA: {$project['title']} (slug: {$project['slug']})";
+            if (!empty($project['short_description'])) {
+                $projectLines[] = '- Opis: ' . plainTextFromHtml((string) $project['short_description']);
+            }
+            if (!empty($project['completed_at'])) {
+                $projectLines[] = "- Data ukończenia: {$project['completed_at']}";
+            }
+            if (!empty($project['specification']) && is_array($project['specification'])) {
+                $components = [];
+                foreach ($project['specification'] as $item) {
+                    if (!is_array($item) || !isset($item['label'], $item['value'])) {
+                        continue;
+                    }
+                    $components[] = plainTextFromHtml((string) $item['label']) . ': ' . plainTextFromHtml((string) $item['value']);
+                }
+                if ($components !== []) {
+                    $projectLines[] = '- Użyte komponenty: ' . implode('; ', $components);
+                }
+            }
+            $projectLines[] = "- Strona realizacji: /realizacje/{$project['slug']}";
+        }
+        $sections[] = "### ZREALIZOWANE PROJEKTY:\nRowery i pojazdy faktycznie zbudowane przez Rexor. "
+            . "Używaj ich jako przykładów tego, co potrafimy złożyć - nie jako pozycji cennika.\n"
+            . implode("\n", $projectLines);
+    }
+
+    // 5. WIEDZA O ZASIĘGACH NA WATOGODZINĘ
     $sections[] = <<<RANGES
 ### DOKŁADNA WIEDZA O ZASIĘGACH NA WATOGODZINĘ (Wh/km) I ZUŻYCIU ENERGII:
 
@@ -193,13 +270,13 @@ function buildChatbotSystemPromptFromDb(PDO $pdo): string
    * Opony: Szerokie opony 2,6" z niskim ciśnieniem na asfalcie podnoszą opory toczenia.
 RANGES;
 
-    // 4. SERWIS
+    // 6. SERWIS
     if ($servicePage) {
-        $cleanContent = trim(preg_replace('/\s+/', ' ', strip_tags((string)$servicePage['content_html'])));
+        $cleanContent = plainTextFromHtml((string) $servicePage['content_html']);
         $sections[] = "### INFORMACJE O SERWISIE REXOR Z BAZY:\nTytuł: {$servicePage['title']}\nTreść: {$cleanContent}";
     }
 
-    // 5. ZASADY KONFIGURATORA
+    // 7. ZASADY KONFIGURATORA
     $sections[] = <<<RULES
 ### ZASADY KONFIGURATORA I CZĘŚCI KLIENTA:
 - Klient może skonfigurować rower na żywo pod adresem: /konfigurator?model={model_id}
@@ -207,7 +284,7 @@ RANGES;
 - Rexor montuje elementy klienta bez dodatkowej opłaty w ramach budowy roweru.
 RULES;
 
-    // 6. DODATKOWY KONTEKST Z PANELU ADMINA (opcjonalny, edytowalny bez redeployu)
+    // 8. DODATKOWY KONTEKST Z PANELU ADMINA (opcjonalny, edytowalny bez redeployu)
     if ($extraContext !== '') {
         $sections[] = "### DODATKOWY KONTEKST OD ADMINISTRATORA:\n{$extraContext}";
     }
