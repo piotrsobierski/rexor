@@ -242,6 +242,7 @@ export const defaultCopy = {
     assemblyLabel: 'Składanie',
     marginLabelPrefix: 'Narzut',
     totalGrossLabel: 'Razem brutto',
+    customerNotesTitle: 'Uwagi do zamówienia',
   },
   meta: {
     title: 'Konfigurator rowerów | Rexor Bikes',

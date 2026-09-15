@@ -203,6 +203,7 @@ function createConfiguration(PDO $pdo, array $input): array
         '<h1>Nowe zapytanie ofertowe</h1><p><strong>Klient:</strong> ' . htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' (' . htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ')</p>'
             . '<p><strong>Model:</strong> ' . htmlspecialchars($model['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ' (' . htmlspecialchars($size['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ')</p>'
             . "<p><strong>Cena:</strong> {$price}</p>"
+            . ($notes !== '' ? '<p><strong>Uwagi klienta:</strong><br />' . nl2br(htmlspecialchars($notes, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>' : '')
             . "<p><a href=\"{$shareUrl}\">Podgląd konfiguracji</a></p>"
             . '<p><a href="' . rtrim(envValue('FRONTEND_URL', envValue('APP_URL', 'http://localhost:3000')), '/') . "/admin/konfiguracje/{$publicId}\">Otwórz w panelu admina</a></p>"
     );
@@ -262,6 +263,21 @@ function logConfiguratorEvent(PDO $pdo, array $input): array
 }
 
 /**
+ * Uwagi klienta trzymamy w kolumnie `customer_notes`, a nie w migawce JSON —
+ * dzięki temu wracają też dla konfiguracji zapisanych, zanim zaczęliśmy je
+ * pokazywać. Doklejamy je do migawki, bo obie strony (podsumowanie klienta
+ * i podgląd w panelu) renderują ten sam obiekt.
+ */
+function withCustomerNotes(array $configuration): array
+{
+    $snapshot = json_decode($configuration['snapshot'], true, 64, JSON_THROW_ON_ERROR);
+    $notes = trim((string) ($configuration['customer_notes'] ?? ''));
+    $snapshot['customerNotes'] = $notes !== '' ? $notes : null;
+
+    return $snapshot;
+}
+
+/**
  * Podgląd konfiguracji dla panelu admina, po jawnym public_id — bez
  * sekretnego tokenu udostępniania. share_token/resume_token trzymamy w
  * bazie tylko jako skrót SHA-256 (jak reset hasła), więc admin nie może
@@ -270,7 +286,7 @@ function logConfiguratorEvent(PDO $pdo, array $input): array
  */
 function getConfigurationForAdmin(PDO $pdo, string $publicId): array
 {
-    $statement = $pdo->prepare('SELECT id, public_id, gross_total, snapshot, created_at FROM configurations WHERE public_id = :public_id LIMIT 1');
+    $statement = $pdo->prepare('SELECT id, public_id, gross_total, snapshot, customer_notes, created_at FROM configurations WHERE public_id = :public_id LIMIT 1');
     $statement->execute(['public_id' => $publicId]);
     $configuration = $statement->fetch();
     if (!$configuration) {
@@ -280,7 +296,7 @@ function getConfigurationForAdmin(PDO $pdo, string $publicId): array
         'publicId' => $configuration['public_id'],
         'grossTotal' => (float) $configuration['gross_total'],
         'createdAt' => $configuration['created_at'],
-        'configuration' => json_decode($configuration['snapshot'], true, 64, JSON_THROW_ON_ERROR),
+        'configuration' => withCustomerNotes($configuration),
     ];
 }
 
@@ -290,7 +306,7 @@ function getConfigurationByToken(PDO $pdo, string $token, string $kind): array
         throw new InvalidArgumentException('Nieprawidłowy link konfiguracji.');
     }
     $column = $kind === 'resume' ? 'resume_token_hash' : 'share_token_hash';
-    $statement = $pdo->prepare("SELECT id, public_id, gross_total, snapshot, created_at FROM configurations WHERE {$column} = :hash AND status <> 'archived' AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1");
+    $statement = $pdo->prepare("SELECT id, public_id, gross_total, snapshot, customer_notes, created_at FROM configurations WHERE {$column} = :hash AND status <> 'archived' AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1");
     $statement->execute(['hash' => hash('sha256', $token)]);
     $configuration = $statement->fetch();
     if (!$configuration) {
@@ -301,7 +317,7 @@ function getConfigurationByToken(PDO $pdo, string $token, string $kind): array
         'publicId' => $configuration['public_id'],
         'grossTotal' => (float) $configuration['gross_total'],
         'createdAt' => $configuration['created_at'],
-        'configuration' => json_decode($configuration['snapshot'], true, 64, JSON_THROW_ON_ERROR),
+        'configuration' => withCustomerNotes($configuration),
         'canResume' => $kind === 'resume',
     ];
 }
