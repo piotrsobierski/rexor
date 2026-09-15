@@ -59,6 +59,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PaintsEditor } from '@/components/admin-paints';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
@@ -434,6 +435,9 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
             <TabsTrigger value="parts" className="rounded-full px-4 py-2">
               Części i ceny
             </TabsTrigger>
+            <TabsTrigger value="paints" className="rounded-full px-4 py-2">
+              Lakiery
+            </TabsTrigger>
             <TabsTrigger value="batteries" className="rounded-full px-4 py-2">
               Baterie
             </TabsTrigger>
@@ -515,6 +519,15 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
               patch={patch}
               request={request}
               reload={loadCatalog}
+              setMessage={setMessage}
+            />
+          </TabsContent>
+          <TabsContent value="paints">
+            <PaintsEditor
+              token={token}
+              models={(catalog.models ?? []).map((row) => ({ slug: String(row.slug), name: String(row.name) }))}
+              frames={(catalog.frames ?? []).map((row) => ({ slug: String(row.slug), name: String(row.name) }))}
+              request={request}
               setMessage={setMessage}
             />
           </TabsContent>

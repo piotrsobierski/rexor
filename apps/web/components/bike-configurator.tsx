@@ -17,6 +17,8 @@ import { CUSTOMER_SUPPLIED_SKU, NONE_SKU, bikeModels, formatPrice, type BikeMode
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
 import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/pricing';
+import { PAINT_GROUP_SLUG, bestRender, findColor, paintImageUrl, usePaints, type PaintColor, type PaintSelection } from '@/lib/paints';
+import { PaintSection } from '@/components/paint-picker';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
 import type { SiteCopy } from '@/lib/copy';
@@ -87,6 +89,12 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   const [selectionsByModel, setSelectionsByModel] = useState<Record<string, Selections>>(() => Object.fromEntries(bikeModels.map((model) => [model.id, initialSelections(model)])));
   const [touchedModels, setTouchedModels] = useState<Record<string, true>>({});
   const [batteryByModel, setBatteryByModel] = useState<Record<string, string>>(() => Object.fromEntries(bikeModels.map((model) => [model.id, defaultBatteryCode(model)])));
+  // Wybór lakieru jest osobnym wymiarem konfiguracji, nie pozycją w grupie
+  // części, więc ma własny stan - i własny per model, tak jak reszta wyborów.
+  const [paintByModel, setPaintByModel] = useState<Record<string, PaintSelection | null>>({});
+  // Palety (680 kolorów) pobieramy dopiero przy pierwszym otwarciu wyboru
+  // koloru - katalog modeli nie ma po co ich wozić.
+  const [paintsRequested, setPaintsRequested] = useState(false);
   const model = models.find((item) => item.id === modelId) ?? models[0];
   const selections = selectionsByModel[model.id] ?? {};
   // Pakiet domyślny wyznacza cenę bazową modelu, więc każdy inny wybór liczy się
@@ -97,14 +105,27 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     ? (battery.name.includes('Wh') ? battery.name : `${battery.name} · ${formatEnergy(battery.energyWh)}`)
     : model.battery;
 
+  const { palettes, state: paintState } = usePaints(model.id, paintsRequested);
+  const paintSelection = paintByModel[model.id] ?? null;
+  const chosenPaint = findColor(palettes, paintSelection);
+  const paintPrice = chosenPaint?.color.priceGross ?? 0;
+
   const selectedSize = model.sizes.find((item) => item.code === size) ?? model.sizes[0] ?? null;
   // Cena liczona z tej samej formuły co API: rama, rozmiar, bateria, części,
   // składanie i narzut. Różnica względem ceny "od" jest tylko informacją.
   const pricing = useMemo(() => {
-    const result = configurationPricing(model, selections, battery ?? null, selectedSize);
+    const result = configurationPricing(model, selections, battery ?? null, selectedSize, paintPrice);
     const delta = result.total !== null && model.basePrice !== null ? Math.round((result.total - model.basePrice) * 100) / 100 : 0;
     return { total: result.total, delta };
-  }, [battery, model, selectedSize, selections]);
+  }, [battery, model, paintPrice, selectedSize, selections]);
+
+  // Render ramy w wybranym kolorze wchodzi na początek galerii, zamiast
+  // podmieniać scenę na stałe: klient nadal ma dostęp do zdjęć fabrycznych,
+  // a porównanie jest jednym ruchem karuzeli.
+  const gallery = useMemo(() => {
+    const render = chosenPaint ? bestRender(chosenPaint.color) : null;
+    return render ? [paintImageUrl(render.image), ...model.gallery] : model.gallery;
+  }, [chosenPaint, model.gallery]);
 
   // Grupy opcji przychodzą z API, więc domyślne wybory ustawiamy po ich
   // wczytaniu — ale tylko dla modeli, których klient jeszcze nie ruszył.
@@ -160,6 +181,13 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
             setBatteryByModel((current) => ({ ...current, [nextModel.id]: restoredBattery }));
           }
           setSelectionsByModel((current) => ({ ...current, [nextModel.id]: restored }));
+          // Lakier odtwarzamy z migawki po slugach; palety dociągają się
+          // asynchronicznie, więc wymuszamy też ich pobranie.
+          const restoredPaint = configuration.paint as { paletteSlug?: string; colorSlug?: string } | null;
+          if (restoredPaint?.paletteSlug && restoredPaint.colorSlug) {
+            setPaintsRequested(true);
+            setPaintByModel((current) => ({ ...current, [nextModel.id]: { paletteSlug: restoredPaint.paletteSlug!, colorSlug: restoredPaint.colorSlug! } }));
+          }
         })
         .catch(() => setSubmitError(copy.configurator.resumeError));
       return;
@@ -239,6 +267,30 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     logConfiguratorEvent(model.id, `group:${groupSlug}`, sku, group && choiceName ? `${group.name}: ${choiceName}` : undefined);
   }
 
+  /**
+   * Wybór koloru. Kolor z palety płatnej sam podnosi zakres lakierowania do
+   * opcji wymaganej przez paletę - inaczej dałoby się zestawić „lakierowanie
+   * standardowe” z lakierem Paint to Sample. API sprawdza tę samą regułę
+   * jeszcze raz, bo wycena nie może zależeć od stanu przeglądarki.
+   */
+  function choosePaint(next: PaintSelection | null, color: PaintColor | null) {
+    setTouchedModels((current) => ({ ...current, [model.id]: true }));
+    setPaintByModel((current) => ({ ...current, [model.id]: next }));
+    if (!next || !color) return;
+
+    const palette = palettes.find((item) => item.slug === next.paletteSlug);
+    const paintGroup = model.groups.find((item) => item.slug === PAINT_GROUP_SLUG);
+    const required = palette?.requiresPartSku ?? null;
+    if (required && paintGroup) {
+      const current = selections[PAINT_GROUP_SLUG] ?? paintGroup.defaultSku;
+      const available = paintGroup.options.some((option) => option.sku === required);
+      if (available && (current === null || current === paintGroup.defaultSku)) {
+        setSelectionsByModel((state) => ({ ...state, [model.id]: { ...state[model.id], [PAINT_GROUP_SLUG]: required } }));
+      }
+    }
+    logConfiguratorEvent(model.id, 'paint', `${next.paletteSlug}/${next.colorSlug}`, `Lakier: ${color.name}${palette ? ` (${palette.name})` : ''}`);
+  }
+
   async function submitConfiguration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!contact.privacyAccepted) { setSubmitError(copy.configurator.privacyRequiredError); setSubmitState('error'); return; }
@@ -257,6 +309,8 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           sizeCode: size,
           batteryCode: battery?.code ?? '',
           selections: selectionsPayload,
+          paintPaletteSlug: paintSelection?.paletteSlug ?? '',
+          paintColorSlug: paintSelection?.colorSlug ?? '',
           customerName: contact.customerName,
           customerEmail: contact.customerEmail,
           customerPhone: contact.customerPhone,
@@ -291,17 +345,17 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                 <p className="eyebrow">{model.eyebrow}</p>
                 <h2 className="mt-1 text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">{model.name}</h2>
               </div>
-              <span className="ml-auto rounded-full bg-ink-wash px-3 py-1.5 text-xs font-semibold tabular-nums text-ink-muted">{galleryIndex + 1} / {model.gallery.length}</span>
+              <span className="ml-auto rounded-full bg-ink-wash px-3 py-1.5 text-xs font-semibold tabular-nums text-ink-muted">{galleryIndex + 1} / {gallery.length}</span>
             </div>
-            <Carousel key={model.id} setApi={setCarouselApi} opts={{ loop: model.gallery.length > 1 }} aria-label={`Zdjęcia modelu ${model.name}`}>
+            <Carousel key={`${model.id}-${gallery[0] ?? ''}`} setApi={setCarouselApi} opts={{ loop: gallery.length > 1 }} aria-label={`Zdjęcia modelu ${model.name}`}>
               <CarouselContent className="ml-0">
-                {model.gallery.map((image, index) => <CarouselItem key={image} className="pl-0">
+                {gallery.map((image, index) => <CarouselItem key={image} className="pl-0">
                   <div className="stage-media p-4 sm:p-8">
-                    <img src={image} alt={`${model.name} — zdjęcie ${index + 1}`} loading={index === 0 ? 'eager' : 'lazy'} />
+                    <img src={image} alt={index === 0 && chosenPaint ? `${model.name} — wizualizacja w kolorze ${chosenPaint.color.name}` : `${model.name} — zdjęcie ${index + 1}`} loading={index === 0 ? 'eager' : 'lazy'} />
                   </div>
                 </CarouselItem>)}
               </CarouselContent>
-              {model.gallery.length > 1 && <><CarouselPrevious size="icon-lg" className="left-3 z-20 border-line bg-surface/90 shadow-md hover:bg-surface sm:left-5" /><CarouselNext size="icon-lg" className="right-3 z-20 border-line bg-surface/90 shadow-md hover:bg-surface sm:right-5" /></>}
+              {gallery.length > 1 && <><CarouselPrevious size="icon-lg" className="left-3 z-20 border-line bg-surface/90 shadow-md hover:bg-surface sm:left-5" /><CarouselNext size="icon-lg" className="right-3 z-20 border-line bg-surface/90 shadow-md hover:bg-surface sm:right-5" /></>}
             </Carousel>
             <div className="stage-bar border-t border-line">
               <span className="spec-pill"><Gauge /> {model.motor}</span>
@@ -396,8 +450,29 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
             {model.groups.filter((group) => group.selectionMode !== 'fixed').map((group, groupIndex) => {
               const choices = groupChoices(group, copy.configurator);
               const defaultPrice = groupDefaultPrice(group);
+              const heading = <div className="section-heading"><div><span>{String(groupIndex + (model.batteries.length > 0 ? 3 : 2)).padStart(2, '0')}</span><h3>{group.name}</h3></div><p>{group.helper}</p></div>;
+              // Lakierowanie ma własną sekcję: obok zakresu robót stoi wybór
+              // koloru, który nie jest częścią z cennika, tylko osobnym bytem.
+              if (group.slug === PAINT_GROUP_SLUG) {
+                return <section className="config-section" key={group.slug}>
+                  {heading}
+                  <PaintSection
+                    choices={choices.map(({ sku, name, detail, price }) => ({ sku, name, detail, price }))}
+                    defaultSku={group.defaultSku}
+                    selectedSku={selections[group.slug] ?? null}
+                    onChooseSku={(value) => choose(group.slug, value)}
+                    palettes={palettes}
+                    paintState={paintState}
+                    selection={paintSelection}
+                    onSelect={choosePaint}
+                    onOpen={() => setPaintsRequested(true)}
+                    formatPrice={formatPrice}
+                    includedLabel={copy.configurator.includedPrice}
+                  />
+                </section>;
+              }
               return <section className="config-section" key={group.slug}>
-                <div className="section-heading"><div><span>{String(groupIndex + (model.batteries.length > 0 ? 3 : 2)).padStart(2, '0')}</span><h3>{group.name}</h3></div><p>{group.helper}</p></div>
+                {heading}
                 <RadioGroup value={selections[group.slug] ?? ''} onValueChange={(value) => choose(group.slug, value)} className="gap-2">
                   {choices.map((choice) => { const selected = selections[group.slug] === choice.sku; const delta = choice.price === null ? null : choice.price - defaultPrice; return <label key={choice.sku} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}>
                     <RadioGroupItem value={choice.sku} className="choice-input" />

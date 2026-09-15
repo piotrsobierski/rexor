@@ -21,14 +21,18 @@ export function groupDefaultPrice(group: OptionGroup): number {
 
 /**
  * Ta sama formuła, którą liczy API w PricingService:
- * rama + rozmiar + bateria + części + składanie + narzut.
+ * rama + rozmiar + bateria + części + składanie + narzut + dopłata za lakier.
  * Konfigurator nie ma własnego cennika, a wysłaną wycenę przelicza serwer.
+ *
+ * `paintPrice` to dopłata za kolor z palety. Jest ceną sprzedaży, nie kosztem
+ * składnika, więc - tak samo jak w API - nie przechodzi przez narzut modelu.
  */
 export function configurationPricing(
   model: BikeModel,
   selections: Selections,
   battery: BikeBattery | null,
   size: BikeSize | null,
+  paintPrice = 0,
 ): { total: number | null; components: number; frame: number; quoteOnly: boolean } {
   let components = 0;
   let quoteOnly = false;
@@ -48,7 +52,9 @@ export function configurationPricing(
 
   const frame = model.framePriceGross + (size?.priceDelta ?? 0);
   const subtotal = frame + (battery?.grossPrice ?? 0) + components + model.assemblyPriceGross;
-  const total = quoteOnly || model.groups.length === 0 ? null : Math.round(subtotal * (1 + model.marginPercent / 100) * 100) / 100;
+  const total = quoteOnly || model.groups.length === 0
+    ? null
+    : Math.round((subtotal * (1 + model.marginPercent / 100) + paintPrice) * 100) / 100;
 
   return { total, components, frame, quoteOnly };
 }
