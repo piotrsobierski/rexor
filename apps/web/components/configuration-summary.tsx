@@ -2,22 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Copy, Mail } from 'lucide-react';
-import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ConfigurationSnapshotView, type Snapshot } from '@/components/configuration-snapshot-view';
 import { usePublicCopy } from '@/lib/use-public-copy';
+import { useRouteToken } from '@/lib/use-route-token';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
 export function ConfigurationSummary() {
-  // useParams() zostaje na placeholderze powłoki przy twardym wejściu (link
-  // udostępniony klientowi, nie nawigacja przez router) - patrz ten sam
-  // problem i wyjaśnienie w components/static-pages.tsx.
-  const pathname = usePathname();
-  const token = pathname.split('/').filter(Boolean).pop() ?? '';
+  // Token linku czytamy z realnego adresu, nie z routera - wyjaśnienie
+  // w lib/use-route-token.ts.
+  const token = useRouteToken();
   const copy = usePublicCopy();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
@@ -27,10 +25,14 @@ export function ConfigurationSummary() {
   useEffect(() => {
     setShareUrl(window.location.href);
     if (!token) return;
+    // Odpowiedź po zmianie tokenu ignorujemy, żeby spóźniona nie nadpisała nowej.
+    let active = true;
+    setError('');
     fetch(`${API_BASE}/configurations/share/${token}`)
       .then(async (response) => { const data = (await response.json()) as any; if (!response.ok) throw new Error(data.error ?? copy.summary.genericLoadError); return data; })
-      .then((data) => setSnapshot(data.configuration))
-      .catch((reason) => setError(reason instanceof Error ? reason.message : copy.summary.genericLoadError));
+      .then((data) => { if (active) setSnapshot(data.configuration); })
+      .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : copy.summary.genericLoadError); });
+    return () => { active = false; };
   // Odczytujemy tekst błędu raz, przy pierwszym pobraniu.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);

@@ -1,28 +1,30 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
 import { ConfigurationSnapshotView, type Snapshot } from '@/components/configuration-snapshot-view';
+import { useRouteToken } from '@/lib/use-route-token';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
 export function AdminConfigurationView() {
-  // useParams() zostaje na placeholderze powłoki przy twardym wejściu (link
-  // otwierany w nowej karcie z panelu, nie nawigacja przez router) - patrz
-  // ten sam problem i wyjaśnienie w components/static-pages.tsx.
-  const pathname = usePathname();
-  const publicId = pathname.split('/').filter(Boolean).pop() ?? '';
+  // public_id czytamy z realnego adresu, nie z routera - wyjaśnienie
+  // w lib/use-route-token.ts.
+  const publicId = useRouteToken();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!publicId) return;
     const token = sessionStorage.getItem('rexor_admin_token');
     if (!token) { setError('Zaloguj się w panelu administracyjnym, aby zobaczyć tę konfigurację.'); return; }
-    if (!publicId) return;
+    // Odpowiedź po zmianie public_id ignorujemy, żeby spóźniona nie nadpisała nowej.
+    let active = true;
+    setError('');
     fetch(`${API_BASE}/admin/configurations/${publicId}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(async (response) => { const data = (await response.json()) as any; if (!response.ok) throw new Error(data.error ?? 'Nie udało się otworzyć konfiguracji.'); return data; })
-      .then((data) => setSnapshot(data.configuration))
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Nie udało się otworzyć konfiguracji.'));
+      .then((data) => { if (active) setSnapshot(data.configuration); })
+      .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Nie udało się otworzyć konfiguracji.'); });
+    return () => { active = false; };
   }, [publicId]);
 
   return <div className="min-h-screen bg-[#f4f5f2]">
