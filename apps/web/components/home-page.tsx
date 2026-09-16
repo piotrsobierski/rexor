@@ -12,23 +12,37 @@ import { publicMediaUrl } from '@/lib/catalog-merge';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
 
-const categoryIcons = [
-  { slug: 'szosa', name: 'Szosa', description: 'Szybkość na asfalcie', icon: Route, empty: true },
-  { slug: 'gravel', name: 'Gravel', description: 'Asfalt, szuter, wyprawa', icon: Map, empty: false },
-  { slug: 'mtb', name: 'MTB', description: 'Kontrola poza asfaltem', icon: Mountain, empty: false },
-  { slug: 'miejski-turystyczny', name: 'Miejski i turystyczny', description: 'Komfort każdego dnia', icon: Bike, empty: true },
-  { slug: 'elektryczne', name: 'Pojazdy elektryczne', description: 'Moc i zasięg bez kompromisów', icon: Zap, empty: false },
-];
+/**
+ * Ikona i zapasowy opis dla kategorii startowych.
+ *
+ * Sama lista kategorii pochodzi z API, nie stąd: kategoria założona w panelu
+ * ma się pokazać bez builda. Wcześniej pasek kategorii brał tylko te pięć
+ * slugów, więc nowa kategoria nie pojawiała się na stronie głównej nigdy.
+ */
+const categoryIcons: Record<string, { icon: typeof Bike; description: string }> = {
+  szosa: { icon: Route, description: 'Szybkość na asfalcie' },
+  gravel: { icon: Map, description: 'Asfalt, szuter, wyprawa' },
+  mtb: { icon: Mountain, description: 'Kontrola poza asfaltem' },
+  'miejski-turystyczny': { icon: Bike, description: 'Komfort każdego dnia' },
+  elektryczne: { icon: Zap, description: 'Moc i zasięg bez kompromisów' },
+};
 
 export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
   const { models, categories: apiCategories, loaded } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
-  const visibleCategories = categoryIcons
-    .filter((fallback) => apiCategories.some((item) => item.slug === fallback.slug))
-    .map((fallback) => {
-      const stored = apiCategories.find((item) => item.slug === fallback.slug);
-      return { ...fallback, name: stored?.name ?? fallback.name, description: stored?.short_description ?? fallback.description, image: publicMediaUrl(stored?.default_image_path) };
-    });
+  // „Wkrótce" bierze się z katalogu, a nie z listy w kodzie: kategoria bez
+  // modeli dostaje znaczek, a gdy pierwszy model do niej trafi - znika sam.
+  const visibleCategories = apiCategories.map((category) => {
+    const known = categoryIcons[category.slug];
+    return {
+      slug: category.slug,
+      name: category.name,
+      description: category.short_description ?? known?.description ?? '',
+      icon: known?.icon ?? Bike,
+      empty: loaded && !models.some((model) => model.categorySlug === category.slug),
+      image: publicMediaUrl(category.default_image_path),
+    };
+  });
   return <div className="flex min-h-screen flex-col bg-background text-foreground"><SiteHeader /><main className="flex-1">
     <section className="mx-auto max-w-[1480px] px-4 pb-7 pt-10 sm:px-8 sm:pb-10 sm:pt-14 lg:px-12">
       <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
@@ -40,7 +54,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
     <section className="mx-auto max-w-[1480px] px-4 sm:px-8 lg:px-12">
       <Reveal delayMs={80} className="overflow-hidden rounded-[30px] border border-line bg-white">
         <div className="no-scrollbar flex snap-x overflow-x-auto">
-          {visibleCategories.map(({ slug, name, description, icon: Icon, empty, image }, idx) => <a key={name} href={`/rowery/${slug}`} className="group flex min-w-[58vw] snap-start flex-col border-r border-line last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1">
+          {visibleCategories.map(({ slug, name, description, icon: Icon, empty, image }, idx) => <a key={slug} href={`/rowery/${slug}`} className="group flex min-w-[58vw] snap-start flex-col border-r border-line last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1">
             <div className="relative aspect-[4/3] overflow-hidden bg-ink-wash">
               {image ? <OptimizedImage src={image} alt="" width={900} height={600} priority={idx === 0} loading={idx < 3 ? 'eager' : 'lazy'} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" /> : null}
               <div className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-colors duration-300 group-hover:bg-[var(--accent-brand)]"><Icon className="size-4.5 transition-transform duration-300 group-hover:rotate-6" /></div>
