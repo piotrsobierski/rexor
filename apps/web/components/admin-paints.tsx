@@ -244,9 +244,14 @@ function PalettesPanel({
   const activeFor = (rows: Availability[], productSlug: string, paletteSlug: string) =>
     rows.some((row) => row.product_slug === productSlug && row.palette_slug === paletteSlug && Number(row.is_active) === 1);
 
-  const availableNowhere = (paletteSlug: string) =>
-    !data.availability.models.some((row) => row.palette_slug === paletteSlug && Number(row.is_active) === 1)
-    && !data.availability.frames.some((row) => row.palette_slug === paletteSlug && Number(row.is_active) === 1);
+  // Licznik obok pól wyboru. Sam znaczek w gęstym rzędzie łatwo przeoczyć,
+  // a różnica „nigdzie" / „wszędzie" decyduje o tym, czy konfigurator pokaże
+  // paletę - więc stan musi dać się odczytać bez wpatrywania się w kwadraciki.
+  const activeCount = (paletteSlug: string) =>
+    models.filter((product) => activeFor(data.availability.models, product.slug, paletteSlug)).length
+    + frames.filter((product) => activeFor(data.availability.frames, product.slug, paletteSlug)).length;
+
+  const productCount = models.length + frames.length;
 
   return <section className="rounded-3xl border border-line bg-white p-5 sm:p-7">
     <h2 className="text-2xl font-semibold tracking-tight">Palety</h2>
@@ -283,7 +288,13 @@ function PalettesPanel({
 
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-3 text-sm">
             <span className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Dostępna w</span>
-            {availableNowhere(palette.slug) && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">nigdzie - konfigurator jej nie pokaże</span>}
+            {(() => {
+              const active = activeCount(palette.slug);
+              if (active === 0) return <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">nigdzie - konfigurator jej nie pokaże</span>;
+              return <span className="rounded-full bg-ink-wash px-2 py-0.5 text-xs text-ink-muted">
+                {active === productCount ? `wszędzie (${active}/${productCount})` : `${active}/${productCount} produktów`}
+              </span>;
+            })()}
             {models.map((product) => <label key={`m-${product.slug}`} className="flex items-center gap-1.5">
               <Checkbox
                 checked={activeFor(data.availability.models, product.slug, palette.slug)}
@@ -503,30 +514,32 @@ function RendersEditor({
       Render zależy od pary kolor + produkt: obraz ramy E55 nie pokaże tego lakieru na E82. Wariant „ultra” ma pierwszeństwo w konfiguratorze.
     </p>
 
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <NativeSelect value={target} onChange={(event) => setTarget(event.target.value)} className="h-10">
+    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <NativeSelect value={target} onChange={(event) => setTarget(event.target.value)} className="h-10 w-full sm:w-auto">
         {models.map((product) => <option key={`m-${product.slug}`} value={`model:${product.slug}`}>{product.name}</option>)}
         {frames.map((product) => <option key={`f-${product.slug}`} value={`frame:${product.slug}`}>rama: {product.name}</option>)}
       </NativeSelect>
-      <span className="text-xs text-ink-muted">
-        {showAll
-          ? `wszystkie rendery tego koloru (${renders.length})`
-          : `rendery dla: ${targetName} (${forTarget.length})`}
-      </span>
-      {elsewhere > 0 && <button
-        type="button"
-        onClick={() => setShowAll(!showAll)}
-        className="focus-ring rounded text-xs font-medium text-ink underline underline-offset-4"
-      >
-        {showAll ? 'pokaż tylko wybrany produkt' : `pokaż też ${elsewhere} dla innych produktów`}
-      </button>}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-xs text-ink-muted">
+          {showAll
+            ? `wszystkie rendery tego koloru (${renders.length})`
+            : `rendery dla: ${targetName} (${forTarget.length})`}
+        </span>
+        {elsewhere > 0 && <button
+          type="button"
+          onClick={() => setShowAll(!showAll)}
+          className="focus-ring rounded text-xs font-medium text-ink underline underline-offset-4"
+        >
+          {showAll ? 'pokaż tylko wybrany produkt' : `pokaż też ${elsewhere} dla innych produktów`}
+        </button>}
+      </div>
     </div>
 
-    <div className="mt-3 flex flex-wrap gap-3">
-      {visible.length === 0 && <p className="text-xs text-ink-muted">
+    <div className="mt-3 grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+      {visible.length === 0 && <p className="col-span-full text-xs text-ink-muted">
         Brak renderu tego koloru dla: {targetName}. Wgraj plik poniżej - trafi dokładnie do tej pary kolor + produkt.
       </p>}
-      {visible.map((render) => <div key={render.id} className="w-44 rounded-xl border border-line bg-white p-2">
+      {visible.map((render) => <div key={render.id} className="rounded-xl border border-line bg-white p-2">
         <button
           type="button"
           onClick={() => setPreview(render)}
@@ -546,16 +559,18 @@ function RendersEditor({
     {/* Wgrywanie idzie do produktu wybranego wyżej - jedna lista steruje
         i podglądem, i celem uploadu, żeby nie dało się wgrać renderu pod inny
         produkt, niż się właśnie ogląda. */}
-    <div className="mt-3 flex flex-wrap items-end gap-2">
+    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <span className="text-xs text-ink-muted">wgraj dla: <strong className="font-semibold text-ink">{targetName}</strong></span>
-      <NativeSelect value={variant} onChange={(event) => setVariant(event.target.value as 'standard' | 'ultra')} className="h-10">
-        <option value="standard">standard</option>
-        <option value="ultra">ultra</option>
-      </NativeSelect>
-      <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-line px-4 text-sm font-medium hover:border-line-strong">
-        <Upload className="size-4" /> {uploading ? 'Wgrywam…' : 'Wgraj render'}
-        <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ''; }} />
-      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <NativeSelect value={variant} onChange={(event) => setVariant(event.target.value as 'standard' | 'ultra')} className="h-10">
+          <option value="standard">standard</option>
+          <option value="ultra">ultra</option>
+        </NativeSelect>
+        <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-line px-4 text-sm font-medium hover:border-line-strong">
+          <Upload className="size-4" /> {uploading ? 'Wgrywam…' : 'Wgraj render'}
+          <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ''; }} />
+        </label>
+      </div>
     </div>
 
     <ImagePreviewDialog
