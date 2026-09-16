@@ -34,6 +34,15 @@ Skrót wdrożeniowy `php scripts/startup.php` uruchamia migracje z `--apply`. Sk
 
 ## Wykonane zmiany schematu poza migracją bazową
 
+- `031_test_frame_scott_spark.sql` (16 września 2026) - **dane testowe**: rama
+  „Scott Spark (rama testowa)" w kategorii MTB wraz z czterema zdjęciami
+  i kompletem palet lakierów. Tabela `frames` była pusta na dev i produkcji,
+  więc ani `/ramy`, ani seed `frame_paint_palettes` z migracji 030 nie miały na
+  czym zadziałać. Rama nie wiąże się z żadnym modelem - `frames` ma tylko
+  relację do `bike_categories`. Przed wdrożeniem na produkcję wpis trzeba
+  usunąć albo przestawić na `draft`: `DELETE FROM frames WHERE slug =
+  'scott-spark-test'` (kaskada sprząta `frame_media` i `frame_paint_palettes`).
+  Wykonana lokalnie na MySQL 8.0.
 - `029_paint_catalog.sql` (16 września 2026) - pełny katalog: 686 kolorów,
   457 renderów i 664 ścieżki zdjęć referencyjnych. Dane jadą migracją, bo
   `import-paints.php` potrzebuje Node.js i repozytorium `e55-paint-to-sample`,

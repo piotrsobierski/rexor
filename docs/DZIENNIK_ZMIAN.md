@@ -5,6 +5,41 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-16 — Rama testowa Scott Spark
+
+### Zakres
+
+Tabela `frames` była pusta, więc `/ramy`, `/ramy/{slug}` i seed
+`frame_paint_palettes` z migracji 030 nie miały na czym zadziałać - nie dało
+się sprawdzić listy ram, galerii ani palet lakierów dla ramy.
+
+### Rama
+
+Migracja `031` dodaje ramę „Scott Spark (rama testowa)" w kategorii MTB:
+cztery zdjęcia prywatnej konwersji Sparka na napęd CYC Motor, fakty, cena
+6900 zł i komplet aktywnych palet. Rama nie ma nic wspólnego z modelami
+konfiguratora - `frames` wiąże się wyłącznie z `bike_categories`, więc Scott
+Spark istnieje bez modelu „Spark".
+
+To dane testowe. Nazwa i slug mówią o tym wprost, żeby wpis rzucał się
+w oczy, gdyby dojechał na produkcję - `docs/MIGRACJE.md` podaje polecenie
+usuwające go.
+
+### Ścieżka zdjęć ram
+
+`publicMediaUrl()` mapowało na statyczny eksport tylko `/media/models/`
+i `/media/categories/`, więc `/media/frames/…` wracało bez zmiany i dawało 404.
+Doszła trzecia reguła, a trasa awaryjna `GET /media/…` w `index.php` przyjmuje
+teraz również `frames/`. Pliki leżą, jak zdjęcia modeli, w dwóch miejscach:
+`public/media/frames/` (dla PHP) i `apps/web/public/frames/` (dla eksportu).
+
+### Pliki
+
+`database/migrations/031_test_frame_scott_spark.sql`,
+`apps/web/lib/catalog-merge.ts`, `apps/api/public/index.php`,
+`public/media/frames/scott-spark/`, `apps/web/public/frames/scott-spark/`,
+`docs/MIGRACJE.md`.
+
 ## 2026-09-16 — Cennik lakieru, filtry grafik i kolory ram
 
 ### Zakres
