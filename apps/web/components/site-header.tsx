@@ -1,13 +1,16 @@
 'use client';
 
 import { ArrowRight, Menu, Settings } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { NavigationMenu, NavigationMenuItem, NavigationMenuLink, NavigationMenuList } from '@/components/ui/navigation-menu';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { usePublicCopy } from '@/lib/use-public-copy';
+import { cn } from '@/lib/utils';
 
 export function SiteHeader() {
   const copy = usePublicCopy();
+  const pathname = usePathname();
   const links = [
     { href: '/rowery', label: copy.nav.rowery },
     { href: '/ramy', label: copy.nav.ramy },
@@ -24,13 +27,22 @@ export function SiteHeader() {
 
         <NavigationMenu className="hidden lg:flex" aria-label="Nawigacja główna">
           <NavigationMenuList className="gap-2">
-            {links.map((link) => (
-              <NavigationMenuItem key={link.href}>
-                <NavigationMenuLink render={<a href={link.href} />} className="px-3 py-2 text-[0.92rem] text-ink-muted hover:bg-ink-wash hover:text-black">
-                  {link.label}
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-            ))}
+            {links.map((link) => {
+              const isActive = pathname === link.href || pathname?.startsWith(`${link.href}/`);
+              return (
+                <NavigationMenuItem key={link.href}>
+                  <NavigationMenuLink
+                    render={<a href={link.href} aria-current={isActive ? 'page' : undefined} />}
+                    className={cn(
+                      'relative px-3 py-2 text-[0.92rem] text-ink-muted hover:bg-ink-wash hover:text-black',
+                      isActive && 'text-black after:absolute after:inset-x-3 after:-bottom-px after:h-[2px] after:rounded-full after:bg-ink',
+                    )}
+                  >
+                    {link.label}
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              );
+            })}
           </NavigationMenuList>
         </NavigationMenu>
 
@@ -51,7 +63,18 @@ export function SiteHeader() {
               <SheetDescription className="sr-only">Nawigacja główna</SheetDescription>
             </SheetHeader>
             <nav className="grid gap-1 px-4 py-3 text-lg font-semibold">
-              {links.map((link) => <SheetClose key={link.href} render={<a href={link.href} className="rounded-xl px-3 py-3 hover:bg-ink-wash" />}>{link.label}</SheetClose>)}
+              {links.map((link) => {
+                const isActive = pathname === link.href || pathname?.startsWith(`${link.href}/`);
+                return (
+                  <SheetClose
+                    key={link.href}
+                    render={<a href={link.href} aria-current={isActive ? 'page' : undefined} />}
+                    className={cn('rounded-xl px-3 py-3 hover:bg-ink-wash', isActive && 'bg-ink-wash text-black')}
+                  >
+                    {link.label}
+                  </SheetClose>
+                );
+              })}
             </nav>
             <div className="mt-auto p-4">
               <Button render={<a href="/konfigurator" />} className="h-12 w-full rounded-full bg-ink text-white">
