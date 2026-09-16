@@ -109,9 +109,30 @@ cena malowania = opcja PROCESU              +  dopłata za KOLOR
 ```
 
 Dlaczego kolor omija narzut: dopłata za paletę jest **ceną sprzedaży**
-ustaloną wprost („PTS kosztuje 2500 zł"), a nie kosztem składnika, który
+ustaloną wprost („ten pigment kosztuje X"), a nie kosztem składnika, który
 dopiero trzeba obłożyć marżą. Mnożenie jej przez `margin_percent` dałoby cenę,
 której nikt nie ustalał.
+
+### Ile dziś kosztuje kolor: zero
+
+Obowiązujący cennik (migracja `030`) obsadza całą kwotę na osi procesu:
+
+| opcja z grupy `paint` | cena | co obejmuje |
+| --- | --- | --- |
+| Lakierowanie standardowe | 0 zł | kolor z palety producenta (`rexor-standard`) |
+| Lakierowanie jednokolorowe | +800 zł | **dowolny** kolor z palet Porsche PTS i Volkswagen |
+| Lakierowanie indywidualne | wycena | dwa kolory, przejścia, wzory - poza konfiguratorem |
+
+Wszystkie trzy palety mają więc `price_gross = 0`, a `porsche-pts`
+i `volkswagen` mają `requires_part_sku = 'paint-single-color'`. Klient płaci
+raz, za proces. Wcześniejsze 2500 zł przy palecie było założeniem roboczym
+i liczyło ten sam koszt dwa razy.
+
+Oś „dopłata za kolor" zostaje w schemacie mimo zerowych kwot, bo jest jedynym
+miejscem, gdzie da się wycenić **pojedynczy** lakier (rzadki pigment, płatek,
+paleta premium) bez tworzenia nowej opcji procesu. Interfejs pokazuje wtedy
+kwotę palety, a gdy jest zerowa - koszt wymaganego procesu, nigdy mylącego
+„w cenie" przy lakierze za 800 zł.
 
 Miejsce w formule całej wyceny (`PricingService::priceConfiguration`):
 
@@ -327,7 +348,7 @@ color_name_snapshot     „Riviera Blue"
 color_code_snapshot     „S8"
 color_hex_snapshot      „#359BD0"
 finish_snapshot         „uni"
-gross_price_snapshot    2500.00
+gross_price_snapshot    0.00     ← dopłata za sam kolor; proces siedzi w częściach
 render_path_snapshot    /media/paints/renders/e55/riviera-blue-s8-ultra.jpg
 color_id                → paint_colors  ON DELETE SET NULL
 ```
@@ -392,7 +413,7 @@ Punkty, w których architektura już przewiduje ruch, i czego każdy wymaga:
 
 | potrzeba | co dochodzi |
 |---|---|
-| picker na podstronie ramy | UI; `frame_paint_palettes` i API już działają |
+| picker na podstronie ramy | wyłącznie UI; `frame_paint_palettes` zasiane migracją `030`, `GET /api/paints/frame/{slug}` zwraca komplet palet |
 | trzeci rodzaj produktu | jeden wpis w whiteliście + bliźniacza tabela |
 | wykluczenie pojedynczego lakieru dla modelu | `model_paint_color_exclusions` + `NOT EXISTS` |
 | generowanie renderów AI | narzędzie **w panelu**, nie w konfiguratorze — inaczej wracają koszt, limity na IP i kilkanaście sekund ciszy u klienta |

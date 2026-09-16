@@ -34,6 +34,19 @@ Skrót wdrożeniowy `php scripts/startup.php` uruchamia migracje z `--apply`. Sk
 
 ## Wykonane zmiany schematu poza migracją bazową
 
+- `029_paint_catalog.sql` (16 września 2026) - pełny katalog: 686 kolorów,
+  457 renderów i 664 ścieżki zdjęć referencyjnych. Dane jadą migracją, bo
+  `import-paints.php` potrzebuje Node.js i repozytorium `e55-paint-to-sample`,
+  których na hostingu nie ma. Wiązania idą po slugach, nie po ID, więc plik
+  jest niezależny od `AUTO_INCREMENT` na docelowej bazie. Wykonana lokalnie na
+  MySQL 8.0.
+- `030_paint_pricing_and_frames.sql` (16 września 2026) - zeruje `price_gross`
+  palet Porsche i Volkswagen oraz nadpisania per produkt. Obowiązujący cennik:
+  „Lakierowanie standardowe" to kolor producenta, „Lakierowanie jednokolorowe"
+  (+800 zł) obejmuje dowolny kolor z obu palet, więc kolor nie może dokładać
+  drugiej opłaty. Migracja dopisuje też opisy opcji i zasiewa
+  `frame_paint_palettes` dla ram z `paint_available = TRUE` - migracja 028
+  zasiała dostępność tylko dla modeli. Wykonana lokalnie na MySQL 8.0.
 - `028_paint_colors.sql` (15 września 2026) - tabele `paint_palettes`,
   `paint_colors`, `model_paint_palettes`, `frame_paint_palettes`,
   `paint_renders` i `configuration_paint`, paleta fabryczna Rexor oraz palety

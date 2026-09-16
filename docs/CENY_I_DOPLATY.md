@@ -95,8 +95,10 @@ cena malowania = opcja procesu (część z grupy `paint`) + dopłata koloru (pal
 
 * **proces** to robocizna — „lakierowanie standardowe” albo „jednokolorowe”.
   Zwykła część w cenniku, rozliczana jak każda inna, z narzutem włącznie.
-* **kolor** to dostęp do lakieru — kolory Rexor 0 zł, Porsche Paint to Sample
-  i Volkswagen z dopłatą palety. Doliczany po narzucie.
+* **kolor** to dostęp do lakieru. Doliczany po narzucie, dziś wyzerowany:
+  „lakierowanie standardowe” obejmuje kolor producenta, a „jednokolorowe”
+  (+800 zł) dowolny kolor z palet Porsche PTS i Volkswagen. Oś zostaje na
+  wypadek pojedynczych lakierów droższych od reszty palety (migracja `030`).
 
 Kolejność źródeł ceny koloru:
 

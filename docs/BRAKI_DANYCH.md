@@ -14,10 +14,12 @@ są wpisane roboczo i czekają na decyzję właściciela:
 - **paleta fabryczna Rexor** - sześć kolorów w migracji `028` (surowy karbon,
   czarny mat, czarny połysk, biały, antracyt, czerwony) jest propozycją, nie
   ofertą. Potrzebna prawdziwa lista kolorów w cenie wraz z wykończeniem.
-- **dopłata za palety Porsche i Volkswagen** - przyjęto 2500 zł brutto jako
-  wartość roboczą. Trzeba ją oprzeć na realnym koszcie lakieru mieszanego na
-  zamówienie i czasie realizacji. Cena jest edytowalna w panelu, także osobno
-  dla pojedynczego lakieru i dla pojedynczego modelu.
+- ~~dopłata za palety Porsche i Volkswagen~~ - **rozstrzygnięte 16 września
+  2026 r.**: kolor nie ma własnej ceny. „Lakierowanie standardowe" to kolor
+  producenta, a „Lakierowanie jednokolorowe" (+800 zł) obejmuje dowolny kolor
+  z obu palet (migracja `030`). Do potwierdzenia zostaje, czy lakier mieszany
+  na zamówienie mieści się w 800 zł przy każdym odcieniu - jeśli nie, dopłatę
+  za pojedynczy lakier da się ustawić w panelu bez zmiany kodu.
 - **prawa do zdjęć referencyjnych** - 664 zdjęcia aut pochodzą z galerii
   Rennbow. Do czasu potwierdzenia praw są widoczne wyłącznie w panelu
   (`storage/paint-reference/`, trasa `GET /api/admin/paint-reference/…`).

@@ -27,7 +27,7 @@ Ustalone 11 września 2026 r.
 23. Kolory motywu są zmiennymi systemu projektowego zapisanymi w `site_settings` i edytowanymi w panelu, bez ręcznego poprawiania każdego komponentu.
 24. Podstrona Serwis jest normalną edytowalną stroną w `site_pages`; jej treść korzysta z tego samego WYSIWYG z obrazami co opisy modeli i kategorii.
 25. Do typowych interakcji używamy sprawdzonych komponentów systemu projektowego: przycisków, menu, karuzeli, dialogów, formularzy i tabel. Kod własny służy układowi oraz funkcjom specyficznym dla konfiguratora.
-26. Kolor lakieru jest osobnym bytem mapowanym na produkty przez paletę, a nie częścią w cenniku ani kolumną modelu. Grupa części `paint` wycenia proces lakierowania, paleta wycenia dostęp do lakieru; dopłata za kolor nie przechodzi przez narzut modelu.
+26. Kolor lakieru jest osobnym bytem mapowanym na produkty przez paletę, a nie częścią w cenniku ani kolumną modelu. Grupa części `paint` wycenia proces lakierowania, paleta wycenia dostęp do lakieru; dopłata za kolor nie przechodzi przez narzut modelu. Obowiązujący cennik obsadza całą kwotę na procesie: „lakierowanie standardowe” to kolor producenta, „jednokolorowe” (+800 zł) obejmuje dowolny kolor z palet Porsche i Volkswagen, a dopłata za paletę wynosi 0 zł i zostaje na wypadek pojedynczych droższych lakierów.
 27. Konfigurator prowadzi klienta do jednego koloru. Malowanie wielokolorowe, przejścia i wzory ustala obsługa na podstawie uwag przy zapisie projektu.
 28. Materiały wizualne pochodzące z cudzych galerii (dziś zdjęcia referencyjne lakierów) leżą poza katalogiem publicznym i są widoczne wyłącznie w panelu, dopóki właściciel nie potwierdzi praw i nie włączy publikacji per pozycja.
 

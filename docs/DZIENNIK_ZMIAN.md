@@ -5,6 +5,60 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-16 — Cennik lakieru, filtry grafik i kolory ram
+
+### Zakres
+
+Poprawki po pierwszym przejściu właściciela przez gotowy wybór koloru.
+
+### Cennik
+
+Kolor nie ma własnej ceny. „Lakierowanie standardowe" to kolor producenta,
+a „Lakierowanie jednokolorowe" (+800 zł) obejmuje dowolny kolor z palet
+Porsche PTS i Volkswagen. Robocze 2500 zł przy palecie liczyło ten sam koszt
+drugi raz, więc migracja `030` zeruje `price_gross` obu palet i nadpisania
+per produkt. Oś dopłaty za kolor zostaje w schemacie - jest jedynym miejscem,
+gdzie da się wycenić pojedynczy, rzadki lakier bez nowej opcji procesu.
+Interfejs przestał przez to pisać „w cenie" przy lakierze za 800 zł: pokazuje
+koszt wymaganego procesu (`paletteNote()` w `paint-picker.tsx`).
+
+### Rendery: filtr zamiast szukania kropki
+
+Renderów jest 457 na 686 kolorów, a jedyną oznaką był biały punkt na próbce.
+Picker dostał chip „Z wizualizacją" z licznikiem, panel - listę wyboru
+(wszystkie / z renderem / ze zdjęciem referencyjnym / z dowolną grafiką /
+bez grafiki) w miejsce pojedynczego checkboxa.
+
+### Rendery w panelu: pełny obraz zamiast kadru
+
+Kafelek renderu brał `thumb_path`, czyli miniaturę 96 px z importu, i kadrował
+ją przez `object-cover` - stąd wrażenie mocnego zoomu. Teraz bierze pełny plik
+z `object-contain`, a klik otwiera podgląd na pełnym ekranie
+(`ImagePreviewDialog`).
+
+### Ramy
+
+Migracja `028` zasiała dostępność palet tylko dla modeli, więc
+`frame_paint_palettes` było puste i `GET /api/paints/frame/{slug}` zwracało
+pustą listę mimo gotowego schematu. Migracja `030` zasiewa ramy z
+`paint_available = TRUE`. Picker na podstronie ramy nadal czeka na decyzję.
+
+### Dostępność palet
+
+`activeFor()` w panelu porównywało `is_active === 1`, co odznaczało wszystkie
+pola, gdy PDO zwracał `'1'` jako tekst (zależnie od emulacji przygotowanych
+zapytań na hostingu). Porównanie idzie teraz przez `Number()`. Paleta
+niedostępna nigdzie dostała wyraźną etykietę, a konfigurator przy zerowej
+liczbie palet nie pokazuje już pustego wyboru koloru, tylko informację, że
+kolor ustalamy indywidualnie.
+
+### Pliki
+
+`database/migrations/030_paint_pricing_and_frames.sql`,
+`apps/web/components/paint-picker.tsx`,
+`apps/web/components/admin-paints.tsx`,
+`docs/ARCHITEKTURA_LAKIEROW.md`, `docs/BRAKI_DANYCH.md`, `docs/MIGRACJE.md`.
+
 ## 2026-09-15 — Wybór koloru lakieru w konfiguratorze
 
 ### Zakres
