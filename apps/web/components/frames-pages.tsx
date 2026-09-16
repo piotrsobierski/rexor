@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { ArrowRight, ExternalLink, PaintBucket } from 'lucide-react';
+import { ArrowRight, ExternalLink, PaintBucket, Palette } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -14,6 +14,8 @@ import { frameHref, type ApiFrame, type PublicFrame } from '@/lib/frames';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
 import { usePublicFrame, usePublicFrames } from '@/lib/use-public-frames';
+import { PaintDialog } from '@/components/paint-picker';
+import { bestRender, usePaints } from '@/lib/paints';
 import type { SiteCopy } from '@/lib/copy';
 
 const priceLabel = (frame: { price_gross: number | null }, copy: SiteCopy) =>
@@ -187,6 +189,8 @@ function FrameDetail({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
         )}
       </div>
 
+      {frame.paint_available && <FramePaints frame={frame} copy={copy} />}
+
       <div className="mt-16 border-t border-line pt-12">
         <div className="max-w-2xl rounded-[28px] border border-line bg-white p-6 sm:p-8">
           <ContactForm
@@ -203,4 +207,92 @@ function FrameDetail({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
       </div>
     </section>
   );
+}
+
+/**
+ * Przeglądanie kolorów przy ramie.
+ *
+ * Rama nie jest konfiguratorem - nie ma tu wyboru, który wchodziłby do wyceny,
+ * bo zakres lakierowania ustalamy w rozmowie. Klient ma jednak zobaczyć, co
+ * w ogóle jest do wzięcia, więc otwieramy tę samą przeglądarkę co
+ * w konfiguratorze, w trybie „browse".
+ *
+ * Palety (ok. 690 kolorów) pobieramy dopiero po kliknięciu: podstrona ramy nie
+ * ma po co ich wozić przy każdym wejściu.
+ */
+function FramePaints({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
+  const [requested, setRequested] = useState(false);
+  const [open, setOpen] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const { palettes, state } = usePaints('frame', frame.slug, requested);
+
+  // Sekcja siedzi pod geometrią, więc kto do niej doscrollował, ten kolory
+  // ogląda - pobieramy je wtedy, żeby próbki były na miejscu przed kliknięciem,
+  // ale nie przy każdym wejściu na podstronę.
+  useEffect(() => {
+    if (requested) return;
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') { setRequested(true); return; }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) { setRequested(true); observer.disconnect(); }
+    }, { rootMargin: '200px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [requested]);
+
+  const colorCount = palettes.reduce((sum, palette) => sum + palette.colors.length, 0);
+  const renderCount = palettes.reduce(
+    (sum, palette) => sum + palette.colors.filter((color) => bestRender(color) !== null).length,
+    0,
+  );
+  const empty = state === 'ready' && palettes.length === 0;
+
+  return <div ref={sectionRef} className="mt-16 border-t border-line pt-12">
+    <p className="eyebrow">{copy.frames.paintSectionTitle}</p>
+    <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{copy.frames.paintSectionTitle}</h2>
+    <p className="mt-4 max-w-3xl text-base leading-relaxed text-ink-muted">{copy.frames.paintSectionText}</p>
+
+    {empty ? <p className="mt-6 max-w-3xl rounded-2xl bg-[var(--muted)] p-6 text-sm text-ink-muted">{copy.frames.paintBrowseEmpty}</p> : <>
+      {palettes.length > 0 && <div className="mt-6 flex flex-wrap gap-3">
+        {palettes.map((palette) => <div key={palette.slug} className="rounded-2xl border border-line bg-white p-4">
+          <p className="font-semibold">{palette.name}</p>
+          <p className="mt-0.5 text-xs text-ink-muted">{palette.colors.length} kolorów</p>
+          <div className="mt-3 flex gap-1.5">
+            {palette.colors.slice(0, 8).map((color) => <span
+              key={color.slug}
+              title={color.name}
+              className="size-6 rounded-md border border-line"
+              style={{ backgroundColor: color.hex }}
+            />)}
+          </div>
+        </div>)}
+      </div>}
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 rounded-full"
+          disabled={state === 'loading'}
+          onClick={() => { setRequested(true); setOpen(true); }}
+        >
+          {state === 'loading' ? copy.frames.paintBrowseLoading : copy.frames.paintBrowseCta}
+          {state === 'loading' ? <Spinner data-icon="inline-end" className="size-4" /> : <Palette data-icon="inline-end" />}
+        </Button>
+        {colorCount > 0 && <span className="text-sm text-ink-muted">
+          {colorCount} kolorów{renderCount > 0 ? `, ${renderCount} z wizualizacją` : ''}
+        </span>}
+        {state === 'error' && <span className="text-sm text-ink-muted">Nie udało się pobrać palet. Odśwież stronę i spróbuj ponownie.</span>}
+      </div>
+    </>}
+
+    <PaintDialog
+      open={open}
+      onOpenChange={setOpen}
+      palettes={palettes}
+      paintState={state}
+      mode="browse"
+      title={copy.frames.paintBrowseDialogTitle}
+    />
+  </div>;
 }

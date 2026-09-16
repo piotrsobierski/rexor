@@ -91,16 +91,20 @@ export function searchColors(palettes: PaintPalette[], query: string, paletteSlu
  * Palety pobieramy osobnym żądaniem i dopiero wtedy, gdy są potrzebne:
  * 680 kolorów nie ma po co jechać razem z katalogiem na stronę główną.
  * `enabled` pozwala odłożyć pobranie do pierwszego otwarcia wyboru koloru.
+ *
+ * `resource` rozstrzyga, o co pytamy API: modele mają własną listę palet,
+ * ramy własną (`model_paint_palettes` vs `frame_paint_palettes`), więc rama
+ * sprzedawana osobno pokazuje dokładnie to, co dla niej włączono w panelu.
  */
-export function usePaints(modelSlug: string | null, enabled: boolean) {
+export function usePaints(resource: 'model' | 'frame', slug: string | null, enabled: boolean) {
   const [palettes, setPalettes] = useState<PaintPalette[]>([]);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
   useEffect(() => {
-    if (!enabled || !modelSlug) return;
+    if (!enabled || !slug) return;
     let active = true;
     setState('loading');
-    fetch(`${API_BASE}/paints/model/${modelSlug}`)
+    fetch(`${API_BASE}/paints/${resource}/${slug}`)
       .then(async (response) => {
         if (!response.ok) throw new Error('paints');
         return response.json() as Promise<{ palettes: PaintPalette[] }>;
@@ -116,7 +120,7 @@ export function usePaints(modelSlug: string | null, enabled: boolean) {
         setState('error');
       });
     return () => { active = false; };
-  }, [modelSlug, enabled]);
+  }, [resource, slug, enabled]);
 
   return { palettes, state };
 }

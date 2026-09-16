@@ -109,7 +109,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     ? (battery.name.includes('Wh') ? battery.name : `${battery.name} · ${formatEnergy(battery.energyWh)}`)
     : model.battery;
 
-  const { palettes, state: paintState } = usePaints(model.id, paintsRequested);
+  const { palettes, state: paintState } = usePaints('model', model.id, paintsRequested);
   const paintSelection = paintByModel[model.id] ?? null;
   const chosenPaint = findColor(palettes, paintSelection);
   const paintPrice = chosenPaint?.color.priceGross ?? 0;

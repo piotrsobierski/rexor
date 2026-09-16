@@ -190,27 +190,46 @@ function paletteNote(
   return includedLabel;
 }
 
-function PaintDialog({
+/**
+ * Przeglądarka lakierów. Dwa tryby, jeden komponent:
+ *
+ * - `select` (konfigurator) - kolor się wybiera, więc widać cenę i przyciski
+ *   potwierdzenia;
+ * - `browse` (podstrona ramy) - kolor się tylko ogląda. Rama nie jest
+ *   konfiguratorem: zakres lakierowania ustalamy w rozmowie, więc pokazywanie
+ *   ceny procesu wprowadzałoby w błąd.
+ *
+ * Wyszukiwanie, filtry, siatka i powiększenie są wspólne - klient, który
+ * obejrzał kolory przy ramie, znajduje dokładnie ten sam ekran w konfiguratorze.
+ */
+export function PaintDialog({
   open,
   onOpenChange,
   palettes,
   paintState,
-  selection,
+  selection = null,
   onConfirm,
   formatPrice,
-  includedLabel,
-  requirementFor,
+  includedLabel = '',
+  requirementFor = () => null,
+  mode = 'select',
+  title,
+  description,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   palettes: PaintPalette[];
   paintState: 'idle' | 'loading' | 'ready' | 'error';
-  selection: PaintSelection | null;
-  onConfirm: (selection: PaintSelection, color: PaintColor) => void;
-  formatPrice: (value: number) => string;
-  includedLabel: string;
-  requirementFor: (palette: PaintPalette) => PaintRequirement;
+  selection?: PaintSelection | null;
+  onConfirm?: (selection: PaintSelection, color: PaintColor) => void;
+  formatPrice?: (value: number) => string;
+  includedLabel?: string;
+  requirementFor?: (palette: PaintPalette) => PaintRequirement;
+  mode?: 'select' | 'browse';
+  title?: string;
+  description?: string;
 }) {
+  const selecting = mode === 'select';
   const [query, setQuery] = useState('');
   const [paletteFilter, setPaletteFilter] = useState<string | null>(null);
   // Panel podglądu ma ok. 340 px, więc render roweru jest tam znaczkiem.
@@ -270,14 +289,16 @@ function PaintDialog({
       onKeyDown={(event) => {
         if (event.key === 'ArrowRight') { event.preventDefault(); step(1); }
         if (event.key === 'ArrowLeft') { event.preventDefault(); step(-1); }
-        if (event.key === 'Enter' && previewed) { event.preventDefault(); onConfirm(preview!, previewed.color); }
+        if (event.key === 'Enter' && previewed && selecting && onConfirm) { event.preventDefault(); onConfirm(preview!, previewed.color); }
       }}
     >
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-6">
         <div className="min-w-0">
-          <DialogTitle className="text-lg font-semibold tracking-tight text-ink">Kolor lakieru</DialogTitle>
+          <DialogTitle className="text-lg font-semibold tracking-tight text-ink">{title ?? 'Kolor lakieru'}</DialogTitle>
           <DialogDescription className="text-xs text-ink-muted">
-            {paintState === 'loading' ? 'Wczytuję palety…' : `${results.length} lakierów do wyboru`}
+            {paintState === 'loading'
+              ? 'Wczytuję palety…'
+              : description ?? `${results.length} lakierów ${selecting ? 'do wyboru' : 'do obejrzenia'}`}
           </DialogDescription>
         </div>
         <DialogClose render={<Button variant="ghost" size="icon" aria-label="Zamknij" />}><X className="size-5" /></DialogClose>
@@ -298,7 +319,9 @@ function PaintDialog({
           <FilterChip active={paletteFilter === null} onClick={() => setPaletteFilter(null)}>Wszystkie</FilterChip>
           {palettes.map((palette) => <FilterChip key={palette.slug} active={paletteFilter === palette.slug} onClick={() => setPaletteFilter(palette.slug)}>
             {palette.name}
-            <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{paletteNote(palette, requirementFor(palette), formatPrice, includedLabel)}</span>
+            {selecting && formatPrice
+              ? <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{paletteNote(palette, requirementFor(palette), formatPrice, includedLabel)}</span>
+              : <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{palette.colors.length}</span>}
           </FilterChip>)}
           {renderCount > 0 && <FilterChip active={onlyWithRender} onClick={() => setOnlyWithRender(!onlyWithRender)}>
             <Camera className="mr-1.5 inline size-3.5 align-[-2px]" />
@@ -361,10 +384,10 @@ function PaintDialog({
                 {previewed.palette.name}
                 {previewed.color.code ? ` · ${previewed.color.code}` : ''} · {FINISH_LABELS[previewed.color.finish]}
               </p>
-              <p className="mt-2 text-base font-semibold tabular-nums">
+              {selecting && formatPrice && <p className="mt-2 text-base font-semibold tabular-nums">
                 {paletteNote(previewed.palette, requirementFor(previewed.palette), formatPrice, includedLabel, previewed.color.priceGross)}
-              </p>
-              {requirementFor(previewed.palette) && <p className="mt-1 text-xs text-ink-muted">
+              </p>}
+              {selecting && requirementFor(previewed.palette) && <p className="mt-1 text-xs text-ink-muted">
                 Ten lakier wymaga opcji „{requirementFor(previewed.palette)!.name}” - ustawimy ją automatycznie po wyborze koloru.
               </p>}
               <p className="mt-2 text-[11px] leading-relaxed text-ink-subtle">
@@ -372,20 +395,20 @@ function PaintDialog({
                   ? 'Wizualizacja poglądowa przygotowana komputerowo. Rzeczywisty odcień lakieru może się różnić od obrazu na ekranie.'
                   : 'Dla tego lakieru nie mamy jeszcze wizualizacji na ramie. Próbka pokazuje przybliżony odcień — realny kolor potwierdzimy wzornikiem.'}
               </p>
-              <Button
+              {selecting && onConfirm && <Button
                 type="button"
                 variant="brand"
                 className="mt-4 hidden h-11 w-full rounded-full font-semibold sm:flex"
                 onClick={() => onConfirm({ paletteSlug: previewed.palette.slug, colorSlug: previewed.color.slug }, previewed.color)}
               >
                 Wybierz ten kolor
-              </Button>
+              </Button>}
             </div>
           </div> : <p className="text-sm text-ink-muted">Wskaż lakier z listy, żeby zobaczyć podgląd.</p>}
         </aside>
       </div>
 
-      {previewed && <div className="border-t border-line p-4 sm:hidden">
+      {previewed && selecting && onConfirm && <div className="border-t border-line p-4 sm:hidden">
         <Button
           type="button"
           variant="brand"

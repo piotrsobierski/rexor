@@ -5,6 +5,36 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-16 — Przeglądanie kolorów na podstronie ramy
+
+### Zakres
+
+Podstrona ramy nie pokazywała kolorów w ogóle, mimo że `frame_paint_palettes`
+i `GET /api/paints/frame/{slug}` działały od migracji 030.
+
+### Tryb „browse" zamiast drugiego komponentu
+
+`PaintDialog` dostał tryb: `select` (konfigurator - cena i potwierdzenie)
+oraz `browse` (rama - samo oglądanie). Wyszukiwarka, filtry, siatka
+i powiększenie są wspólne, więc klient, który obejrzał kolory przy ramie,
+znajduje ten sam ekran w konfiguratorze. Rama nie jest konfiguratorem: wybór
+nie wchodzi do wyceny, a zakres lakierowania ustalamy w rozmowie, dlatego
+w trybie `browse` nie pokazujemy ceny procesu.
+
+### Pobieranie palet
+
+`usePaints` przyjmuje teraz `resource` (`model` albo `frame`) i pyta właściwą
+trasę - modele i ramy mają osobne tabele dostępności. Na podstronie ramy palety
+dociągamy, gdy sekcja wchodzi w widok (`IntersectionObserver`, margines 200 px):
+próbki są na miejscu przed kliknięciem, ale 690 kolorów nie jedzie przy każdym
+wejściu na stronę.
+
+### Pliki
+
+`apps/web/components/frames-pages.tsx`, `apps/web/components/paint-picker.tsx`,
+`apps/web/components/bike-configurator.tsx`, `apps/web/lib/paints.ts`,
+`apps/web/lib/copy.ts`.
+
 ## 2026-09-16 — Poprawki po przeglądzie wyboru koloru
 
 ### Dopłata za lakierowanie nie wracała w dół
