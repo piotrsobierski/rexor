@@ -5,6 +5,39 @@ Nowe wpisy dopisujemy na górze.
 
 ---
 
+## 2026-09-16 — Poprawki po przeglądzie wyboru koloru
+
+### Dopłata za lakierowanie nie wracała w dół
+
+Wybór koloru z palety płatnej podnosi zakres lakierowania do wymaganego SKU,
+ale powrót na paletę bez wymagań nic nie cofał - po zmianie Porsche → Rexor
+konfigurator dalej liczył +800 zł przy etykiecie „w cenie". Doszła pamięć
+`paintAutoPartByModel`: cofamy tylko to, co sami podnieśliśmy. Ręczny wybór
+zakresu przez klienta kasuje ten znacznik, więc żadna zmiana koloru go nie
+nadpisze.
+
+### Powiększenie wizualizacji w pickerze
+
+Panel podglądu ma ok. 340 px, więc render roweru był tam znaczkiem i nie dało
+się go obejrzeć. Render jest teraz przyciskiem otwierającym warstwę nad
+modalem; Escape zamyka powiększenie, nie cały picker.
+
+### Rendery w panelu idą za wyborem produktu
+
+Lista renderów przy kolorze pokazywała wszystkie rendery tego koloru, więc
+przełączenie modelu nie zmieniało nic - wyglądało to jak brak przeładowania.
+Lista filtruje się teraz po wybranym produkcie, ta sama lista wyboru steruje
+celem wgrywania, a rendery innych produktów da się dołączyć jednym kliknięciem.
+Przy okazji `docs/ARCHITEKTURA_LAKIEROW.md` notuje, czemu render wisi na parze
+kolor × produkt, a nie na osobnej palecie per model.
+
+### Pliki
+
+`apps/web/components/bike-configurator.tsx`,
+`apps/web/components/paint-picker.tsx`,
+`apps/web/components/admin-paints.tsx`,
+`docs/ARCHITEKTURA_LAKIEROW.md`.
+
 ## 2026-09-16 — Rama testowa Scott Spark
 
 ### Zakres

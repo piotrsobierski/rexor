@@ -254,6 +254,19 @@ Render ramy E55 nie pokazuje, jak lakier wygląda na E82 — dlatego
 `paint_renders` ma `model_id` / `frame_id`, a zdjęcie auta jest wspólne dla
 wszystkich produktów i siedzi wprost przy kolorze.
 
+Rozważaliśmy tańszy wariant: żadnego `model_id`, a osobne rendery dla innego
+roweru robi się przez osobną **paletę** przypiętą tylko do tego modelu.
+Odrzucony, bo paleta odpowiada na pytanie „jakie kolory wolno tu wybrać", a nie
+„jak ten kolor wygląda na tej ramie". Rozdzielenie palet per model dawałoby
+686 kolorów powielonych tyle razy, ile mamy produktów, każdy ze swoim wpisem
+dostępności i własną ceną do pilnowania — a i tak trzeba by czegoś, co wiąże
+render z produktem. Klucz `(color_id, produkt, variant)` robi to wprost
+i zostawia paletę przy jej jednej roli.
+
+Konsekwencja dla panelu: lista renderów przy kolorze idzie za wyborem produktu.
+Bez tego pokazywała komplet renderów koloru i przełączenie modelu nic nie
+zmieniało, co wyglądało jak brak przeładowania.
+
 ### Ścieżki plików zamiast wierszy w `media`
 
 Rendery **nie** są wpisywane do tabeli `media`. To setki obrazów generowanych

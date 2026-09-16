@@ -461,9 +461,22 @@ function RendersEditor({
   const [variant, setVariant] = useState<'standard' | 'ultra'>('standard');
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<Render | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  // Render należy do pary kolor + produkt, więc lista musi iść za wyborem
+  // produktu. Wcześniej pokazywała wszystkie rendery koloru niezależnie od
+  // tego, co było wybrane w liście - przełączenie modelu nie zmieniało nic.
+  const [targetResource, targetSlug] = target.split(':');
+  const forTarget = renders.filter((render) => (targetResource === 'model'
+    ? render.modelSlug === targetSlug
+    : render.frameSlug === targetSlug));
+  const visible = showAll ? renders : forTarget;
+  const elsewhere = renders.length - forTarget.length;
+  const targetName = (targetResource === 'model' ? models : frames).find((product) => product.slug === targetSlug)?.name ?? targetSlug;
 
   async function upload(file: File) {
-    const [resource, slug] = target.split(':');
+    const resource = targetResource;
+    const slug = targetSlug;
     if (!slug) { setMessage('Wskaż model albo ramę dla renderu.'); return; }
     setUploading(true);
     try {
@@ -490,8 +503,30 @@ function RendersEditor({
       Render zależy od pary kolor + produkt: obraz ramy E55 nie pokaże tego lakieru na E82. Wariant „ultra” ma pierwszeństwo w konfiguratorze.
     </p>
 
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <NativeSelect value={target} onChange={(event) => setTarget(event.target.value)} className="h-10">
+        {models.map((product) => <option key={`m-${product.slug}`} value={`model:${product.slug}`}>{product.name}</option>)}
+        {frames.map((product) => <option key={`f-${product.slug}`} value={`frame:${product.slug}`}>rama: {product.name}</option>)}
+      </NativeSelect>
+      <span className="text-xs text-ink-muted">
+        {showAll
+          ? `wszystkie rendery tego koloru (${renders.length})`
+          : `rendery dla: ${targetName} (${forTarget.length})`}
+      </span>
+      {elsewhere > 0 && <button
+        type="button"
+        onClick={() => setShowAll(!showAll)}
+        className="focus-ring rounded text-xs font-medium text-ink underline underline-offset-4"
+      >
+        {showAll ? 'pokaż tylko wybrany produkt' : `pokaż też ${elsewhere} dla innych produktów`}
+      </button>}
+    </div>
+
     <div className="mt-3 flex flex-wrap gap-3">
-      {renders.map((render) => <div key={render.id} className="w-44 rounded-xl border border-line bg-white p-2">
+      {visible.length === 0 && <p className="text-xs text-ink-muted">
+        Brak renderu tego koloru dla: {targetName}. Wgraj plik poniżej - trafi dokładnie do tej pary kolor + produkt.
+      </p>}
+      {visible.map((render) => <div key={render.id} className="w-44 rounded-xl border border-line bg-white p-2">
         <button
           type="button"
           onClick={() => setPreview(render)}
@@ -508,11 +543,11 @@ function RendersEditor({
       </div>)}
     </div>
 
+    {/* Wgrywanie idzie do produktu wybranego wyżej - jedna lista steruje
+        i podglądem, i celem uploadu, żeby nie dało się wgrać renderu pod inny
+        produkt, niż się właśnie ogląda. */}
     <div className="mt-3 flex flex-wrap items-end gap-2">
-      <NativeSelect value={target} onChange={(event) => setTarget(event.target.value)} className="h-10">
-        {models.map((product) => <option key={`m-${product.slug}`} value={`model:${product.slug}`}>{product.name}</option>)}
-        {frames.map((product) => <option key={`f-${product.slug}`} value={`frame:${product.slug}`}>rama: {product.name}</option>)}
-      </NativeSelect>
+      <span className="text-xs text-ink-muted">wgraj dla: <strong className="font-semibold text-ink">{targetName}</strong></span>
       <NativeSelect value={variant} onChange={(event) => setVariant(event.target.value as 'standard' | 'ultra')} className="h-10">
         <option value="standard">standard</option>
         <option value="ultra">ultra</option>
