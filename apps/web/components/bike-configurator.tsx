@@ -92,6 +92,10 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   // Wybór lakieru jest osobnym wymiarem konfiguracji, nie pozycją w grupie
   // części, więc ma własny stan - i własny per model, tak jak reszta wyborów.
   const [paintByModel, setPaintByModel] = useState<Record<string, PaintSelection | null>>({});
+  // SKU lakierowania, które podniósł za klienta wybór palety płatnej. Bez tej
+  // pamięci nie da się odróżnić „podnieśliśmy sami" od „klient tak wybrał",
+  // więc powrót na paletę bez wymagań zostawiał dopłatę za proces.
+  const [paintAutoPartByModel, setPaintAutoPartByModel] = useState<Record<string, string | null>>({});
   // Palety (680 kolorów) pobieramy dopiero przy pierwszym otwarciu wyboru
   // koloru - katalog modeli nie ma po co ich wozić.
   const [paintsRequested, setPaintsRequested] = useState(false);
@@ -262,6 +266,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   function choose(groupSlug: string, sku: string) {
     setTouchedModels((current) => ({ ...current, [model.id]: true }));
     setSelectionsByModel((current) => ({ ...current, [model.id]: { ...current[model.id], [groupSlug]: sku } }));
+    // Ręczny wybór zakresu lakierowania przestaje być „nasz": od tej chwili
+    // zmiana koloru go nie cofa (patrz choosePaint).
+    if (groupSlug === PAINT_GROUP_SLUG) setPaintAutoPartByModel((current) => ({ ...current, [model.id]: null }));
     const group = model.groups.find((item) => item.slug === groupSlug);
     const choiceName = group ? groupChoices(group, copy.configurator).find((item) => item.sku === sku)?.name : undefined;
     logConfiguratorEvent(model.id, `group:${groupSlug}`, sku, group && choiceName ? `${group.name}: ${choiceName}` : undefined);
@@ -272,6 +279,10 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
    * opcji wymaganej przez paletę - inaczej dałoby się zestawić „lakierowanie
    * standardowe” z lakierem Paint to Sample. API sprawdza tę samą regułę
    * jeszcze raz, bo wycena nie może zależeć od stanu przeglądarki.
+   *
+   * Powrót na paletę bez wymagań cofa TYLKO to, co podnieśliśmy sami
+   * (`paintAutoPartByModel`). Klient, który świadomie wybrał droższe
+   * lakierowanie, zachowuje je przy każdej zmianie koloru.
    */
   function choosePaint(next: PaintSelection | null, color: PaintColor | null) {
     setTouchedModels((current) => ({ ...current, [model.id]: true }));
@@ -281,11 +292,25 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     const palette = palettes.find((item) => item.slug === next.paletteSlug);
     const paintGroup = model.groups.find((item) => item.slug === PAINT_GROUP_SLUG);
     const required = palette?.requiresPartSku ?? null;
-    if (required && paintGroup) {
+    if (paintGroup) {
       const current = selections[PAINT_GROUP_SLUG] ?? paintGroup.defaultSku;
-      const available = paintGroup.options.some((option) => option.sku === required);
-      if (available && (current === null || current === paintGroup.defaultSku)) {
-        setSelectionsByModel((state) => ({ ...state, [model.id]: { ...state[model.id], [PAINT_GROUP_SLUG]: required } }));
+      const autoApplied = paintAutoPartByModel[model.id] ?? null;
+      if (required) {
+        const available = paintGroup.options.some((option) => option.sku === required);
+        if (available && (current === null || current === paintGroup.defaultSku || current === autoApplied)) {
+          setSelectionsByModel((state) => ({ ...state, [model.id]: { ...state[model.id], [PAINT_GROUP_SLUG]: required } }));
+          setPaintAutoPartByModel((state) => ({ ...state, [model.id]: required }));
+        }
+      } else if (autoApplied !== null && current === autoApplied) {
+        setSelectionsByModel((state) => {
+          const next = { ...state[model.id] };
+          // Grupa bez domyślnego SKU nie ma czego przywrócić - kasujemy wpis,
+          // żeby wycena wróciła do stanu sprzed automatycznego podniesienia.
+          if (paintGroup.defaultSku === null) delete next[PAINT_GROUP_SLUG];
+          else next[PAINT_GROUP_SLUG] = paintGroup.defaultSku;
+          return { ...state, [model.id]: next };
+        });
+        setPaintAutoPartByModel((state) => ({ ...state, [model.id]: null }));
       }
     }
     logConfiguratorEvent(model.id, 'paint', `${next.paletteSlug}/${next.colorSlug}`, `Lakier: ${color.name}${palette ? ` (${palette.name})` : ''}`);
