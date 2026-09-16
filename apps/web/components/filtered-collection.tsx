@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+import { CardGridSkeleton } from '@/components/page-loading';
 import type { PublicCategory } from '@/lib/catalog-merge';
 import type { SiteCopy } from '@/lib/copy';
 
@@ -66,9 +66,9 @@ export function FilteredCollection({
   const effectiveSlug = activeSlug && filters.some((category) => category.slug === activeSlug) ? activeSlug : null;
   const visible = effectiveSlug ? items.filter((item) => item.categorySlug === effectiveSlug) : items;
 
-  if (!loaded) {
-    return <div className="mt-10 flex items-center gap-2 text-sm text-ink-muted"><Spinner className="size-4" /> {copy.collection.loading}</div>;
-  }
+  // Szkielet, nie pasek tekstu: lista ram wyglądała przez chwilę na pustą,
+  // a potem treść „wskakiwała" i przesuwała stronę.
+  if (!loaded) return <CardGridSkeleton />;
 
   return (
     <div className="mt-8">

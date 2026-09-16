@@ -5,10 +5,11 @@ import { usePathname } from 'next/navigation';
 import { ArrowRight, ExternalLink, PaintBucket, Palette } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
 import { ContactForm } from '@/components/contact-form';
 import { FilteredCollection, type CollectionItem } from '@/components/filtered-collection';
 import { PageFrame } from '@/components/page-frame';
+import { ProductDetailSkeleton } from '@/components/page-loading';
+import { Spinner } from '@/components/ui/spinner';
 import { formatPrice } from '@/lib/catalog';
 import { frameHref, type ApiFrame, type PublicFrame } from '@/lib/frames';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
@@ -76,11 +77,7 @@ export function FrameDetailPage({ frame: initialFrame, catalog, copy: initialCop
   const slug = (pathname.split('/').filter(Boolean).pop() ?? '').toLowerCase();
   const { frame, loaded } = usePublicFrame(slug === '_' ? '' : slug, initialFrame, categories);
 
-  if (!loaded) {
-    return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-20 sm:px-8 lg:px-12">
-      <div className="flex items-center gap-2 text-sm text-ink-muted"><Spinner className="size-4" /> {copy.frames.loading}</div>
-    </section></PageFrame>;
-  }
+  if (!loaded || slug === '_' || slug === '') return <PageFrame><ProductDetailSkeleton /></PageFrame>;
 
   if (!frame) {
     return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">

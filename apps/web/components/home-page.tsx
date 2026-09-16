@@ -2,6 +2,7 @@
 
 import { ArrowRight, Bike, Map, Mountain, Route, Wrench, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CardGridSkeleton } from '@/components/page-loading';
 import { Reveal } from '@/components/reveal';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
@@ -19,7 +20,7 @@ const categoryIcons = [
 ];
 
 export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
-  const { models, categories: apiCategories } = usePublicCatalog(catalog);
+  const { models, categories: apiCategories, loaded } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
   const visibleCategories = categoryIcons
     .filter((fallback) => apiCategories.some((item) => item.slug === fallback.slug))
@@ -53,7 +54,9 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
 
     <section className="mx-auto max-w-[1480px] px-4 py-16 sm:px-8 lg:px-12 lg:py-24">
       <Reveal className="mb-8 flex items-end justify-between"><div><p className="eyebrow">{copy.home.modelsEyebrow}</p><h2 className="mt-2 text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">{copy.home.modelsTitle}</h2></div><Button render={<a href="/rowery" />} variant="ghost" className="hidden sm:inline-flex">{copy.home.modelsAllCta} <ArrowRight data-icon="inline-end" /></Button></Reveal>
-      <div className="grid gap-4 lg:grid-cols-3">{models.map((model, idx) => {
+      {/* Bez bramki na `loaded` sekcja pokazywała modele z listy zapasowej
+          (z cenami sprzed wczytania katalogu) i podmieniała je w locie. */}
+      {!loaded ? <CardGridSkeleton /> : <div className="grid gap-4 lg:grid-cols-3">{models.map((model, idx) => {
         const productHref = `/rowery/${model.categorySlug}/${model.id}`;
         const configHref = model.available ? `/konfigurator?model=${model.id}` : productHref;
         return (
@@ -87,7 +90,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
           </article>
           </Reveal>
         );
-      })}</div>
+      })}</div>}
     </section>
 
     <section className="bg-[#111] text-white"><Reveal className="mx-auto grid max-w-[1480px] gap-10 px-4 py-16 sm:px-8 md:grid-cols-[0.8fr_1.2fr] lg:px-12 lg:py-24"><div><Wrench className="size-8 text-[var(--accent-brand)]" /><p className="mt-10 text-xs font-bold uppercase tracking-[0.16em] text-[var(--accent-brand)]">{copy.home.serviceEyebrow}</p><h2 className="mt-3 text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">{copy.home.serviceTitle}</h2></div><div className="flex flex-col items-start justify-end"><p className="max-w-xl text-lg leading-relaxed text-white/58">{copy.home.serviceText}</p><Button render={<a href="/serwis" />} className="mt-7 h-11 rounded-full bg-white px-5 text-ink transition-transform hover:bg-white/90 hover:scale-[1.03] active:scale-[0.98]">{copy.home.serviceCta} <ArrowRight data-icon="inline-end" /></Button></div></Reveal></section>

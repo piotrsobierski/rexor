@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, BatteryCharging, Bike, Check, Gauge, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel';
@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
+import { ConfiguratorSkeleton } from '@/components/page-loading';
 import { CUSTOMER_SUPPLIED_SKU, NONE_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
@@ -75,7 +76,7 @@ function groupChoices(group: OptionGroup, t: SiteCopy['configurator']) {
 }
 
 export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
-  const { models } = usePublicCatalog(catalog);
+  const { models, loaded: catalogLoaded } = usePublicCatalog(catalog);
   const copy = usePublicCopy();
   const [modelId, setModelId] = useState<BikeModel['id']>(models[0]?.id ?? 'e82');
   const [size, setSize] = useState('M');
@@ -99,6 +100,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   // Palety (680 kolorów) pobieramy dopiero przy pierwszym otwarciu wyboru
   // koloru - katalog modeli nie ma po co ich wozić.
   const [paintsRequested, setPaintsRequested] = useState(false);
+  // Model z `?model=` ustawiamy dokładnie raz - inaczej ponowny przebieg
+  // efektu cofałby wybór klienta, który zdążył przełączyć rower.
+  const requestedModelApplied = useRef(false);
   const model = models.find((item) => item.id === modelId) ?? models[0];
   const selections = selectionsByModel[model.id] ?? {};
   // Pakiet domyślny wyznacza cenę bazową modelu, więc każdy inny wybór liczy się
@@ -163,6 +167,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   }, [model, size]);
 
   useEffect(() => {
+    if (requestedModelApplied.current) return;
     const query = new URLSearchParams(window.location.search);
     const resumeToken = query.get('resume');
     if (resumeToken) {
@@ -197,10 +202,15 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
       return;
     }
     const requested = query.get('model') as BikeModel['id'] | null;
-    if (requested && models.some((item) => item.id === requested)) selectModel(requested);
-  // Query is read once when the configurator opens.
+    if (requested && models.some((item) => item.id === requested)) {
+      requestedModelApplied.current = true;
+      selectModel(requested);
+    }
+  // Efekt powtarza się, dopóki żądany model nie zostanie ustawiony: przy
+  // pierwszym przebiegu `models` to jeszcze lista zapasowa, więc model
+  // istniejący wyłącznie w bazie nie miał szans się dopasować.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [models]);
 
   useEffect(() => {
     if (!carouselApi) return;
@@ -350,6 +360,17 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
       setSubmitError(error instanceof Error ? error.message : copy.configurator.submitError);
       setSubmitState('error');
     }
+  }
+
+  // Dopóki nie ma katalogu z API, `models` to lista zapasowa z kodu i pierwszy
+  // jej element - konfigurator pokazywał więc przez ułamek sekundy cudzy rower,
+  // także przy wejściu z `?model=`, bo parametr stosuje dopiero efekt.
+  if (!catalogLoaded) {
+    return <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <SiteHeader />
+      <main className="flex-1"><ConfiguratorSkeleton /></main>
+      <SiteFooter />
+    </div>;
   }
 
   return <div className="flex min-h-screen flex-col bg-background text-foreground">

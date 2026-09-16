@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowRight, BatteryCharging, Gauge, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageFrame } from '@/components/page-frame';
+import { CardGridSkeleton, ProductDetailSkeleton } from '@/components/page-loading';
 import { formatPrice, type BikeModel } from '@/lib/catalog';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
@@ -14,7 +15,7 @@ import type { SiteCopy } from '@/lib/copy';
 
 function BikePickCard({ model, copy }: { model: BikeModel; copy: SiteCopy }) {
   const productHref = `/rowery/${model.categorySlug}/${model.id}`;
-  const configHref = model.available ? `/konfigurator?model=${model.id}` : '/serwis';
+  const configHref = model.available ? `/konfigurator?model=${model.id}` : '/kontakt';
 
   return (
     <article className="overflow-hidden rounded-[28px] border border-line bg-white transition-shadow hover:shadow-[0_10px_34px_rgba(0,0,0,0.09)] focus-within:shadow-[0_10px_34px_rgba(0,0,0,0.09)] flex flex-col justify-between">
@@ -51,16 +52,18 @@ export function BikesPage({ catalog, copy: initialCopy }: { catalog?: PublicCata
   // Ceny i zdjęcia pochodzą z katalogu API, bo cena "od" jest wyliczana z
   // cennika części, a nie wpisana w kodzie. Katalog przychodzi z serwera,
   // żeby pierwszy render nie pokazywał danych zapasowych.
-  const { models } = usePublicCatalog(catalog);
+  const { models, loaded } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
-  return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.bikes.eyebrow}</p><h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.bikes.title}</h1><div className="mt-10 grid gap-5 lg:grid-cols-3">{models.map((model) => <BikePickCard key={model.id} model={model} copy={copy} />)}</div></section></PageFrame>;
+  return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.bikes.eyebrow}</p><h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.bikes.title}</h1>{loaded
+    ? <div className="mt-10 grid gap-5 lg:grid-cols-3">{models.map((model) => <BikePickCard key={model.id} model={model} copy={copy} />)}</div>
+    : <CardGridSkeleton />}</section></PageFrame>;
 }
 
 /** Kategorie, które przekraczają moc/prędkość roweru elektrycznego - klient musi potwierdzić ostrzeżenie raz na przeglądarkę zanim zobaczy ofertę. */
 const restrictedCategorySlugs = ['elektryczne'];
 
 export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { catalog?: PublicCatalogData; categorySlug: string; copy?: unknown }) {
-  const { models, categories } = usePublicCatalog(catalog);
+  const { models, categories, loaded } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
   const category = categories.find((item) => item.slug === categorySlug);
   const categoryModels = models.filter((model) => model.categorySlug === categorySlug);
@@ -71,6 +74,10 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
     if (!isRestricted) return;
     setDisclaimerAccepted(window.localStorage.getItem(`rexor_disclaimer_${categorySlug}`) === '1');
   }, [categorySlug, isRestricted]);
+
+  // Kategorie startują pustą listą, więc bez tej bramki „nie znaleziono
+  // kategorii" mignęłoby przy każdym wejściu, zanim dojedzie katalog.
+  if (!loaded) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><CardGridSkeleton /></section></PageFrame>;
 
   if (!category) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.category.eyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.category.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.category.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
 
@@ -98,7 +105,7 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
 }
 
 export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initialCopy }: { catalog?: PublicCatalogData; modelSlug?: string; copy?: unknown }) {
-  const { models, categories } = usePublicCatalog(catalog);
+  const { models, categories, loaded } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
   // Statyczny eksport nie może z góry wypisać wszystkich par kategoria/model
   // (nowe modele/ramy dochodzą wyłącznie z bazy, przez panel) - trasa
@@ -116,8 +123,17 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
   const pathname = usePathname();
   const modelSlug = modelSlugProp ?? pathname.split('/').filter(Boolean).pop() ?? '';
   const normalizedSlug = modelSlug.toLowerCase();
-  const model = models.find((m) => m.id === normalizedSlug || m.name.toLowerCase().includes(normalizedSlug) || (normalizedSlug.includes('e82') && m.id === 'e82') || (normalizedSlug.includes('e55') && m.id === 'e55') || (normalizedSlug.includes('cfr707') && m.id === 'cfr707')) ?? models[0];
+  // ŻADNEGO `?? models[0]`: powłoka jest jedna dla wszystkich modeli, więc
+  // przy braku dopasowania podstawiała pierwszy model z listy zapasowej -
+  // i to on mignął na ułamek sekundy pod cudzym adresem, zanim dojechał
+  // katalog z API. Brak dopasowania to teraz albo „jeszcze nie wiem"
+  // (szkielet), albo „nie ma takiego modelu".
+  const model = models.find((m) => m.id === normalizedSlug || m.name.toLowerCase().includes(normalizedSlug) || (normalizedSlug.includes('e82') && m.id === 'e82') || (normalizedSlug.includes('e55') && m.id === 'e55') || (normalizedSlug.includes('cfr707') && m.id === 'cfr707')) ?? null;
   const [selectedPhoto, setSelectedPhoto] = useState(0);
+
+  if (!loaded || normalizedSlug === '_' || normalizedSlug === '') {
+    return <PageFrame><ProductDetailSkeleton /></PageFrame>;
+  }
 
   if (!model) {
     return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.model.notFoundEyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.model.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.model.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
@@ -125,7 +141,7 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
 
   const category = categories.find((c) => c.slug === model.categorySlug);
   const activeImage = model.gallery[selectedPhoto] ?? model.image;
-  const configHref = model.available ? `/konfigurator?model=${model.id}` : '/serwis';
+  const configHref = model.available ? `/konfigurator?model=${model.id}` : '/kontakt';
   const ctaLabel = model.available ? copy.model.configureCta : copy.model.askCta;
 
   return (
@@ -280,7 +296,7 @@ export function CategoryOrModelPage({ catalog, copy: initialCopy }: { catalog?: 
   const slug = (pathname.split('/').filter(Boolean).pop() ?? '').toLowerCase();
 
   // Bez tego, zanim dojedzie katalog, mignęłoby "nie znaleziono kategorii".
-  if (!loaded) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-20 sm:px-8 lg:px-12"><p className="text-sm text-ink-muted">{copy.content.loading}</p></section></PageFrame>;
+  if (!loaded) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><CardGridSkeleton /></section></PageFrame>;
 
   const resolved: PublicCatalogData = { models, categories };
   return models.some((model) => model.id === slug)
