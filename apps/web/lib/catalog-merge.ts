@@ -31,6 +31,10 @@ export function publicMediaUrl(path: string | null | undefined): string {
   if (path.startsWith('/media/categories/')) return path.replace('/media/categories/', '/categories/');
   if (path.startsWith('/media/frames/')) return path.replace('/media/frames/', '/frames/');
   if (path.startsWith('/uploads/')) return `${API_BASE}${path}`;
+  // Wiersze zapisane dawniej z doklejonym prefiksem API. Na produkcji
+  // (`/api`) trafiały przypadkiem w cel, lokalnie - w serwer Next.js, gdzie
+  // pliku nie ma. Sprowadzamy je do tej samej postaci co świeże ścieżki.
+  if (path.startsWith('/api/uploads/')) return `${API_BASE}${path.slice('/api'.length)}`;
   return path;
 }
 

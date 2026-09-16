@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { mediaSrc } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
@@ -100,7 +101,7 @@ type Product = { slug: string; name: string };
 const FINISHES: Array<Color['finish']> = ['uni', 'metallic', 'pearl'];
 const FINISH_LABELS: Record<Color['finish'], string> = { uni: 'uni', metallic: 'metalik', pearl: 'perła' };
 
-const mediaUrl = (path: string) => (path.startsWith('http') ? path : `${API_BASE}${path}`);
+const mediaUrl = mediaSrc;
 
 /**
  * Powyżej tylu produktów listy przestają być „kilkoma kratkami w rzędzie”

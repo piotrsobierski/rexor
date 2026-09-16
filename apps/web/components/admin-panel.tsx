@@ -68,7 +68,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { cn, mediaSrc } from '@/lib/utils';
 import { compressUploadImage } from '@/lib/image-compression';
 import { isAdminTabSlug, type AdminTabSlug } from '@/lib/admin-tabs';
 import { mergeCopy, type SiteCopy } from '@/lib/copy';
@@ -843,7 +843,7 @@ function PartsEditor({
         method: 'POST',
         body: form,
       });
-      await patch('parts', part.id, { image_path: `${API_BASE}${result.url}` });
+      await patch('parts', part.id, { image_path: String(result.url) });
       setMessage('Zdjęcie części zapisane.');
     } catch (error) {
       setMessage(
@@ -1128,10 +1128,10 @@ function PartsEditor({
                       {row.image_path ? (
                         <div className="group/thumb relative inline-block">
                           <img
-                            src={String(row.image_path)}
+                            src={mediaSrc(String(row.image_path))}
                             alt={String(row.name)}
                             onMouseEnter={(event) =>
-                              showPreview(event, String(row.image_path))
+                              showPreview(event, mediaSrc(String(row.image_path)))
                             }
                             onMouseLeave={() => setPreview(null)}
                             className="size-12 rounded-lg border border-line bg-white object-contain cursor-zoom-in"
@@ -1379,9 +1379,6 @@ function CategoriesEditor({
     setDrafts(Object.fromEntries(rows.map((row) => [row.id, { ...row }])));
   }, [rows]);
 
-  function imageSrc(path: string) {
-    return path.startsWith('http') ? path : `${API_BASE}${path}`;
-  }
 
   async function uploadImage(row: Row, file?: File) {
     if (!file) return;
@@ -1398,7 +1395,7 @@ function CategoriesEditor({
         body: form,
       });
       await patch('categories', row.id, {
-        default_image_path: `${API_BASE}${result.url}`,
+        default_image_path: String(result.url),
       });
       setMessage('Zdjęcie kategorii zaktualizowane.');
     } catch (error) {
@@ -1428,7 +1425,7 @@ function CategoriesEditor({
               <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--muted)]">
                 {row.default_image_path ? (
                   <img
-                    src={imageSrc(String(row.default_image_path))}
+                    src={mediaSrc(String(row.default_image_path))}
                     alt=""
                     className="size-full object-cover"
                   />
@@ -2057,7 +2054,7 @@ function ModelsEditor({
           body: form,
         });
         if (!defaultImagePath) {
-          defaultImagePath = `${API_BASE}${result.url}`;
+          defaultImagePath = String(result.url);
           await request(`/admin/models/${model.id}`, {
             method: 'PATCH',
             body: JSON.stringify({ default_image_path: defaultImagePath }),
@@ -2124,9 +2121,6 @@ function ModelsEditor({
           : 'Nie udało się zapisać kolejności.',
       );
     }
-  }
-  function imageSrc(path: string) {
-    return path.startsWith('http') ? path : `${API_BASE}${path}`;
   }
   const [newModel, setNewModel] = useState<{
     name: string;
@@ -2244,7 +2238,11 @@ function ModelsEditor({
               <div className="flex gap-3 overflow-x-auto pb-3">
                 {modelMedia.length === 0 && (
                   <img
-                    src={String(row.default_image_path || '/models/e82/01.jpg')}
+                    src={
+                      row.default_image_path
+                        ? mediaSrc(String(row.default_image_path))
+                        : '/models/e82/01.jpg'
+                    }
                     alt=""
                     className="h-28 w-40 shrink-0 rounded-xl bg-[var(--muted)] object-contain"
                   />
@@ -2257,12 +2255,12 @@ function ModelsEditor({
                       className="group/photo relative h-28 w-40 shrink-0"
                     >
                       <a
-                        href={imageSrc(item.storage_path)}
+                        href={mediaSrc(item.storage_path)}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
                         <img
-                          src={imageSrc(item.storage_path)}
+                          src={mediaSrc(item.storage_path)}
                           alt={item.alt_text}
                           className="size-full rounded-xl bg-[var(--muted)] object-contain"
                         />
@@ -2745,9 +2743,6 @@ function FramesEditor({
     setDrafts(frameDrafts(rows));
   }, [rows]);
 
-  function imageSrc(path: string) {
-    return path.startsWith('http') ? path : `${API_BASE}${path}`;
-  }
 
   // Wgranie pliku i przypięcie go do ramy to dwa wywołania (tak jak w kontrakcie
   // w docs/PLAN_RAMY_REALIZACJE.md): /admin/media zwraca id, a rola ('gallery'
@@ -2780,7 +2775,7 @@ function FramesEditor({
           body: JSON.stringify({ mediaId: Number(result.id), role }),
         });
         if (role === 'gallery' && !defaultImagePath) {
-          defaultImagePath = `${API_BASE}${result.url}`;
+          defaultImagePath = String(result.url);
           await request(`/admin/frames/${frame.id}`, {
             method: 'PATCH',
             body: JSON.stringify({ default_image_path: defaultImagePath }),
@@ -3035,12 +3030,12 @@ function FramesEditor({
                     className="group/photo relative h-28 w-40 shrink-0"
                   >
                     <a
-                      href={imageSrc(item.storage_path)}
+                      href={mediaSrc(item.storage_path)}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
                       <img
-                        src={imageSrc(item.storage_path)}
+                        src={mediaSrc(item.storage_path)}
                         alt={item.alt_text}
                         className="size-full rounded-xl bg-[var(--muted)] object-contain"
                       />
@@ -3392,12 +3387,12 @@ function FramesEditor({
                           className="group/geo relative h-24 w-40 shrink-0"
                         >
                           <a
-                            href={imageSrc(item.storage_path)}
+                            href={mediaSrc(item.storage_path)}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
                             <img
-                              src={imageSrc(item.storage_path)}
+                              src={mediaSrc(item.storage_path)}
                               alt={item.alt_text}
                               className="size-full rounded-xl bg-[var(--muted)] object-contain"
                             />
@@ -3535,9 +3530,6 @@ function ProjectsEditor({
     setSpecs(projectSpecifications(rows));
   }, [rows]);
 
-  function imageSrc(path: string) {
-    return path.startsWith('http') ? path : `${API_BASE}${path}`;
-  }
 
   async function upload(
     project: Row,
@@ -3564,7 +3556,7 @@ function ProjectsEditor({
           await request(`/admin/projects/${project.id}`, {
             method: 'PATCH',
             body: JSON.stringify({
-              cover_image_path: `${API_BASE}${result.url}`,
+              cover_image_path: String(result.url),
             }),
           });
         setMessage(`Wysyłam zdjęcia (${index + 1}/${selected.length})…`);
@@ -3781,13 +3773,13 @@ function ProjectsEditor({
                   <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--muted)]">
                     {cover ? (
                       <img
-                        src={imageSrc(cover.storage_path)}
+                        src={mediaSrc(cover.storage_path)}
                         alt={cover.alt_text}
                         className="size-full object-cover"
                       />
                     ) : row.cover_image_path ? (
                       <img
-                        src={imageSrc(String(row.cover_image_path))}
+                        src={mediaSrc(String(row.cover_image_path))}
                         alt=""
                         className="size-full object-cover"
                       />
@@ -4002,12 +3994,12 @@ function ProjectsEditor({
                       className="group/photo relative h-28 w-40 shrink-0"
                     >
                       <a
-                        href={imageSrc(item.storage_path)}
+                        href={mediaSrc(item.storage_path)}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
                         <img
-                          src={imageSrc(item.storage_path)}
+                          src={mediaSrc(item.storage_path)}
                           alt={item.alt_text}
                           className="size-full rounded-xl bg-[var(--muted)] object-contain"
                         />
