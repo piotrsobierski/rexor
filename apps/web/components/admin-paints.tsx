@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Upload } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -56,7 +57,7 @@ type Render = {
   isPublic: boolean;
 };
 
-type Availability = { product_slug: string; palette_slug: string; price_gross_override: string | null; is_active: number };
+type Availability = { product_slug: string; palette_slug: string; price_gross_override: string | null; is_active: number | string };
 
 type PaintsData = {
   palettes: Palette[];
@@ -71,6 +72,41 @@ const FINISHES: Array<Color['finish']> = ['uni', 'metallic', 'pearl'];
 const FINISH_LABELS: Record<Color['finish'], string> = { uni: 'uni', metallic: 'metalik', pearl: 'perła' };
 
 const mediaUrl = (path: string) => (path.startsWith('http') ? path : `${API_BASE}${path}`);
+
+/** Filtr „co widać na liście”: rendery i zdjęcia referencyjne pojawiają się dla różnych kolorów. */
+type GraphicFilter = 'all' | 'render' | 'reference' | 'any' | 'none';
+
+const GRAPHIC_FILTERS: Array<{ value: GraphicFilter; label: string }> = [
+  { value: 'all', label: 'Wszystkie kolory' },
+  { value: 'render', label: 'Tylko z renderem' },
+  { value: 'reference', label: 'Tylko ze zdjęciem referencyjnym' },
+  { value: 'any', label: 'Z dowolną grafiką' },
+  { value: 'none', label: 'Bez grafiki' },
+];
+
+function matchesGraphicFilter(color: Color, filter: GraphicFilter): boolean {
+  const hasRender = color.renderCount > 0;
+  const hasReference = color.referencePath !== null;
+  if (filter === 'render') return hasRender;
+  if (filter === 'reference') return hasReference;
+  if (filter === 'any') return hasRender || hasReference;
+  if (filter === 'none') return !hasRender && !hasReference;
+  return true;
+}
+
+/**
+ * Podgląd pełnego obrazu. Miniatury renderów z importu mają 96 px, więc w panelu
+ * pokazujemy plik źródłowy i nigdy go nie kadrujemy - `object-contain`, nie `object-cover`.
+ */
+function ImagePreviewDialog({ src, caption, onClose }: { src: string | null; caption: string; onClose: () => void }) {
+  return <Dialog open={src !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <DialogContent className="w-[min(96vw,1100px)] max-w-none bg-[#101210] p-3 sm:p-4">
+      <DialogTitle className="sr-only">{caption}</DialogTitle>
+      {src && <img src={src} alt="" className="max-h-[78vh] w-full rounded-xl object-contain" />}
+      <p className="mt-2 text-center text-xs text-white/70">{caption}</p>
+    </DialogContent>
+  </Dialog>;
+}
 
 /**
  * Sekcja „Lakiery”: palety, kolory, dostępność dla modeli i ram oraz rendery.
@@ -94,7 +130,7 @@ export function PaintsEditor({
   const [data, setData] = useState<PaintsData | null>(null);
   const [paletteFilter, setPaletteFilter] = useState<number | 'all'>('all');
   const [search, setSearch] = useState('');
-  const [onlyWithRender, setOnlyWithRender] = useState(false);
+  const [graphicFilter, setGraphicFilter] = useState<GraphicFilter>('all');
   const [expandedColor, setExpandedColor] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(60);
 
@@ -109,16 +145,16 @@ export function PaintsEditor({
     const needle = search.trim().toLowerCase();
     return data.colors.filter((color) => {
       if (paletteFilter !== 'all' && color.paletteId !== paletteFilter) return false;
-      if (onlyWithRender && color.renderCount === 0) return false;
+      if (!matchesGraphicFilter(color, graphicFilter)) return false;
       if (needle === '') return true;
       return color.name.toLowerCase().includes(needle)
         || (color.code?.toLowerCase().includes(needle) ?? false)
         || color.hex.toLowerCase().includes(needle)
         || (color.searchAlt?.toLowerCase().includes(needle) ?? false);
     });
-  }, [data, paletteFilter, search, onlyWithRender]);
+  }, [data, paletteFilter, search, graphicFilter]);
 
-  useEffect(() => { setVisibleCount(60); }, [paletteFilter, search, onlyWithRender]);
+  useEffect(() => { setVisibleCount(60); }, [paletteFilter, search, graphicFilter]);
 
   if (!data) return <p className="text-sm text-ink-muted">Wczytuję lakiery…</p>;
 
@@ -142,10 +178,9 @@ export function PaintsEditor({
           <option value="all">Wszystkie palety</option>
           {data.palettes.map((palette) => <option key={palette.id} value={palette.id}>{palette.name}</option>)}
         </NativeSelect>
-        <label className="flex items-center gap-2 text-sm text-ink-muted">
-          <Checkbox checked={onlyWithRender} onCheckedChange={(checked) => setOnlyWithRender(checked === true)} />
-          tylko z renderem
-        </label>
+        <NativeSelect value={graphicFilter} onChange={(event) => setGraphicFilter(event.target.value as GraphicFilter)} className="h-10">
+          {GRAPHIC_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </NativeSelect>
         <span className="ml-auto text-sm text-ink-muted">{colors.length} pozycji</span>
       </div>
 
@@ -203,8 +238,15 @@ function PalettesPanel({
     } catch (error) { setMessage((error as Error).message); }
   }
 
+  // Number(): MySQL przez PDO zwraca TINYINT raz jako liczbę, raz jako '1'
+  // (zależnie od emulacji przygotowanych zapytań na hostingu). Ścisłe
+  // porównanie z 1 odznaczało wtedy wszystkie pola mimo aktywnego wiersza.
   const activeFor = (rows: Availability[], productSlug: string, paletteSlug: string) =>
-    rows.some((row) => row.product_slug === productSlug && row.palette_slug === paletteSlug && row.is_active === 1);
+    rows.some((row) => row.product_slug === productSlug && row.palette_slug === paletteSlug && Number(row.is_active) === 1);
+
+  const availableNowhere = (paletteSlug: string) =>
+    !data.availability.models.some((row) => row.palette_slug === paletteSlug && Number(row.is_active) === 1)
+    && !data.availability.frames.some((row) => row.palette_slug === paletteSlug && Number(row.is_active) === 1);
 
   return <section className="rounded-3xl border border-line bg-white p-5 sm:p-7">
     <h2 className="text-2xl font-semibold tracking-tight">Palety</h2>
@@ -241,6 +283,7 @@ function PalettesPanel({
 
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-3 text-sm">
             <span className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Dostępna w</span>
+            {availableNowhere(palette.slug) && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">nigdzie - konfigurator jej nie pokaże</span>}
             {models.map((product) => <label key={`m-${product.slug}`} className="flex items-center gap-1.5">
               <Checkbox
                 checked={activeFor(data.availability.models, product.slug, palette.slug)}
@@ -417,6 +460,7 @@ function RendersEditor({
   const [target, setTarget] = useState(models[0] ? `model:${models[0].slug}` : '');
   const [variant, setVariant] = useState<'standard' | 'ultra'>('standard');
   const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<Render | null>(null);
 
   async function upload(file: File) {
     const [resource, slug] = target.split(':');
@@ -447,8 +491,16 @@ function RendersEditor({
     </p>
 
     <div className="mt-3 flex flex-wrap gap-3">
-      {renders.map((render) => <div key={render.id} className="w-40 rounded-xl border border-line bg-white p-2">
-        <img src={mediaUrl(render.thumbPath ?? render.imagePath)} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-lg object-cover" />
+      {renders.map((render) => <div key={render.id} className="w-44 rounded-xl border border-line bg-white p-2">
+        <button
+          type="button"
+          onClick={() => setPreview(render)}
+          className="focus-ring block w-full overflow-hidden rounded-lg bg-[#f2f4f2]"
+          title="Pokaż w pełnym rozmiarze"
+        >
+          {/* Pełny plik, nie `thumbPath`: miniatury z importu mają 96 px i w tym kafelku były rozmyte. */}
+          <img src={mediaUrl(render.imagePath)} alt="" loading="lazy" className="aspect-square w-full object-contain" />
+        </button>
         <p className="mt-1.5 truncate text-[11px] text-ink-muted">{render.modelSlug ?? `rama: ${render.frameSlug}`} · {render.variant}</p>
         <Button size="sm" variant="ghost" className="mt-1 h-7 w-full text-red-600" onClick={async () => { if (!confirm('Usunąć ten render?')) return; try { await request(`/admin/paint-renders/${render.id}`, { method: 'DELETE' }); await reload(); } catch (error) { setMessage((error as Error).message); } }}>
           <Trash2 /> Usuń
@@ -470,5 +522,11 @@ function RendersEditor({
         <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ''; }} />
       </label>
     </div>
+
+    <ImagePreviewDialog
+      src={preview ? mediaUrl(preview.imagePath) : null}
+      caption={preview ? `${color.name} · ${preview.modelSlug ?? `rama: ${preview.frameSlug}`} · ${preview.variant}` : ''}
+      onClose={() => setPreview(null)}
+    />
   </div>;
 }
