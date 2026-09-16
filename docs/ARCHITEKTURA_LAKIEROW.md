@@ -29,9 +29,10 @@ Stan na 15 września 2026 r., migracja `028_paint_colors.sql`.
               │ 1:N                            │ palettes           │
               │                                └────────────────────┘
     ┌─────────▼────────┐
-    │  paint_renders   │  render PARY kolor × produkt
+    │  paint_renders   │  obraz PARY kolor × produkt
     │                  │──► bike_models  (model_id)
     │ standard / ultra │──► frames       (frame_id)
+    │ / photo          │
     └──────────────────┘
 
     ┌────────────────────────┐
@@ -48,7 +49,7 @@ Jedno zdanie na byt:
 | `paint_colors` | pojedynczy lakier + zdjęcie referencyjne auta | 686 |
 | `model_paint_palettes` | które palety widać przy którym modelu | model × paleta |
 | `frame_paint_palettes` | to samo dla ram sprzedawanych osobno | rama × paleta |
-| `paint_renders` | obraz produktu w tym kolorze | kolor × produkt × wariant |
+| `paint_renders` | obraz produktu w tym kolorze - render albo zdjęcie | kolor × produkt × wariant (zdjęć wiele) |
 | `configuration_paint` | co klient wybrał i za ile, na zawsze | 1:1 z konfiguracją |
 
 ---
@@ -240,15 +241,22 @@ typ bytu.
 
 To rozróżnienie przesądziło o schemacie:
 
-| | zdjęcie referencyjne | render |
-|---|---|---|
-| **co to jest** | prawdziwe auto w tym lakierze | wizualizacja ramy w tym lakierze |
-| **zależy od** | wyłącznie koloru | pary **kolor × produkt** |
-| **ile** | jedno na kolor | jedno na kolor × produkt × wariant |
-| **gdzie** | `paint_colors.reference_image_path` | tabela `paint_renders` |
-| **plik** | `storage/paint-reference/` (poza public) | `public/media/paints/renders/{model}/` |
-| **publiczne** | nie, dopóki `reference_is_public = FALSE` | tak (`is_public`) |
-| **ile mamy** | 664 | 457 (228 standard + 229 ultra) |
+| | zdjęcie referencyjne | render | zdjęcie produktu |
+|---|---|---|---|
+| **co to jest** | prawdziwe auto w tym lakierze | wizualizacja ramy w tym lakierze | prawdziwy rower w tym lakierze |
+| **zależy od** | wyłącznie koloru | pary **kolor × produkt** | pary **kolor × produkt** |
+| **ile** | jedno na kolor | jedno na kolor × produkt × wariant | ile ujęć zrobimy |
+| **gdzie** | `paint_colors.reference_image_path` | `paint_renders` (`standard`, `ultra`) | `paint_renders` (`photo`) |
+| **plik** | `storage/paint-reference/` (poza public) | `public/media/paints/renders/{model}/` | `/uploads/…` z panelu |
+| **publiczne** | nie, dopóki `reference_is_public = FALSE` | tak (`is_public`) | tak (`is_public`) |
+| **ile mamy** | 664 | 457 (228 standard + 229 ultra) | tyle, ile wgramy |
+
+Zdjęcie produktu siedzi w `paint_renders`, a nie w osobnej tabeli, bo ma
+dokładnie tę samą kardynalność, ścieżkę pliku, flagę publiczności i trasę
+serwującą co render. Różnica jest jedna i siedzi w kodzie: render trzymamy
+po jednym na wariant (kolejny upload podmienia poprzedni), a zdjęć wiele -
+stąd kolumna `sort_order`, która przy jednym renderze nie miała czego
+porządkować.
 
 Render ramy E55 nie pokazuje, jak lakier wygląda na E82 — dlatego
 `paint_renders` ma `model_id` / `frame_id`, a zdjęcie auta jest wspólne dla
@@ -288,12 +296,22 @@ nie dopuszcza kropki poza rozszerzeniem, więc nie da się nim wyjść z katalog
 '~^/media/(paints/renders/[a-z0-9-]+/[a-z0-9_-]+\.(?:jpg|jpeg|png|webp|avif))$~'
 ```
 
-### Wariant `ultra` ma pierwszeństwo
+### Zdjęcie bije render, `ultra` bije `standard`
 
 Gdziekolwiek pokazujemy jeden obraz, kolejność jest ta sama:
-`ultra` → `standard` → płaska próbka `hex`. W kodzie jedna funkcja,
-`bestRender()` po stronie web i to samo rozstrzygnięcie w
-`PaintService::resolvePaintSelection` dla migawki.
+`photo` → `ultra` → `standard` → płaska próbka `hex`. W kodzie jedna funkcja,
+`paintImages()` / `bestRender()` po stronie web i to samo rozstrzygnięcie
+w `PaintService::resolvePaintSelection` dla migawki.
+
+Zdjęcie idzie pierwsze, bo odpowiada na inne pytanie niż render: nie „jak to
+mniej więcej wygląda", tylko „tak ten rower wygląda naprawdę". Dlatego web
+**nazywa** to, co pokazuje - plakietka „zdjęcie" na podglądzie w pickerze,
+podpis slajdu w konfiguratorze i osobna nota pod próbką („prawdziwe zdjęcie
+roweru w tym lakierze, a nie wizualizacja"). Bez tego zdjęcie i render byłyby
+dla klienta tym samym obrazkiem, a obiecują różne rzeczy.
+
+Kolorów ze zdjęciem jest i będzie mało, więc mają własny filtr („Ze zdjęciem")
+obok filtru wizualizacji, a próbka w siatce dostaje grubszą obwódkę kropki.
 
 ---
 
@@ -318,7 +336,7 @@ wybór koloru
   │    ├─ zapis w paintByModel
   │    ├─ podniesienie opcji procesu, jeśli paleta tego wymaga
   │    └─ log zdarzenia do dziennika aktywności
-  └─ render wchodzi jako pierwszy slajd galerii
+  └─ zdjęcia i render wchodzą na początek galerii (zdjęcia pierwsze)
 
 zapis projektu
   └─ POST /api/configurations { paintPaletteSlug, paintColorSlug, … }

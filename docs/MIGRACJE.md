@@ -34,6 +34,11 @@ Skrót wdrożeniowy `php scripts/startup.php` uruchamia migracje z `--apply`. Sk
 
 ## Wykonane zmiany schematu poza migracją bazową
 
+- `033_paint_photos.sql` (16 września 2026) - dokłada wariant `photo` do
+  `paint_renders.variant` oraz kolumnę `sort_order` (kolejność ujęć), a indeksy
+  wariantu rozszerza o tę kolumnę. Zdjęcie realnego roweru ma pierwszeństwo
+  przed wizualizacją: `photo` → `ultra` → `standard`. Wykonana lokalnie na
+  MySQL 8.0.
 - `032_rename_porsche_palette.sql` (16 września 2026) - zmienia nazwę palety
   `porsche-pts` z „Porsche Paint to Sample" na „Porsche" (slug bez zmian).
   Wykonana lokalnie na MySQL 8.0.

@@ -16,7 +16,7 @@ import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catal
 import { usePublicCopy } from '@/lib/use-public-copy';
 import { usePublicFrame, usePublicFrames } from '@/lib/use-public-frames';
 import { PaintDialog } from '@/components/paint-picker';
-import { bestRender, usePaints } from '@/lib/paints';
+import { bestRender, hasPhoto, usePaints } from '@/lib/paints';
 import type { SiteCopy } from '@/lib/copy';
 
 const priceLabel = (frame: { price_gross: number | null }, copy: SiteCopy) =>
@@ -242,6 +242,10 @@ function FramePaints({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
     (sum, palette) => sum + palette.colors.filter((color) => bestRender(color) !== null).length,
     0,
   );
+  const photoCount = palettes.reduce(
+    (sum, palette) => sum + palette.colors.filter((color) => hasPhoto(color)).length,
+    0,
+  );
   const empty = state === 'ready' && palettes.length === 0;
 
   return <div ref={sectionRef} className="mt-16 border-t border-line pt-12">
@@ -277,7 +281,7 @@ function FramePaints({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
           {state === 'loading' ? <Spinner data-icon="inline-end" className="size-4" /> : <Palette data-icon="inline-end" />}
         </Button>
         {colorCount > 0 && <span className="text-sm text-ink-muted">
-          {colorCount} kolorów{renderCount > 0 ? `, ${renderCount} z wizualizacją` : ''}
+          {colorCount} kolorów{renderCount > 0 ? `, ${renderCount} z wizualizacją` : ''}{photoCount > 0 ? `, ${photoCount} ze zdjęciem gotowej ramy` : ''}
         </span>}
         {state === 'error' && <span className="text-sm text-ink-muted">Nie udało się pobrać palet. Odśwież stronę i spróbuj ponownie.</span>}
       </div>

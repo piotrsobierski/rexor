@@ -40,12 +40,13 @@ function adminPaints(PDO $pdo): array
     )->fetchAll();
 
     $renders = $pdo->query(
-        'SELECT r.id, r.color_id, r.model_id, r.frame_id, r.variant, r.image_path, r.thumb_path, r.source, r.is_public, ' .
+        'SELECT r.id, r.color_id, r.model_id, r.frame_id, r.variant, r.image_path, r.thumb_path, r.source, ' .
+        'r.sort_order, r.is_public, ' .
         'm.slug AS model_slug, f.slug AS frame_slug ' .
         'FROM paint_renders r ' .
         'LEFT JOIN bike_models m ON m.id = r.model_id ' .
         'LEFT JOIN frames f ON f.id = r.frame_id ' .
-        'ORDER BY r.color_id, r.variant'
+        'ORDER BY r.color_id, r.variant, r.sort_order, r.id'
     )->fetchAll();
 
     return [
@@ -89,6 +90,7 @@ function adminPaints(PDO $pdo): array
             'imagePath' => $row['image_path'],
             'thumbPath' => $row['thumb_path'],
             'source' => $row['source'],
+            'sortOrder' => (int) $row['sort_order'],
             'isPublic' => (bool) $row['is_public'],
         ], $renders),
         'availability' => [
@@ -328,8 +330,8 @@ function saveAdminPaintRender(PDO $pdo, array $input): array
     }
 
     $variant = (string) ($input['variant'] ?? 'standard');
-    if (!in_array($variant, ['standard', 'ultra'], true)) {
-        throw new InvalidArgumentException('Wariant renderu to „standard” albo „ultra”.');
+    if (!in_array($variant, ['standard', 'ultra', 'photo'], true)) {
+        throw new InvalidArgumentException('Wariant obrazu to „standard”, „ultra” albo „photo”.');
     }
     $imagePath = trim((string) ($input['imagePath'] ?? ''));
     if (!preg_match('~^/(uploads|media)/~', $imagePath)) {
@@ -359,13 +361,18 @@ function saveAdminPaintRender(PDO $pdo, array $input): array
     }
 
     // Jedna para kolor + produkt + wariant ma jeden render: kolejny upload
-    // podmienia poprzedni zamiast dokładać drugi wiersz.
-    $existing = $pdo->prepare(
-        'SELECT id FROM paint_renders WHERE color_id = :color AND variant = :variant ' .
-        'AND model_id <=> :model AND frame_id <=> :frame'
-    );
-    $existing->execute(['color' => $colorId, 'variant' => $variant, 'model' => $modelId, 'frame' => $frameId]);
-    $existingId = $existing->fetchColumn();
+    // podmienia poprzedni zamiast dokładać drugi wiersz. Zdjęcia są wyjątkiem
+    // - rower sfotografowany z kilku stron to kilka wierszy, więc każdy upload
+    // dokłada nowy, a `sort_order` trzyma kolejność wgrywania.
+    $existingId = false;
+    if ($variant !== 'photo') {
+        $existing = $pdo->prepare(
+            'SELECT id FROM paint_renders WHERE color_id = :color AND variant = :variant ' .
+            'AND model_id <=> :model AND frame_id <=> :frame'
+        );
+        $existing->execute(['color' => $colorId, 'variant' => $variant, 'model' => $modelId, 'frame' => $frameId]);
+        $existingId = $existing->fetchColumn();
+    }
 
     $parameters = [
         'image' => $imagePath,
@@ -374,10 +381,20 @@ function saveAdminPaintRender(PDO $pdo, array $input): array
         'public' => ($input['isPublic'] ?? true) ? 1 : 0,
     ];
     if ($existingId === false) {
+        if (isset($input['sortOrder']) && $input['sortOrder'] !== null && $input['sortOrder'] !== '') {
+            $sort = (int) $input['sortOrder'];
+        } else {
+            $next = $pdo->prepare(
+                'SELECT COALESCE(MAX(sort_order), 0) + 10 FROM paint_renders ' .
+                'WHERE color_id = :color AND variant = :variant AND model_id <=> :model AND frame_id <=> :frame'
+            );
+            $next->execute(['color' => $colorId, 'variant' => $variant, 'model' => $modelId, 'frame' => $frameId]);
+            $sort = (int) $next->fetchColumn();
+        }
         $pdo->prepare(
-            'INSERT INTO paint_renders (color_id, model_id, frame_id, variant, image_path, thumb_path, source, is_public) ' .
-            'VALUES (:color, :model, :frame, :variant, :image, :thumb, :source, :public)'
-        )->execute($parameters + ['color' => $colorId, 'model' => $modelId, 'frame' => $frameId, 'variant' => $variant]);
+            'INSERT INTO paint_renders (color_id, model_id, frame_id, variant, image_path, thumb_path, source, sort_order, is_public) ' .
+            'VALUES (:color, :model, :frame, :variant, :image, :thumb, :source, :sort, :public)'
+        )->execute($parameters + ['color' => $colorId, 'model' => $modelId, 'frame' => $frameId, 'variant' => $variant, 'sort' => $sort]);
         $id = (int) $pdo->lastInsertId();
     } else {
         $id = (int) $existingId;
@@ -385,7 +402,8 @@ function saveAdminPaintRender(PDO $pdo, array $input): array
             ->execute($parameters + ['id' => $id]);
     }
 
-    logActivity($pdo, 'paint_render_saved', 'admin', currentAdmin()['email'] ?? null, "Zapisano render lakieru „{$colorRow['name']}”.", ['id' => $id, 'variant' => $variant]);
+    $what = $variant === 'photo' ? 'zdjęcie' : 'render';
+    logActivity($pdo, 'paint_render_saved', 'admin', currentAdmin()['email'] ?? null, "Zapisano {$what} lakieru „{$colorRow['name']}”.", ['id' => $id, 'variant' => $variant]);
 
     return ['id' => $id];
 }

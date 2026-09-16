@@ -7,7 +7,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/
 /** Slug części z grupy „paint”, która oznacza lakierowanie standardowe. */
 export const PAINT_GROUP_SLUG = 'paint';
 
-export type PaintRender = { image: string; thumb: string | null; source: string | null };
+export type PaintVariant = 'standard' | 'ultra' | 'photo';
+
+export type PaintRender = { variant: PaintVariant; image: string; thumb: string | null; source: string | null };
 
 export type PaintColor = {
   id: number;
@@ -20,7 +22,12 @@ export type PaintColor = {
   searchAlt: string | null;
   /** Dopłata brutto za ten kolor; zwykle cena palety, czasem nadpisana. */
   priceGross: number;
-  renders: { standard?: PaintRender; ultra?: PaintRender };
+  /**
+   * Obrazy lakieru na TYM produkcie. `standard` i `ultra` to wizualizacje
+   * komputerowe - po jednej z każdego wariantu. `photos` to zdjęcia gotowego
+   * roweru, których może być kilka (kilka ujęć tego samego egzemplarza).
+   */
+  renders: { standard?: PaintRender; ultra?: PaintRender; photos?: PaintRender[] };
 };
 
 export type PaintPalette = {
@@ -44,9 +51,28 @@ export const FINISH_LABELS: Record<PaintColor['finish'], string> = {
   pearl: 'perła',
 };
 
-/** Render „ultra” jest lepszy, więc gdy istnieje, to on idzie na podgląd. */
+/**
+ * Wszystkie obrazy lakieru na produkcie, w kolejności pokazywania.
+ *
+ * Prawdziwe zdjęcie bije każdą wizualizację: pokazuje lakier w świetle,
+ * a nie w renderze, więc idzie pierwsze. Dalej „ultra”, potem „standard”.
+ * Ta sama kolejność rozstrzyga migawkę konfiguracji po stronie API
+ * (`resolvePaintSelection`) - jedno źródło prawdy dla obu stron.
+ */
+export function paintImages(color: PaintColor): PaintRender[] {
+  const photos = color.renders.photos ?? [];
+  const renders = [color.renders.ultra, color.renders.standard].filter((item): item is PaintRender => Boolean(item));
+  return [...photos, ...renders];
+}
+
+/** Pierwszy obraz z tej kolejności - podgląd, próbka, pierwszy slajd galerii. */
 export function bestRender(color: PaintColor): PaintRender | null {
-  return color.renders.ultra ?? color.renders.standard ?? null;
+  return paintImages(color)[0] ?? null;
+}
+
+/** Czy mamy zdjęcie tego lakieru na produkcie (a nie samą wizualizację). */
+export function hasPhoto(color: PaintColor): boolean {
+  return (color.renders.photos?.length ?? 0) > 0;
 }
 
 export function paintImageUrl(path: string | null | undefined): string {

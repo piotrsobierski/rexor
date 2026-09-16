@@ -18,7 +18,7 @@ import { CUSTOMER_SUPPLIED_SKU, NONE_SKU, bikeModels, formatPrice, type BikeMode
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
 import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/pricing';
-import { PAINT_GROUP_SLUG, bestRender, findColor, paintImageUrl, usePaints, type PaintColor, type PaintSelection } from '@/lib/paints';
+import { PAINT_GROUP_SLUG, findColor, paintImageUrl, paintImages, usePaints, type PaintColor, type PaintSelection } from '@/lib/paints';
 import { PaintSection } from '@/components/paint-picker';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
@@ -130,10 +130,14 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   // Render ramy w wybranym kolorze wchodzi na początek galerii, zamiast
   // podmieniać scenę na stałe: klient nadal ma dostęp do zdjęć fabrycznych,
   // a porównanie jest jednym ruchem karuzeli.
-  const gallery = useMemo(() => {
-    const render = chosenPaint ? bestRender(chosenPaint.color) : null;
-    return render ? [paintImageUrl(render.image), ...model.gallery] : model.gallery;
-  }, [chosenPaint, model.gallery]);
+  // Zdjęcia realnego roweru w tym lakierze idą przed wizualizacją i przed
+  // zdjęciami fabrycznymi - jeśli mamy dowód koloru, to on otwiera galerię.
+  const paintSlides = useMemo(() => (chosenPaint ? paintImages(chosenPaint.color) : []), [chosenPaint]);
+  const gallery = useMemo(
+    () => [...paintSlides.map((slide) => paintImageUrl(slide.image)), ...model.gallery],
+    [paintSlides, model.gallery],
+  );
+  const paintSlide = galleryIndex < paintSlides.length ? paintSlides[galleryIndex] : null;
 
   // Grupy opcji przychodzą z API, więc domyślne wybory ustawiamy po ich
   // wczytaniu — ale tylko dla modeli, których klient jeszcze nie ruszył.
@@ -391,13 +395,24 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                 <p className="eyebrow">{model.eyebrow}</p>
                 <h2 className="mt-1 text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">{model.name}</h2>
               </div>
-              <span className="ml-auto rounded-full bg-ink-wash px-3 py-1.5 text-xs font-semibold tabular-nums text-ink-muted">{galleryIndex + 1} / {gallery.length}</span>
+              {/* Podpis slajdu lakieru: klient ma wiedzieć, czy patrzy na
+                  wizualizację, czy na rower, który naprawdę stoi w tym kolorze. */}
+              {paintSlide && chosenPaint && <span className="ml-auto rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white">
+                {paintSlide.variant === 'photo' ? 'zdjęcie' : 'wizualizacja'} · {chosenPaint.color.name}
+              </span>}
+              <span className={`rounded-full bg-ink-wash px-3 py-1.5 text-xs font-semibold tabular-nums text-ink-muted ${paintSlide ? '' : 'ml-auto'}`}>{galleryIndex + 1} / {gallery.length}</span>
             </div>
             <Carousel key={`${model.id}-${gallery[0] ?? ''}`} setApi={setCarouselApi} opts={{ loop: gallery.length > 1 }} aria-label={`Zdjęcia modelu ${model.name}`}>
               <CarouselContent className="ml-0">
                 {gallery.map((image, index) => <CarouselItem key={image} className="pl-0">
                   <div className="stage-media p-4 sm:p-8">
-                    <img src={image} alt={index === 0 && chosenPaint ? `${model.name} — wizualizacja w kolorze ${chosenPaint.color.name}` : `${model.name} — zdjęcie ${index + 1}`} loading={index === 0 ? 'eager' : 'lazy'} />
+                    <img
+                      src={image}
+                      alt={index < paintSlides.length && chosenPaint
+                        ? `${model.name} — ${paintSlides[index].variant === 'photo' ? 'zdjęcie' : 'wizualizacja'} w kolorze ${chosenPaint.color.name}`
+                        : `${model.name} — zdjęcie ${index - paintSlides.length + 1}`}
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                    />
                   </div>
                 </CarouselItem>)}
               </CarouselContent>

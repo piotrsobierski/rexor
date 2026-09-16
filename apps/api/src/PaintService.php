@@ -66,7 +66,7 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
         'SELECT r.color_id, r.variant, r.image_path, r.thumb_path, r.source ' .
         'FROM paint_renders r JOIN paint_colors c ON c.id = r.color_id ' .
         "WHERE c.palette_id = :palette AND r.{$definition['column']} = :owner AND r.is_public = TRUE " .
-        'ORDER BY r.variant, r.id'
+        'ORDER BY r.variant, r.sort_order, r.id'
     );
 
     $result = [];
@@ -77,11 +77,21 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
         $renderStatement->execute(['palette' => $paletteId, 'owner' => $ownerId]);
         $renders = [];
         foreach ($renderStatement->fetchAll() as $render) {
-            $renders[(int) $render['color_id']][(string) $render['variant']] = [
+            $colorKey = (int) $render['color_id'];
+            $variant = (string) $render['variant'];
+            $entry = [
+                'variant' => $variant,
                 'image' => $render['image_path'],
                 'thumb' => $render['thumb_path'],
                 'source' => $render['source'],
             ];
+            // Wizualizacji jest po jednej na wariant, zdjęć wiele - stąd
+            // `photos` jako lista, a `standard`/`ultra` jako pojedyncze pola.
+            if ($variant === 'photo') {
+                $renders[$colorKey]['photos'][] = $entry;
+            } else {
+                $renders[$colorKey][$variant] = $entry;
+            }
         }
 
         $colorStatement->execute(['palette' => $paletteId]);
@@ -172,9 +182,13 @@ function resolvePaintSelection(PDO $pdo, string $resource, int $ownerId, ?string
             if ($color['slug'] !== $colorSlug) {
                 continue;
             }
-            // Render "ultra" jest lepszy, więc gdy istnieje, to on trafia do
-            // migawki jako obrazek konfiguracji.
-            $render = $color['renders']['ultra']['image'] ?? $color['renders']['standard']['image'] ?? null;
+            // Prawdziwe zdjęcie bije każdą wizualizację, a "ultra" bije
+            // "standard" - ta sama kolejność co w `bestRender()` po stronie
+            // web. To, co widział klient, trafia do migawki konfiguracji.
+            $render = $color['renders']['photos'][0]['image']
+                ?? $color['renders']['ultra']['image']
+                ?? $color['renders']['standard']['image']
+                ?? null;
 
             return [
                 'colorId' => $color['id'],

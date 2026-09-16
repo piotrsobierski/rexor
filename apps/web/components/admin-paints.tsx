@@ -50,11 +50,18 @@ type Render = {
   colorId: number;
   modelSlug: string | null;
   frameSlug: string | null;
-  variant: 'standard' | 'ultra';
+  variant: 'standard' | 'ultra' | 'photo';
   imagePath: string;
   thumbPath: string | null;
   source: string | null;
+  sortOrder: number;
   isPublic: boolean;
+};
+
+const VARIANT_LABELS: Record<Render['variant'], string> = {
+  standard: 'wizualizacja standard',
+  ultra: 'wizualizacja ultra',
+  photo: 'zdjęcie',
 };
 
 type Availability = { product_slug: string; palette_slug: string; price_gross_override: string | null; is_active: number | string };
@@ -388,7 +395,11 @@ function ColorRow({
   useEffect(() => { setDraft({ ...color }); }, [color]);
 
   const effectivePrice = color.priceGrossOverride ?? palette?.priceGross ?? 0;
-  const thumb = renders.find((render) => render.variant === 'ultra') ?? renders[0];
+  // Ta sama kolejność co w konfiguratorze: zdjęcie bije „ultra”, „ultra” bije
+  // „standard” - miniatura w panelu pokazuje to, co zobaczy klient.
+  const thumb = renders.find((render) => render.variant === 'photo')
+    ?? renders.find((render) => render.variant === 'ultra')
+    ?? renders[0];
 
   return <div className="py-3">
     <button type="button" onClick={onToggle} className="focus-ring flex w-full items-center gap-3 rounded-xl text-left">
@@ -399,7 +410,8 @@ function ColorRow({
         <span className="block truncate font-semibold">{color.name}{!color.isActive && <span className="ml-2 rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase text-ink-subtle">wyłączony</span>}</span>
         <span className="mt-0.5 block truncate text-sm text-ink-muted">
           {palette?.name}{color.code ? ` · ${color.code}` : ''} · {FINISH_LABELS[color.finish]} · {color.hex}
-          {renders.length > 0 && ` · ${renders.length} render(y)`}
+          {renders.filter((render) => render.variant !== 'photo').length > 0 && ` · ${renders.filter((render) => render.variant !== 'photo').length} render(y)`}
+          {renders.filter((render) => render.variant === 'photo').length > 0 && ` · ${renders.filter((render) => render.variant === 'photo').length} zdjęcie/zdjęcia`}
         </span>
       </span>
       <span className="shrink-0 text-sm font-semibold tabular-nums">{effectivePrice === 0 ? 'w cenie' : `+${effectivePrice} zł`}</span>
@@ -469,7 +481,7 @@ function RendersEditor({
   setMessage: (value: string) => void;
 }) {
   const [target, setTarget] = useState(models[0] ? `model:${models[0].slug}` : '');
-  const [variant, setVariant] = useState<'standard' | 'ultra'>('standard');
+  const [variant, setVariant] = useState<Render['variant']>('standard');
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<Render | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -485,33 +497,40 @@ function RendersEditor({
   const elsewhere = renders.length - forTarget.length;
   const targetName = (targetResource === 'model' ? models : frames).find((product) => product.slug === targetSlug)?.name ?? targetSlug;
 
-  async function upload(file: File) {
+  async function upload(files: File[]) {
     const resource = targetResource;
     const slug = targetSlug;
-    if (!slug) { setMessage('Wskaż model albo ramę dla renderu.'); return; }
+    if (!slug) { setMessage('Wskaż model albo ramę dla obrazu.'); return; }
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      const media = await request('/admin/media', { method: 'POST', body: form });
-      await request('/admin/paint-renders', {
-        method: 'POST',
-        body: JSON.stringify({
-          colorId: color.id,
-          [resource === 'model' ? 'modelSlug' : 'frameSlug']: slug,
-          variant,
-          imagePath: media.url,
-          source: 'panel',
-        }),
-      });
+      // Sekwencyjnie, nie równolegle: `sort_order` kolejnego zdjęcia liczy się
+      // z maksimum już zapisanych, więc równoległe zapisy dałyby remis
+      // i przypadkową kolejność ujęć.
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+        const media = await request('/admin/media', { method: 'POST', body: form });
+        await request('/admin/paint-renders', {
+          method: 'POST',
+          body: JSON.stringify({
+            colorId: color.id,
+            [resource === 'model' ? 'modelSlug' : 'frameSlug']: slug,
+            variant,
+            imagePath: media.url,
+            source: 'panel',
+          }),
+        });
+      }
       await reload();
     } catch (error) { setMessage((error as Error).message); } finally { setUploading(false); }
   }
 
   return <div className="border-t border-line pt-4">
-    <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Rendery</h4>
+    <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Rendery i zdjęcia</h4>
     <p className="mt-1 text-xs text-ink-muted">
-      Render zależy od pary kolor + produkt: obraz ramy E55 nie pokaże tego lakieru na E82. Wariant „ultra” ma pierwszeństwo w konfiguratorze.
+      Obraz zależy od pary kolor + produkt: obraz ramy E55 nie pokaże tego lakieru na E82. Pierwszeństwo w konfiguratorze:
+      <strong className="font-semibold text-ink"> zdjęcie → ultra → standard</strong>. Zdjęć realnego roweru może być kilka
+      (każde wgranie dokłada kolejne ujęcie); wizualizacja jest jedna na wariant i kolejne wgranie ją podmienia.
     </p>
 
     <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -522,8 +541,8 @@ function RendersEditor({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-xs text-ink-muted">
           {showAll
-            ? `wszystkie rendery tego koloru (${renders.length})`
-            : `rendery dla: ${targetName} (${forTarget.length})`}
+            ? `wszystkie obrazy tego koloru (${renders.length})`
+            : `obrazy dla: ${targetName} (${forTarget.length})`}
         </span>
         {elsewhere > 0 && <button
           type="button"
@@ -537,7 +556,7 @@ function RendersEditor({
 
     <div className="mt-3 grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
       {visible.length === 0 && <p className="col-span-full text-xs text-ink-muted">
-        Brak renderu tego koloru dla: {targetName}. Wgraj plik poniżej - trafi dokładnie do tej pary kolor + produkt.
+        Brak renderu i zdjęcia tego koloru dla: {targetName}. Wgraj plik poniżej - trafi dokładnie do tej pary kolor + produkt.
       </p>}
       {visible.map((render) => <div key={render.id} className="rounded-xl border border-line bg-white p-2">
         <button
@@ -549,8 +568,8 @@ function RendersEditor({
           {/* Pełny plik, nie `thumbPath`: miniatury z importu mają 96 px i w tym kafelku były rozmyte. */}
           <img src={mediaUrl(render.imagePath)} alt="" loading="lazy" className="aspect-square w-full object-contain" />
         </button>
-        <p className="mt-1.5 truncate text-[11px] text-ink-muted">{render.modelSlug ?? `rama: ${render.frameSlug}`} · {render.variant}</p>
-        <Button size="sm" variant="ghost" className="mt-1 h-7 w-full text-red-600" onClick={async () => { if (!confirm('Usunąć ten render?')) return; try { await request(`/admin/paint-renders/${render.id}`, { method: 'DELETE' }); await reload(); } catch (error) { setMessage((error as Error).message); } }}>
+        <p className="mt-1.5 truncate text-[11px] text-ink-muted">{render.modelSlug ?? `rama: ${render.frameSlug}`} · {VARIANT_LABELS[render.variant]}</p>
+        <Button size="sm" variant="ghost" className="mt-1 h-7 w-full text-red-600" onClick={async () => { if (!confirm(render.variant === 'photo' ? 'Usunąć to zdjęcie?' : 'Usunąć ten render?')) return; try { await request(`/admin/paint-renders/${render.id}`, { method: 'DELETE' }); await reload(); } catch (error) { setMessage((error as Error).message); } }}>
           <Trash2 /> Usuń
         </Button>
       </div>)}
@@ -562,20 +581,23 @@ function RendersEditor({
     <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <span className="text-xs text-ink-muted">wgraj dla: <strong className="font-semibold text-ink">{targetName}</strong></span>
       <div className="flex flex-wrap items-center gap-2">
-        <NativeSelect value={variant} onChange={(event) => setVariant(event.target.value as 'standard' | 'ultra')} className="h-10">
-          <option value="standard">standard</option>
-          <option value="ultra">ultra</option>
+        <NativeSelect value={variant} onChange={(event) => setVariant(event.target.value as Render['variant'])} className="h-10">
+          <option value="standard">wizualizacja standard</option>
+          <option value="ultra">wizualizacja ultra</option>
+          <option value="photo">zdjęcie realnego roweru</option>
         </NativeSelect>
         <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-line px-4 text-sm font-medium hover:border-line-strong">
-          <Upload className="size-4" /> {uploading ? 'Wgrywam…' : 'Wgraj render'}
-          <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.target.value = ''; }} />
+          <Upload className="size-4" /> {uploading ? 'Wgrywam…' : variant === 'photo' ? 'Wgraj zdjęcie' : 'Wgraj render'}
+          {/* Zdjęć bywa kilka na raz (ujęcia jednego roweru), więc dla nich
+              pozwalamy wskazać wiele plików; render i tak byłby podmieniony. */}
+          <input type="file" accept="image/*" multiple={variant === 'photo'} className="sr-only" disabled={uploading} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void upload(files); event.target.value = ''; }} />
         </label>
       </div>
     </div>
 
     <ImagePreviewDialog
       src={preview ? mediaUrl(preview.imagePath) : null}
-      caption={preview ? `${color.name} · ${preview.modelSlug ?? `rama: ${preview.frameSlug}`} · ${preview.variant}` : ''}
+      caption={preview ? `${color.name} · ${preview.modelSlug ?? `rama: ${preview.frameSlug}`} · ${VARIANT_LABELS[preview.variant]}` : ''}
       onClose={() => setPreview(null)}
     />
   </div>;

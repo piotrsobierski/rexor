@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, Info, Maximize2, Palette, Search, X } from 'lucide-react';
+import { Camera, Check, Image as ImageIcon, Info, Maximize2, Palette, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -10,10 +10,13 @@ import {
   FINISH_LABELS,
   bestRender,
   findColor,
+  hasPhoto,
   paintImageUrl,
+  paintImages,
   searchColors,
   type PaintColor,
   type PaintPalette,
+  type PaintRender,
   type PaintSelection,
 } from '@/lib/paints';
 
@@ -153,13 +156,18 @@ export function PaintSection({
  * dało się zobaczyć roweru. W tym trybie bierzemy pełny render (1184x912 albo
  * 1024x1024) i mieścimy go w całości, na białym tle studyjnym renderu -
  * kolorem lakieru nie podmalowujemy, bo dałby kolorowe pasy wokół zdjęcia.
+ *
+ * `image` wskazuje konkretny obraz z galerii koloru (gdy zdjęć jest kilka);
+ * bez niego próbka bierze pierwszy z kolejności `bestRender()`. Zdjęcie
+ * dostaje szare tło zamiast białego - studyjna biel renderu pod fotografią
+ * z realnego tła wyglądała jak dziura w kadrze.
  */
-function ColorPreview({ color, className, full = false }: { color: PaintColor; className?: string; full?: boolean }) {
-  const render = bestRender(color);
+function ColorPreview({ color, className, full = false, image }: { color: PaintColor; className?: string; full?: boolean; image?: PaintRender | null }) {
+  const render = image !== undefined ? image : bestRender(color);
   const source = full ? render?.image ?? render?.thumb ?? null : render?.thumb ?? render?.image ?? null;
   const showsRender = full && source !== null;
   return <span
-    className={`relative block overflow-hidden border border-line ${showsRender ? 'bg-white' : ''} ${className ?? ''}`}
+    className={`relative block overflow-hidden border border-line ${showsRender ? (render?.variant === 'photo' ? 'bg-[#f2f4f2]' : 'bg-white') : ''} ${className ?? ''}`}
     style={showsRender ? undefined : { backgroundColor: color.hex }}
   >
     {source && <img
@@ -237,8 +245,14 @@ export function PaintDialog({
   // liście kolorów, po której klient wciąż przewija.
   const [zoomed, setZoomed] = useState(false);
   // Renderów jest kilkaset na ~690 lakierów, więc sama kropka na próbce nie
-  // wystarczy do ich znalezienia - potrzebny jest filtr.
+  // wystarczy do ich znalezienia - potrzebny jest filtr. Zdjęć realnych
+  // rowerów jest jeszcze mniej, więc mają filtr osobny: kto ich szuka, ten
+  // szuka dowodu koloru, a nie wizualizacji.
   const [onlyWithRender, setOnlyWithRender] = useState(false);
+  const [onlyWithPhoto, setOnlyWithPhoto] = useState(false);
+  // Który obraz z galerii koloru jest na podglądzie. Zdjęć bywa kilka, więc
+  // indeks, a nie pojedynczy render; zmiana lakieru wraca na pierwszy.
+  const [imageIndex, setImageIndex] = useState(0);
   // Podgląd jest stanem modala, nie konfiguracji: klik w próbkę pokazuje
   // lakier, ale ceny nie zmienia dopóki klient nie potwierdzi. Przy 680
   // kolorach przypadkowe trafienie nie może przestawić zamówienia.
@@ -247,19 +261,27 @@ export function PaintDialog({
   useEffect(() => { if (open) setPreview(selection); }, [open, selection]);
   // Zamknięcie pickera nie może zostawić otwartego powiększenia na następny raz.
   useEffect(() => { if (!open) setZoomed(false); }, [open]);
-  useEffect(() => { setZoomed(false); }, [preview]);
+  useEffect(() => { setZoomed(false); setImageIndex(0); }, [preview]);
 
   const renderCount = useMemo(
     () => palettes.reduce((sum, palette) => sum + palette.colors.filter((color) => bestRender(color) !== null).length, 0),
     [palettes],
   );
+  const photoCount = useMemo(
+    () => palettes.reduce((sum, palette) => sum + palette.colors.filter((color) => hasPhoto(color)).length, 0),
+    [palettes],
+  );
 
   const results = useMemo(() => {
-    const found = searchColors(palettes, query, paletteFilter);
-    return onlyWithRender ? found.filter(({ color }) => bestRender(color) !== null) : found;
-  }, [palettes, query, paletteFilter, onlyWithRender]);
+    let found = searchColors(palettes, query, paletteFilter);
+    if (onlyWithPhoto) found = found.filter(({ color }) => hasPhoto(color));
+    else if (onlyWithRender) found = found.filter(({ color }) => bestRender(color) !== null);
+    return found;
+  }, [palettes, query, paletteFilter, onlyWithRender, onlyWithPhoto]);
   const previewed = findColor(palettes, preview);
-  const previewHasRender = previewed !== null && bestRender(previewed.color) !== null;
+  const previewImages = previewed ? paintImages(previewed.color) : [];
+  const previewImage = previewImages[Math.min(imageIndex, previewImages.length - 1)] ?? null;
+  const previewHasRender = previewImage !== null;
 
   // Sekcje po grupie kolorystycznej palety ("Czerwienie", "Błękity").
   // Przy wyszukiwaniu grupujemy po palecie, bo wynik i tak jest przemieszany.
@@ -323,10 +345,15 @@ export function PaintDialog({
               ? <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{paletteNote(palette, requirementFor(palette), formatPrice, includedLabel)}</span>
               : <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{palette.colors.length}</span>}
           </FilterChip>)}
-          {renderCount > 0 && <FilterChip active={onlyWithRender} onClick={() => setOnlyWithRender(!onlyWithRender)}>
+          {renderCount > 0 && <FilterChip active={onlyWithRender} onClick={() => { setOnlyWithRender(!onlyWithRender); setOnlyWithPhoto(false); }}>
             <Camera className="mr-1.5 inline size-3.5 align-[-2px]" />
             Z wizualizacją
             <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{renderCount}</span>
+          </FilterChip>}
+          {photoCount > 0 && <FilterChip active={onlyWithPhoto} onClick={() => { setOnlyWithPhoto(!onlyWithPhoto); setOnlyWithRender(false); }}>
+            <ImageIcon className="mr-1.5 inline size-3.5 align-[-2px]" />
+            Ze zdjęciem
+            <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{photoCount}</span>
           </FilterChip>}
         </div>
       </div>
@@ -344,7 +371,7 @@ export function PaintDialog({
                 return <button
                   key={`${palette.slug}/${color.slug}`}
                   type="button"
-                  title={`${color.name}${color.code ? ` · ${color.code}` : ''}`}
+                  title={`${color.name}${color.code ? ` · ${color.code}` : ''}${hasPhoto(color) ? ' · zdjęcie roweru' : ''}`}
                   aria-label={`${color.name}, ${palette.name}`}
                   aria-pressed={active}
                   onClick={() => setPreview({ paletteSlug: palette.slug, colorSlug: color.slug })}
@@ -352,8 +379,9 @@ export function PaintDialog({
                   style={{ backgroundColor: color.hex }}
                 >
                   {/* Kropka = ten lakier ma policzony render ramy. Ta sama
-                      konwencja co w projekcie e55, tam się sprawdziła. */}
-                  {bestRender(color) && <span className="absolute right-1 top-1 size-1.5 rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />}
+                      konwencja co w projekcie e55, tam się sprawdziła.
+                      Obwódka dokłada informację „to nie render, to zdjęcie”. */}
+                  {bestRender(color) && <span className={`absolute right-1 top-1 size-1.5 rounded-full bg-white ${hasPhoto(color) ? 'shadow-[0_0_0_2px_rgba(0,0,0,0.65)]' : 'shadow-[0_0_0_1px_rgba(0,0,0,0.25)]'}`} />}
                 </button>;
               })}
             </div>
@@ -364,17 +392,41 @@ export function PaintDialog({
           {previewed ? <div className={previewHasRender ? 'block' : 'flex gap-4 sm:block'}>
             {/* Gdy jest render, zdjęcie idzie na pełną szerokość panelu także
                 na telefonie - przy 96 px obok tekstu roweru nie było widać. */}
-            {previewHasRender ? <button
-              type="button"
-              onClick={() => setZoomed(true)}
-              className="focus-ring block w-full rounded-2xl"
-              title="Pokaż wizualizację w powiększeniu"
-            >
-              <ColorPreview color={previewed.color} full className="aspect-[4/3] w-full rounded-2xl" />
-              <span className="mt-1.5 flex items-center justify-center gap-1.5 text-xs font-medium text-ink-muted">
-                <Maximize2 className="size-3.5" /> Powiększ wizualizację
-              </span>
-            </button> : <ColorPreview
+            {previewHasRender ? <div>
+              <button
+                type="button"
+                onClick={() => setZoomed(true)}
+                className="focus-ring block w-full rounded-2xl"
+                title={previewImage?.variant === 'photo' ? 'Pokaż zdjęcie w powiększeniu' : 'Pokaż wizualizację w powiększeniu'}
+              >
+                <span className="relative block">
+                  <ColorPreview color={previewed.color} full image={previewImage} className="aspect-[4/3] w-full rounded-2xl" />
+                  {/* Plakietka wprost na obrazie: klient ma wiedzieć, czy
+                      patrzy na render, czy na rower, który naprawdę stoi
+                      w tym lakierze - to zmienia wagę tego, co widzi. */}
+                  {previewImage?.variant === 'photo' && <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-white">
+                    <ImageIcon className="size-3" /> zdjęcie
+                  </span>}
+                </span>
+                <span className="mt-1.5 flex items-center justify-center gap-1.5 text-xs font-medium text-ink-muted">
+                  <Maximize2 className="size-3.5" /> {previewImage?.variant === 'photo' ? 'Powiększ zdjęcie' : 'Powiększ wizualizację'}
+                </span>
+              </button>
+              {/* Pasek miniatur tylko wtedy, gdy jest w czym przebierać:
+                  przy jednym obrazie byłby drugą kopią tego samego kadru. */}
+              {previewImages.length > 1 && <div className="no-scrollbar mt-2 flex gap-2 overflow-x-auto">
+                {previewImages.map((image, index) => <button
+                  key={`${image.variant}-${image.image}`}
+                  type="button"
+                  onClick={() => setImageIndex(index)}
+                  aria-pressed={image === previewImage}
+                  title={image.variant === 'photo' ? `Zdjęcie ${index + 1}` : 'Wizualizacja'}
+                  className={`focus-ring size-12 shrink-0 overflow-hidden rounded-lg border transition-colors ${image === previewImage ? 'border-ink ring-1 ring-ink' : 'border-line hover:border-line-strong'}`}
+                >
+                  <img src={paintImageUrl(image.thumb ?? image.image)} alt="" loading="lazy" className="size-full bg-white object-cover" />
+                </button>)}
+              </div>}
+            </div> : <ColorPreview
               color={previewed.color}
               className="aspect-square w-24 shrink-0 rounded-2xl sm:w-full"
             />}
@@ -390,10 +442,15 @@ export function PaintDialog({
               {selecting && requirementFor(previewed.palette) && <p className="mt-1 text-xs text-ink-muted">
                 Ten lakier wymaga opcji „{requirementFor(previewed.palette)!.name}” - ustawimy ją automatycznie po wyborze koloru.
               </p>}
+              {/* Trzy stany, trzy różne obietnice - zdjęcie realnego roweru
+                  jest mocniejszym dowodem koloru niż render, więc nie może
+                  jechać pod notką o wizualizacji przygotowanej komputerowo. */}
               <p className="mt-2 text-[11px] leading-relaxed text-ink-subtle">
-                {bestRender(previewed.color)
-                  ? 'Wizualizacja poglądowa przygotowana komputerowo. Rzeczywisty odcień lakieru może się różnić od obrazu na ekranie.'
-                  : 'Dla tego lakieru nie mamy jeszcze wizualizacji na ramie. Próbka pokazuje przybliżony odcień — realny kolor potwierdzimy wzornikiem.'}
+                {previewImage?.variant === 'photo'
+                  ? `Prawdziwe zdjęcie roweru w tym lakierze${previewImages.filter((image) => image.variant === 'photo').length > 1 ? ` (${previewImages.filter((image) => image.variant === 'photo').length} ujęcia)` : ''}, a nie wizualizacja. Odcień na ekranie zależy od światła w kadrze i kalibracji monitora.`
+                  : previewHasRender
+                    ? 'Wizualizacja poglądowa przygotowana komputerowo. Rzeczywisty odcień lakieru może się różnić od obrazu na ekranie.'
+                    : 'Dla tego lakieru nie mamy jeszcze wizualizacji na ramie. Próbka pokazuje przybliżony odcień — realny kolor potwierdzimy wzornikiem.'}
               </p>
               {selecting && onConfirm && <Button
                 type="button"
@@ -424,17 +481,33 @@ export function PaintDialog({
       <Dialog open={zoomed && previewHasRender} onOpenChange={setZoomed}>
         <DialogContent className="w-[min(96vw,1200px)] max-w-none bg-[#101210] p-3 sm:p-4">
           <DialogTitle className="sr-only">
-            {previewed ? `${previewed.color.name} - wizualizacja` : 'Wizualizacja lakieru'}
+            {previewed
+              ? `${previewed.color.name} - ${previewImage?.variant === 'photo' ? 'zdjęcie' : 'wizualizacja'}`
+              : 'Wizualizacja lakieru'}
           </DialogTitle>
-          {previewed && <img
-            src={paintImageUrl(bestRender(previewed.color)?.image ?? bestRender(previewed.color)?.thumb)}
+          {previewed && previewImage && <img
+            src={paintImageUrl(previewImage.image ?? previewImage.thumb)}
             alt=""
             className="max-h-[78vh] w-full rounded-xl bg-white object-contain"
           />}
+          {/* Powiększenie ma własny pasek miniatur: kto tu doszedł, ten ogląda
+              ujęcia, a zamykanie warstwy po każdym z nich byłoby karą. */}
+          {previewImages.length > 1 && <div className="mt-2 flex flex-wrap justify-center gap-2">
+            {previewImages.map((image, index) => <button
+              key={`zoom-${image.variant}-${image.image}`}
+              type="button"
+              onClick={() => setImageIndex(index)}
+              aria-pressed={image === previewImage}
+              className={`focus-ring size-12 overflow-hidden rounded-lg border transition-colors ${image === previewImage ? 'border-white' : 'border-white/25 hover:border-white/60'}`}
+            >
+              <img src={paintImageUrl(image.thumb ?? image.image)} alt="" loading="lazy" className="size-full bg-white object-cover" />
+            </button>)}
+          </div>}
           {previewed && <p className="mt-2 text-center text-xs text-white/70">
             {previewed.color.name}
             {previewed.color.code ? ` · ${previewed.color.code}` : ''} · {previewed.palette.name}
-            {' · '}wizualizacja poglądowa, przygotowana komputerowo
+            {' · '}
+            {previewImage?.variant === 'photo' ? 'prawdziwe zdjęcie roweru w tym lakierze' : 'wizualizacja poglądowa, przygotowana komputerowo'}
           </p>}
         </DialogContent>
       </Dialog>
