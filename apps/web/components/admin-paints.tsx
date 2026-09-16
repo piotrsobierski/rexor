@@ -626,6 +626,112 @@ function ColorRow({
   </div>;
 }
 
+/** Trzy zestawy obrazów w kolejności, w jakiej konfigurator po nie sięga. */
+const SLOTS: Array<{
+  variant: Render['variant'];
+  title: string;
+  rank: string;
+  rule: string;
+  multiple: boolean;
+}> = [
+  {
+    variant: 'photo',
+    title: 'Zdjęcia realnego roweru',
+    rank: '1. wybór',
+    rule: 'Kilka ujęć — każde wgranie dokłada kolejne.',
+    multiple: true,
+  },
+  {
+    variant: 'ultra',
+    title: 'Wizualizacja ultra',
+    rank: '2. wybór',
+    rule: 'Jedna na produkt — nowe wgranie podmienia poprzednią.',
+    multiple: false,
+  },
+  {
+    variant: 'standard',
+    title: 'Wizualizacja standard',
+    rank: '3. wybór',
+    rule: 'Jedna na produkt — nowe wgranie podmienia poprzednią.',
+    multiple: false,
+  },
+];
+
+/** Klucz „produktu” dla obrazu: rendery modeli i ram leżą w jednej tabeli. */
+const renderTarget = (render: Render) => (render.modelSlug !== null ? `model:${render.modelSlug}` : `frame:${render.frameSlug}`);
+
+/**
+ * Jeden z trzech zestawów obrazów dla wybranego produktu.
+ *
+ * Pliki wchodzą przeciągnięciem albo kliknięciem - w obu wypadkach trafiają
+ * dokładnie do tego wariantu, więc nie da się wgrać zdjęcia „w miejsce”
+ * wizualizacji przez nieuwagę przy liście wyboru.
+ */
+function RenderSlot({
+  slot, items, isWinner, uploading, onUpload, onPreview, onDelete,
+}: {
+  slot: (typeof SLOTS)[number];
+  items: Render[];
+  isWinner: boolean;
+  uploading: boolean;
+  onUpload: (files: File[]) => void;
+  onPreview: (render: Render) => void;
+  onDelete: (render: Render) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+
+  function accept(list: FileList | null) {
+    const files = [...(list ?? [])].filter((file) => file.type.startsWith('image/'));
+    if (files.length === 0) return;
+    onUpload(slot.multiple ? files : files.slice(0, 1));
+  }
+
+  return <div
+    onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+    onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+    onDrop={(event) => { event.preventDefault(); setDragging(false); accept(event.dataTransfer.files); }}
+    className={`flex flex-col rounded-2xl border-2 bg-white p-3 transition-colors ${dragging ? 'border-dashed border-ink bg-[#f2f4f2]' : isWinner ? 'border-ink' : 'border-line'}`}
+  >
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{slot.title}</p>
+        <p className="mt-0.5 text-[11px] text-ink-muted">{slot.rank} · {slot.rule}</p>
+      </div>
+      {isWinner && <span className="shrink-0 rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">to widzi klient</span>}
+    </div>
+
+    <div className="mt-3 grid flex-1 grid-cols-2 gap-2">
+      {items.map((render) => <div key={render.id} className="group relative overflow-hidden rounded-xl border border-line bg-[#f2f4f2]">
+        <button type="button" onClick={() => onPreview(render)} className="focus-ring block w-full" title="Pokaż w pełnym rozmiarze">
+          {/* Pełny plik, nie `thumbPath`: miniatury z importu mają 96 px i w tym kafelku były rozmyte. */}
+          <img src={mediaUrl(render.imagePath)} alt="" loading="lazy" className="aspect-square w-full object-contain" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(render)}
+          title="Usuń"
+          className="focus-ring absolute right-1 top-1 rounded-full bg-white/90 p-1.5 text-red-600 shadow-sm transition-opacity hover:bg-white"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      </div>)}
+
+      <label className={`focus-within:ring-2 focus-within:ring-ink/20 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line-strong p-3 text-center text-[11px] text-ink-muted hover:border-ink hover:text-ink ${items.length === 0 ? 'col-span-2 aspect-[2/1]' : 'aspect-square'}`}>
+        <Upload className="size-4" />
+        <span>{uploading ? 'Wgrywam…' : items.length === 0 ? 'Przeciągnij plik albo kliknij' : slot.multiple ? 'Dodaj ujęcie' : 'Podmień'}</span>
+        <input
+          type="file"
+          accept="image/*"
+          multiple={slot.multiple}
+          className="sr-only"
+          disabled={uploading}
+          onChange={(event) => { accept(event.target.files); event.target.value = ''; }}
+        />
+      </label>
+    </div>
+  </div>;
+}
+
 function RendersEditor({
   color, renders, models, frames, request, reload, setMessage,
 }: {
@@ -637,28 +743,26 @@ function RendersEditor({
   reload: () => Promise<void>;
   setMessage: (value: string) => void;
 }) {
-  const [target, setTarget] = useState(models[0] ? `model:${models[0].slug}` : '');
-  const [variant, setVariant] = useState<Render['variant']>('standard');
-  const [uploading, setUploading] = useState(false);
+  const products = useMemo(() => [
+    ...models.map((product) => ({ key: `model:${product.slug}`, slug: product.slug, name: product.name, resource: 'model' as const })),
+    ...frames.map((product) => ({ key: `frame:${product.slug}`, slug: product.slug, name: `rama: ${product.name}`, resource: 'frame' as const })),
+  ], [models, frames]);
+
+  const [target, setTarget] = useState(products[0]?.key ?? '');
+  const [uploadingVariant, setUploadingVariant] = useState<Render['variant'] | null>(null);
   const [preview, setPreview] = useState<Render | null>(null);
-  const [showAll, setShowAll] = useState(false);
 
-  // Render należy do pary kolor + produkt, więc lista musi iść za wyborem
-  // produktu. Wcześniej pokazywała wszystkie rendery koloru niezależnie od
-  // tego, co było wybrane w liście - przełączenie modelu nie zmieniało nic.
-  const [targetResource, targetSlug] = target.split(':');
-  const forTarget = renders.filter((render) => (targetResource === 'model'
-    ? render.modelSlug === targetSlug
-    : render.frameSlug === targetSlug));
-  const visible = showAll ? renders : forTarget;
-  const elsewhere = renders.length - forTarget.length;
-  const targetName = (targetResource === 'model' ? models : frames).find((product) => product.slug === targetSlug)?.name ?? targetSlug;
+  // Render należy do pary kolor + produkt, więc wszystko poniżej idzie za
+  // wybranym produktem: jeden przełącznik steruje i podglądem, i celem
+  // wgrywania, żeby nie dało się wgrać obrazu pod inny rower, niż się ogląda.
+  const current = products.find((product) => product.key === target) ?? products[0];
+  const forTarget = renders.filter((render) => renderTarget(render) === current?.key);
+  const bySlot = (variant: Render['variant']) => forTarget.filter((render) => render.variant === variant);
+  const winner = SLOTS.find((slot) => bySlot(slot.variant).length > 0)?.variant ?? null;
 
-  async function upload(files: File[]) {
-    const resource = targetResource;
-    const slug = targetSlug;
-    if (!slug) { setMessage('Wskaż model albo ramę dla obrazu.'); return; }
-    setUploading(true);
+  async function upload(variant: Render['variant'], files: File[]) {
+    if (!current) { setMessage('Wskaż model albo ramę dla obrazu.'); return; }
+    setUploadingVariant(variant);
     try {
       // Sekwencyjnie, nie równolegle: `sort_order` kolejnego zdjęcia liczy się
       // z maksimum już zapisanych, więc równoległe zapisy dałyby remis
@@ -671,7 +775,7 @@ function RendersEditor({
           method: 'POST',
           body: JSON.stringify({
             colorId: color.id,
-            [resource === 'model' ? 'modelSlug' : 'frameSlug']: slug,
+            [current.resource === 'model' ? 'modelSlug' : 'frameSlug']: current.slug,
             variant,
             imagePath: media.url,
             source: 'panel',
@@ -679,78 +783,63 @@ function RendersEditor({
         });
       }
       await reload();
-    } catch (error) { setMessage((error as Error).message); } finally { setUploading(false); }
+    } catch (error) { setMessage((error as Error).message); } finally { setUploadingVariant(null); }
+  }
+
+  async function remove(render: Render) {
+    if (!confirm(render.variant === 'photo' ? 'Usunąć to zdjęcie?' : 'Usunąć tę wizualizację?')) return;
+    try {
+      await request(`/admin/paint-renders/${render.id}`, { method: 'DELETE' });
+      await reload();
+    } catch (error) { setMessage((error as Error).message); }
   }
 
   return <div className="border-t border-line pt-4">
     <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Rendery i zdjęcia</h4>
     <p className="mt-1 text-xs text-ink-muted">
-      Obraz zależy od pary kolor + produkt: obraz ramy E55 nie pokaże tego lakieru na E82. Pierwszeństwo w konfiguratorze:
-      <strong className="font-semibold text-ink"> zdjęcie → ultra → standard</strong>. Zdjęć realnego roweru może być kilka
-      (każde wgranie dokłada kolejne ujęcie); wizualizacja jest jedna na wariant i kolejne wgranie ją podmienia.
+      Obraz należy do pary kolor + produkt: obraz E55 nie pokaże tego lakieru na E82. Najpierw wybierz produkt,
+      potem przeciągnij plik do właściwego zestawu. Konfigurator bierze pierwszy zestaw, w którym coś jest:
+      <strong className="font-semibold text-ink"> zdjęcie → ultra → standard</strong>.
     </p>
 
-    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-      <NativeSelect value={target} onChange={(event) => setTarget(event.target.value)} className="h-10 w-full sm:w-auto">
-        {models.map((product) => <option key={`m-${product.slug}`} value={`model:${product.slug}`}>{product.name}</option>)}
-        {frames.map((product) => <option key={`f-${product.slug}`} value={`frame:${product.slug}`}>rama: {product.name}</option>)}
-      </NativeSelect>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-xs text-ink-muted">
-          {showAll
-            ? `wszystkie obrazy tego koloru (${renders.length})`
-            : `obrazy dla: ${targetName} (${forTarget.length})`}
-        </span>
-        {elsewhere > 0 && <button
+    <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-subtle">1 · Produkt</p>
+    <div className="mt-2 flex flex-wrap gap-2">
+      {products.map((product) => {
+        const count = renders.filter((render) => renderTarget(render) === product.key).length;
+        const active = product.key === current?.key;
+        return <button
+          key={product.key}
           type="button"
-          onClick={() => setShowAll(!showAll)}
-          className="focus-ring rounded text-xs font-medium text-ink underline underline-offset-4"
+          onClick={() => setTarget(product.key)}
+          aria-pressed={active}
+          className={`focus-ring flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm transition-colors ${active ? 'border-ink bg-ink text-white' : 'border-line bg-white hover:border-line-strong'}`}
         >
-          {showAll ? 'pokaż tylko wybrany produkt' : `pokaż też ${elsewhere} dla innych produktów`}
-        </button>}
-      </div>
+          <span className="font-medium">{product.name}</span>
+          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${active ? 'bg-white/20' : count === 0 ? 'bg-amber-50 text-amber-800' : 'bg-ink-wash text-ink-muted'}`}>
+            {count === 0 ? 'brak' : count}
+          </span>
+        </button>;
+      })}
     </div>
 
-    <div className="mt-3 grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-      {visible.length === 0 && <p className="col-span-full text-xs text-ink-muted">
-        Brak renderu i zdjęcia tego koloru dla: {targetName}. Wgraj plik poniżej - trafi dokładnie do tej pary kolor + produkt.
-      </p>}
-      {visible.map((render) => <div key={render.id} className="rounded-xl border border-line bg-white p-2">
-        <button
-          type="button"
-          onClick={() => setPreview(render)}
-          className="focus-ring block w-full overflow-hidden rounded-lg bg-[#f2f4f2]"
-          title="Pokaż w pełnym rozmiarze"
-        >
-          {/* Pełny plik, nie `thumbPath`: miniatury z importu mają 96 px i w tym kafelku były rozmyte. */}
-          <img src={mediaUrl(render.imagePath)} alt="" loading="lazy" className="aspect-square w-full object-contain" />
-        </button>
-        <p className="mt-1.5 truncate text-[11px] text-ink-muted">{render.modelSlug ?? `rama: ${render.frameSlug}`} · {VARIANT_LABELS[render.variant]}</p>
-        <Button size="sm" variant="ghost" className="mt-1 h-7 w-full text-red-600" onClick={async () => { if (!confirm(render.variant === 'photo' ? 'Usunąć to zdjęcie?' : 'Usunąć ten render?')) return; try { await request(`/admin/paint-renders/${render.id}`, { method: 'DELETE' }); await reload(); } catch (error) { setMessage((error as Error).message); } }}>
-          <Trash2 /> Usuń
-        </Button>
-      </div>)}
+    <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+      2 · Obrazy: <span className="text-ink">{color.name}</span> na <span className="text-ink">{current?.name ?? '—'}</span>
+    </p>
+    <div className="mt-2 grid gap-3 lg:grid-cols-3">
+      {SLOTS.map((slot) => <RenderSlot
+        key={slot.variant}
+        slot={slot}
+        items={bySlot(slot.variant)}
+        isWinner={winner === slot.variant}
+        uploading={uploadingVariant === slot.variant}
+        onUpload={(files) => void upload(slot.variant, files)}
+        onPreview={setPreview}
+        onDelete={(render) => void remove(render)}
+      />)}
     </div>
-
-    {/* Wgrywanie idzie do produktu wybranego wyżej - jedna lista steruje
-        i podglądem, i celem uploadu, żeby nie dało się wgrać renderu pod inny
-        produkt, niż się właśnie ogląda. */}
-    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-      <span className="text-xs text-ink-muted">wgraj dla: <strong className="font-semibold text-ink">{targetName}</strong></span>
-      <div className="flex flex-wrap items-center gap-2">
-        <NativeSelect value={variant} onChange={(event) => setVariant(event.target.value as Render['variant'])} className="h-10">
-          <option value="standard">wizualizacja standard</option>
-          <option value="ultra">wizualizacja ultra</option>
-          <option value="photo">zdjęcie realnego roweru</option>
-        </NativeSelect>
-        <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-line px-4 text-sm font-medium hover:border-line-strong">
-          <Upload className="size-4" /> {uploading ? 'Wgrywam…' : variant === 'photo' ? 'Wgraj zdjęcie' : 'Wgraj render'}
-          {/* Zdjęć bywa kilka na raz (ujęcia jednego roweru), więc dla nich
-              pozwalamy wskazać wiele plików; render i tak byłby podmieniony. */}
-          <input type="file" accept="image/*" multiple={variant === 'photo'} className="sr-only" disabled={uploading} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void upload(files); event.target.value = ''; }} />
-        </label>
-      </div>
-    </div>
+    {winner === null && <p className="mt-2 text-xs text-amber-800">
+      Ten lakier nie ma żadnego obrazu dla: {current?.name}. Przy filtrze „tylko kolory ze zdjęciem albo wizualizacją” klient go tu nie zobaczy.
+    </p>}
 
     <ImagePreviewDialog
       src={preview ? mediaUrl(preview.imagePath) : null}
