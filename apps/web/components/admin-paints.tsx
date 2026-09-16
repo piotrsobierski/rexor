@@ -102,6 +102,26 @@ const FINISH_LABELS: Record<Color['finish'], string> = { uni: 'uni', metallic: '
 
 const mediaUrl = (path: string) => (path.startsWith('http') ? path : `${API_BASE}${path}`);
 
+/**
+ * Powyżej tylu produktów listy przestają być „kilkoma kratkami w rzędzie”
+ * i dostają wyszukiwarkę oraz własny pasek przewijania. Ram bywa kilkaset
+ * (importy, ramy testowe), a rozlane na całą stronę pole wyboru zasłaniało
+ * resztę panelu i zawieszało przeglądarkę.
+ */
+const MANY_PRODUCTS = 12;
+
+type ProductRef = { key: string; slug: string; name: string; resource: 'model' | 'frame' };
+
+function productRefs(models: Product[], frames: Product[]): ProductRef[] {
+  return [
+    ...models.map((product) => ({ key: `model:${product.slug}`, slug: product.slug, name: product.name, resource: 'model' as const })),
+    ...frames.map((product) => ({ key: `frame:${product.slug}`, slug: product.slug, name: `rama: ${product.name}`, resource: 'frame' as const })),
+  ];
+}
+
+const matchesProduct = (product: ProductRef, needle: string) =>
+  needle === '' || product.name.toLowerCase().includes(needle) || product.slug.toLowerCase().includes(needle);
+
 /** Filtr „co widać na liście”: rendery i zdjęcia referencyjne pojawiają się dla różnych kolorów. */
 type GraphicFilter = 'all' | 'render' | 'reference' | 'any' | 'none';
 
@@ -256,6 +276,8 @@ function PaintSettingsPanel({
   setMessage: (value: string) => void;
 }) {
   const [saving, setSaving] = useState(false);
+  const [rowSearch, setRowSearch] = useState('');
+  const [onlyProblems, setOnlyProblems] = useState(false);
   const current = data.settings.colorFilter;
 
   // Ile kolorów zostanie klientowi przy każdym z ustawień - dla każdego
@@ -306,6 +328,12 @@ function PaintSettingsPanel({
   }
 
   const visible = (row: (typeof impact)[number]) => (current === 'with_photo' ? row.withPhoto : current === 'with_image' ? row.withImage : row.all);
+  const problems = impact.filter((row) => visible(row) === 0);
+  const needle = rowSearch.trim().toLowerCase();
+  const rows = impact.filter((row) => {
+    if (onlyProblems && visible(row) > 0) return false;
+    return needle === '' || row.name.toLowerCase().includes(needle);
+  });
 
   return <section className="rounded-3xl border border-line bg-white p-5 sm:p-7">
     <h2 className="text-2xl font-semibold tracking-tight">Ustawienia globalne palet</h2>
@@ -342,9 +370,28 @@ function PaintSettingsPanel({
       lakier bywa policzony dla jednego roweru, a dla drugiego nie. Kolumna „widoczne teraz” pokazuje, ile kolorów zobaczy klient
       przy obecnym ustawieniu.
     </p>
-    <div className="mt-3 overflow-x-auto">
+    <div className="mt-3 flex flex-wrap items-center gap-3">
+      <Input
+        value={rowSearch}
+        onChange={(event) => setRowSearch(event.target.value)}
+        placeholder="Szukaj produktu…"
+        className="h-9 w-full text-sm sm:w-64"
+      />
+      <span className="text-xs text-ink-muted">{rows.length} z {impact.length} produktów</span>
+      {problems.length > 0 && <button
+        type="button"
+        onClick={() => setOnlyProblems(!onlyProblems)}
+        className="focus-ring rounded text-xs font-medium text-ink underline underline-offset-4"
+      >
+        {onlyProblems ? 'pokaż wszystkie produkty' : `pokaż tylko ${problems.length} bez kolorów`}
+      </button>}
+    </div>
+
+    {/* Ram bywa kilkaset, więc tabela dostaje własne przewijanie zamiast
+        rozpychać stronę na kilkanaście ekranów. */}
+    <div className="mt-3 max-h-96 overflow-auto">
       <table className="w-full min-w-[520px] text-sm">
-        <thead className="text-left text-xs uppercase tracking-wider text-ink-subtle">
+        <thead className="sticky top-0 bg-white text-left text-xs uppercase tracking-wider text-ink-subtle">
           <tr>
             <th className="py-2 pr-3 font-semibold">Produkt</th>
             <th className="py-2 pr-3 text-right font-semibold">Wszystkie</th>
@@ -354,7 +401,7 @@ function PaintSettingsPanel({
           </tr>
         </thead>
         <tbody>
-          {impact.map((row) => <tr key={row.key} className="border-t border-line">
+          {rows.map((row) => <tr key={row.key} className="border-t border-line">
             <td className="py-2 pr-3">{row.name}</td>
             <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{row.all}</td>
             <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{row.withImage}</td>
@@ -364,9 +411,10 @@ function PaintSettingsPanel({
         </tbody>
       </table>
     </div>
-    {impact.some((row) => visible(row) === 0) && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
-      Przy tym ustawieniu któryś produkt nie ma ani jednego koloru do wyboru — sekcja lakierowania będzie u niego pusta.
-      Wgraj zdjęcia albo wróć do łagodniejszego filtra.
+    {problems.length > 0 && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+      Przy tym ustawieniu {problems.length === 1 ? 'jeden produkt nie ma' : `${problems.length} produktów nie ma`} ani jednego koloru do wyboru
+      — sekcja lakierowania będzie u {problems.length === 1 ? 'niego' : 'nich'} pusta ({problems.slice(0, 3).map((row) => row.name).join(', ')}
+      {problems.length > 3 ? ` i ${problems.length - 3} więcej` : ''}). Wgraj zdjęcia albo wróć do łagodniejszego filtra.
     </p>}
   </section>;
 }
@@ -383,6 +431,7 @@ function PalettesPanel({
 }) {
   const [drafts, setDrafts] = useState<Record<number, Palette>>(() => Object.fromEntries(data.palettes.map((row) => [row.id, { ...row }])));
   const [newName, setNewName] = useState('');
+  const products = useMemo(() => productRefs(models, frames), [models, frames]);
   useEffect(() => { setDrafts(Object.fromEntries(data.palettes.map((row) => [row.id, { ...row }]))); }, [data.palettes]);
 
   async function save(palette: Palette) {
@@ -450,30 +499,14 @@ function PalettesPanel({
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-3 text-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Dostępna w</span>
-            {(() => {
-              const active = activeCount(palette.slug);
-              if (active === 0) return <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">nigdzie - konfigurator jej nie pokaże</span>;
-              return <span className="rounded-full bg-ink-wash px-2 py-0.5 text-xs text-ink-muted">
-                {active === productCount ? `wszędzie (${active}/${productCount})` : `${active}/${productCount} produktów`}
-              </span>;
-            })()}
-            {models.map((product) => <label key={`m-${product.slug}`} className="flex items-center gap-1.5">
-              <Checkbox
-                checked={activeFor(data.availability.models, product.slug, palette.slug)}
-                onCheckedChange={(checked) => toggleAvailability('model', product.slug, palette.slug, checked === true)}
-              />
-              {product.name}
-            </label>)}
-            {frames.map((product) => <label key={`f-${product.slug}`} className="flex items-center gap-1.5">
-              <Checkbox
-                checked={activeFor(data.availability.frames, product.slug, palette.slug)}
-                onCheckedChange={(checked) => toggleAvailability('frame', product.slug, palette.slug, checked === true)}
-              />
-              <span className="text-ink-muted">rama:</span> {product.name}
-            </label>)}
-          </div>
+          <AvailabilityPicker
+            paletteSlug={palette.slug}
+            products={products}
+            activeCount={activeCount(palette.slug)}
+            productCount={productCount}
+            isActive={(product) => activeFor(product.resource === 'model' ? data.availability.models : data.availability.frames, product.slug, palette.slug)}
+            onToggle={(product, isActive) => toggleAvailability(product.resource, product.slug, palette.slug, isActive)}
+          />
         </div>;
       })}
     </div>
@@ -495,6 +528,74 @@ function PalettesPanel({
       </Button>
     </div>
   </section>;
+}
+
+/**
+ * „Dostępna w” dla jednej palety.
+ *
+ * Przy trzech rowerach to zwykły rząd pól wyboru. Przy kilkuset ramach rząd
+ * rozlewał się na ekrany w dół i panel stawał się nie do użycia, więc lista
+ * dostaje wyszukiwarkę, własne przewijanie i domyślnie pokazuje tylko to,
+ * co jest włączone - resztę znajduje się po nazwie.
+ */
+function AvailabilityPicker({
+  paletteSlug, products, activeCount, productCount, isActive, onToggle,
+}: {
+  paletteSlug: string;
+  products: ProductRef[];
+  activeCount: number;
+  productCount: number;
+  isActive: (product: ProductRef) => boolean;
+  onToggle: (product: ProductRef, isActive: boolean) => void;
+}) {
+  const crowded = products.length > MANY_PRODUCTS;
+  const [search, setSearch] = useState('');
+  const [showAll, setShowAll] = useState(!crowded);
+
+  const needle = search.trim().toLowerCase();
+  const visible = products.filter((product) => {
+    if (!matchesProduct(product, needle)) return false;
+    return showAll || needle !== '' || isActive(product);
+  });
+
+  return <div className="mt-3 border-t border-line pt-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Dostępna w</span>
+      {activeCount === 0
+        ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">nigdzie - konfigurator jej nie pokaże</span>
+        : <span className="rounded-full bg-ink-wash px-2 py-0.5 text-xs text-ink-muted">
+          {activeCount === productCount ? `wszędzie (${activeCount}/${productCount})` : `${activeCount}/${productCount} produktów`}
+        </span>}
+      {crowded && <>
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Szukaj produktu…"
+          className="h-8 w-full text-sm sm:w-56"
+        />
+        <button
+          type="button"
+          onClick={() => setShowAll(!showAll)}
+          className="focus-ring rounded text-xs font-medium text-ink underline underline-offset-4"
+        >
+          {showAll ? 'pokaż tylko włączone' : `pokaż wszystkie (${products.length})`}
+        </button>
+      </>}
+    </div>
+
+    <div className={`mt-2 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3 ${crowded ? 'max-h-52 overflow-y-auto pr-1' : ''}`}>
+      {visible.length === 0 && <p className="text-xs text-ink-muted">
+        {needle === '' ? 'Nic nie jest włączone - użyj „pokaż wszystkie”.' : 'Żaden produkt nie pasuje do wyszukiwania.'}
+      </p>}
+      {visible.map((product) => <label key={`${paletteSlug}-${product.key}`} className="flex min-w-0 items-center gap-1.5">
+        <Checkbox
+          checked={isActive(product)}
+          onCheckedChange={(checked) => onToggle(product, checked === true)}
+        />
+        <span className="truncate">{product.name}</span>
+      </label>)}
+    </div>
+  </div>;
 }
 
 function NewColorForm({
@@ -743,19 +844,20 @@ function RendersEditor({
   reload: () => Promise<void>;
   setMessage: (value: string) => void;
 }) {
-  const products = useMemo(() => [
-    ...models.map((product) => ({ key: `model:${product.slug}`, slug: product.slug, name: product.name, resource: 'model' as const })),
-    ...frames.map((product) => ({ key: `frame:${product.slug}`, slug: product.slug, name: `rama: ${product.name}`, resource: 'frame' as const })),
-  ], [models, frames]);
+  const products = useMemo(() => productRefs(models, frames), [models, frames]);
 
   const [target, setTarget] = useState(products[0]?.key ?? '');
   const [uploadingVariant, setUploadingVariant] = useState<Render['variant'] | null>(null);
   const [preview, setPreview] = useState<Render | null>(null);
+  const [productSearch, setProductSearch] = useState('');
 
   // Render należy do pary kolor + produkt, więc wszystko poniżej idzie za
   // wybranym produktem: jeden przełącznik steruje i podglądem, i celem
   // wgrywania, żeby nie dało się wgrać obrazu pod inny rower, niż się ogląda.
   const current = products.find((product) => product.key === target) ?? products[0];
+  const crowded = products.length > MANY_PRODUCTS;
+  const needle = productSearch.trim().toLowerCase();
+  const shownProducts = products.filter((product) => product.key === current?.key || matchesProduct(product, needle));
   const forTarget = renders.filter((render) => renderTarget(render) === current?.key);
   const bySlot = (variant: Render['variant']) => forTarget.filter((render) => render.variant === variant);
   const winner = SLOTS.find((slot) => bySlot(slot.variant).length > 0)?.variant ?? null;
@@ -802,9 +904,25 @@ function RendersEditor({
       <strong className="font-semibold text-ink"> zdjęcie → ultra → standard</strong>.
     </p>
 
-    <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-subtle">1 · Produkt</p>
-    <div className="mt-2 flex flex-wrap gap-2">
-      {products.map((product) => {
+    <div className="mt-4 flex flex-wrap items-center gap-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">1 · Produkt</p>
+      {crowded && <>
+        <Input
+          value={productSearch}
+          onChange={(event) => setProductSearch(event.target.value)}
+          placeholder="Szukaj modelu albo ramy…"
+          className="h-9 w-full text-sm sm:w-64"
+        />
+        <span className="text-xs text-ink-muted">{shownProducts.length} z {products.length}</span>
+      </>}
+    </div>
+
+    {/* Przy kilkuset ramach rząd chipów zająłby kilkanaście ekranów, więc
+        dostaje wyszukiwarkę i własne przewijanie. Wybrany produkt jest zawsze
+        na liście, nawet gdy wypadnie z wyszukiwania. */}
+    <div className={`mt-2 flex flex-wrap gap-2 ${crowded ? 'max-h-40 overflow-y-auto pr-1' : ''}`}>
+      {shownProducts.length === 0 && <p className="text-xs text-ink-muted">Żaden produkt nie pasuje do wyszukiwania.</p>}
+      {shownProducts.map((product) => {
         const count = renders.filter((render) => renderTarget(render) === product.key).length;
         const active = product.key === current?.key;
         return <button
