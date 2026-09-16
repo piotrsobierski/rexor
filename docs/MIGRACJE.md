@@ -34,6 +34,9 @@ Skrót wdrożeniowy `php scripts/startup.php` uruchamia migracje z `--apply`. Sk
 
 ## Wykonane zmiany schematu poza migracją bazową
 
+- `032_rename_porsche_palette.sql` (16 września 2026) - zmienia nazwę palety
+  `porsche-pts` z „Porsche Paint to Sample" na „Porsche" (slug bez zmian).
+  Wykonana lokalnie na MySQL 8.0.
 - `031_test_frame_scott_spark.sql` (16 września 2026) - **dane testowe**: rama
   „Scott Spark (rama testowa)" w kategorii MTB wraz z czterema zdjęciami
   i kompletem palet lakierów. Tabela `frames` była pusta na dev i produkcji,

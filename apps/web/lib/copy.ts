@@ -108,7 +108,7 @@ export const defaultCopy = {
     factsTitle: 'Najważniejsze cechy',
     paintBadge: 'Lakierowanie wg projektu',
     paintSectionTitle: 'Kolory lakieru',
-    paintSectionText: 'Ramę lakierujemy w kolorze z naszej palety albo w dowolnym odcieniu z palet samochodowych Porsche Paint to Sample i Volkswagen. Podstrona ramy służy do obejrzenia kolorów - zakres lakierowania i cenę ustalamy w rozmowie.',
+    paintSectionText: 'Ramę lakierujemy w kolorze z naszej palety albo w dowolnym odcieniu z palet samochodowych Porsche i Volkswagen. Podstrona ramy służy do obejrzenia kolorów - zakres lakierowania i cenę ustalamy w rozmowie.',
     paintBrowseCta: 'Przeglądaj kolory',
     paintBrowseLoading: 'Wczytuję kolory…',
     paintBrowseEmpty: 'Dla tej ramy nie włączono jeszcze palet kolorów. Napisz do nas - kolor ustalimy indywidualnie.',
