@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, Info, Palette, Search, X } from 'lucide-react';
+import { Camera, Check, Info, Maximize2, Palette, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -213,6 +213,10 @@ function PaintDialog({
 }) {
   const [query, setQuery] = useState('');
   const [paletteFilter, setPaletteFilter] = useState<string | null>(null);
+  // Panel podglądu ma ok. 340 px, więc render roweru jest tam znaczkiem.
+  // Powiększenie to osobna warstwa nad modalem, żeby nie zabierać miejsca
+  // liście kolorów, po której klient wciąż przewija.
+  const [zoomed, setZoomed] = useState(false);
   // Renderów jest kilkaset na ~690 lakierów, więc sama kropka na próbce nie
   // wystarczy do ich znalezienia - potrzebny jest filtr.
   const [onlyWithRender, setOnlyWithRender] = useState(false);
@@ -222,6 +226,9 @@ function PaintDialog({
   const [preview, setPreview] = useState<PaintSelection | null>(selection);
 
   useEffect(() => { if (open) setPreview(selection); }, [open, selection]);
+  // Zamknięcie pickera nie może zostawić otwartego powiększenia na następny raz.
+  useEffect(() => { if (!open) setZoomed(false); }, [open]);
+  useEffect(() => { setZoomed(false); }, [preview]);
 
   const renderCount = useMemo(
     () => palettes.reduce((sum, palette) => sum + palette.colors.filter((color) => bestRender(color) !== null).length, 0),
@@ -334,13 +341,20 @@ function PaintDialog({
           {previewed ? <div className={previewHasRender ? 'block' : 'flex gap-4 sm:block'}>
             {/* Gdy jest render, zdjęcie idzie na pełną szerokość panelu także
                 na telefonie - przy 96 px obok tekstu roweru nie było widać. */}
-            <ColorPreview
+            {previewHasRender ? <button
+              type="button"
+              onClick={() => setZoomed(true)}
+              className="focus-ring block w-full rounded-2xl"
+              title="Pokaż wizualizację w powiększeniu"
+            >
+              <ColorPreview color={previewed.color} full className="aspect-[4/3] w-full rounded-2xl" />
+              <span className="mt-1.5 flex items-center justify-center gap-1.5 text-xs font-medium text-ink-muted">
+                <Maximize2 className="size-3.5" /> Powiększ wizualizację
+              </span>
+            </button> : <ColorPreview
               color={previewed.color}
-              full={previewHasRender}
-              className={previewHasRender
-                ? 'aspect-[4/3] w-full rounded-2xl'
-                : 'aspect-square w-24 shrink-0 rounded-2xl sm:w-full'}
-            />
+              className="aspect-square w-24 shrink-0 rounded-2xl sm:w-full"
+            />}
             <div className={previewHasRender ? 'mt-4 min-w-0' : 'min-w-0 flex-1 sm:mt-4'}>
               <p className="text-lg font-semibold leading-tight tracking-tight">{previewed.color.name}</p>
               <p className="mt-1 text-sm text-ink-muted">
@@ -381,6 +395,26 @@ function PaintDialog({
           Wybierz {previewed.color.name}
         </Button>
       </div>}
+
+      {/* Warstwa nad modalem wyboru. Radix domyka najpierw ją, więc Escape
+          zamyka powiększenie, a nie cały picker. */}
+      <Dialog open={zoomed && previewHasRender} onOpenChange={setZoomed}>
+        <DialogContent className="w-[min(96vw,1200px)] max-w-none bg-[#101210] p-3 sm:p-4">
+          <DialogTitle className="sr-only">
+            {previewed ? `${previewed.color.name} - wizualizacja` : 'Wizualizacja lakieru'}
+          </DialogTitle>
+          {previewed && <img
+            src={paintImageUrl(bestRender(previewed.color)?.image ?? bestRender(previewed.color)?.thumb)}
+            alt=""
+            className="max-h-[78vh] w-full rounded-xl bg-white object-contain"
+          />}
+          {previewed && <p className="mt-2 text-center text-xs text-white/70">
+            {previewed.color.name}
+            {previewed.color.code ? ` · ${previewed.color.code}` : ''} · {previewed.palette.name}
+            {' · '}wizualizacja poglądowa, przygotowana komputerowo
+          </p>}
+        </DialogContent>
+      </Dialog>
     </DialogContent>
   </Dialog>;
 }
