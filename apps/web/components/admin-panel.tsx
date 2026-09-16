@@ -4394,11 +4394,12 @@ function BatteriesEditor({
           const rows = batteries.filter(
             (row) => Number(row.model_id) === Number(model.id),
           );
-          const modelSlug = String(model.slug || model.name || 'e82')
-            .toLowerCase()
-            .includes('e55')
+          const rawSlug = String(model.slug || model.name || '').toLowerCase();
+          const modelSlug = rawSlug.includes('e55')
             ? 'e55'
-            : 'e82';
+            : rawSlug.includes('e82')
+              ? 'e82'
+              : rawSlug.replace(/[^a-z0-9]/g, '') || 'model';
           const draftNew = newRows[Number(model.id)] ?? { ...emptyBattery };
 
           return (

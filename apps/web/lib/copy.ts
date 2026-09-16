@@ -122,7 +122,7 @@ export const defaultCopy = {
   projects: {
     eyebrow: 'Realizacje',
     title: 'Rowery, które już jeżdżą.',
-    subtitle: 'Prawdziwe składy zbudowane w Rexor - ze zdjęciami i pełnym spisem komponentów.',
+    subtitle: 'Prawdziwe realizacje zbudowane w Rexor - ze zdjęciami i pełnym spisem komponentów.',
     empty: 'Nie opublikowaliśmy jeszcze żadnej realizacji. Wkrótce się to zmieni.',
     cardDetailsCta: 'Zobacz realizację',
     completedPrefix: 'Ukończono',
