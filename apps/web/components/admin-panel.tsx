@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -2019,6 +2020,9 @@ function ModelsEditor({
       ]),
     ),
   );
+  const list = useLongList(rows, (row) =>
+    `${String(row.name ?? '')} ${String(row.slug ?? '')}`,
+  );
   const editorRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -2224,8 +2228,13 @@ function ModelsEditor({
           <Save /> Dodaj model
         </Button>
       </div>
+      <LongListSearch
+        list={list}
+        placeholder="Szukaj modelu po nazwie albo slugu…"
+        noun="modeli"
+      />
       <div className="grid gap-6">
-        {rows.map((row) => {
+        {list.visible.map((row) => {
           const modelMedia = media.filter((item) => item.model_id === row.id);
           return (
             <article
@@ -2559,7 +2568,90 @@ function ModelsEditor({
           );
         })}
       </div>
+      <LongListMore list={list} noun="modeli" />
     </Panel>
+  );
+}
+
+/**
+ * Długie listy kart w panelu (modele, ramy, realizacje).
+ *
+ * Każda karta to pełny edytor z polami rich-text, więc kilkaset ram naraz
+ * zawieszało przeglądarkę. Lista dostaje wyszukiwarkę i doładowywanie
+ * porcjami: w DOM-ie siedzi tylko tyle kart, ile widać.
+ */
+function useLongList<T>(rows: T[], toText: (row: T) => string, pageSize = 12) {
+  const [search, setSearch] = useState('');
+  const [limit, setLimit] = useState(pageSize);
+  const needle = search.trim().toLowerCase();
+
+  const filtered = useMemo(
+    () => (needle === '' ? rows : rows.filter((row) => toText(row).toLowerCase().includes(needle))),
+    // toText jest tworzone na nowo przy każdym renderze - celowo pomijamy je
+    // w zależnościach, bo liczy się tylko treść wierszy i szukana fraza.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, needle],
+  );
+
+  useEffect(() => {
+    setLimit(pageSize);
+  }, [needle, pageSize]);
+
+  return {
+    search,
+    setSearch,
+    total: rows.length,
+    matched: filtered.length,
+    visible: filtered.slice(0, limit),
+    hidden: Math.max(filtered.length - limit, 0),
+    showMore: () => setLimit((value) => value + pageSize),
+  };
+}
+
+/** Pasek wyszukiwania nad listą kart; chowa się, gdy pozycji jest niewiele. */
+function LongListSearch({
+  list,
+  placeholder,
+  noun,
+}: {
+  list: ReturnType<typeof useLongList<any>>;
+  placeholder: string;
+  noun: string;
+}) {
+  if (list.total <= 12) return null;
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="relative w-full sm:w-80">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-subtle" />
+        <Input
+          value={list.search}
+          onChange={(event) => list.setSearch(event.target.value)}
+          placeholder={placeholder}
+          className="h-9 pl-9 text-sm"
+        />
+      </div>
+      <span className="text-xs text-ink-muted">
+        {list.search.trim() === ''
+          ? `${list.total} ${noun}`
+          : `${list.matched} z ${list.total} ${noun}`}
+      </span>
+    </div>
+  );
+}
+
+/** Przycisk „pokaż kolejne” pod listą kart. */
+function LongListMore({
+  list,
+  noun,
+}: {
+  list: ReturnType<typeof useLongList<any>>;
+  noun: string;
+}) {
+  if (list.hidden === 0) return null;
+  return (
+    <Button variant="outline" className="mt-6" onClick={list.showMore}>
+      Pokaż kolejne ({list.hidden} {noun})
+    </Button>
   );
 }
 
@@ -2633,6 +2725,9 @@ function FramesEditor({
 }) {
   const [drafts, setDrafts] = useState<Record<number, Row>>(() =>
     frameDrafts(rows),
+  );
+  const list = useLongList(rows, (row) =>
+    `${String(row.name ?? '')} ${String(row.manufacturer ?? '')} ${String(row.slug ?? '')}`,
   );
   const descriptionRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const geometryRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -2904,8 +2999,18 @@ function FramesEditor({
           Nie ma jeszcze żadnej ramy. Dodaj pierwszą powyżej.
         </p>
       )}
+      <LongListSearch
+        list={list}
+        placeholder="Szukaj ramy po nazwie, producencie albo slugu…"
+        noun="ram"
+      />
+      {list.matched === 0 && rows.length > 0 && (
+        <p className="text-sm text-ink-muted">
+          Żadna rama nie pasuje do wyszukiwania.
+        </p>
+      )}
       <div className="grid gap-6">
-        {rows.map((row) => {
+        {list.visible.map((row) => {
           const frameMedia = media.filter((item) => item.frame_id === row.id);
           const gallery = frameMedia.filter((item) => item.role !== 'geometry');
           const geometryImages = frameMedia.filter(
@@ -3366,6 +3471,7 @@ function FramesEditor({
           );
         })}
       </div>
+      <LongListMore list={list} noun="ram" />
     </Panel>
   );
 }
@@ -3414,6 +3520,9 @@ function ProjectsEditor({
   // w `Row` (same skalary), więc trzymamy go w osobnym stanie obok draftów.
   const [specs, setSpecs] = useState<Record<number, SpecificationRow[]>>(() =>
     projectSpecifications(rows),
+  );
+  const list = useLongList(rows, (row) =>
+    `${String(row.title ?? '')} ${String(row.slug ?? '')}`,
   );
   const contentRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const [newProject, setNewProject] = useState<{
@@ -3643,8 +3752,13 @@ function ProjectsEditor({
           Nie ma jeszcze żadnej realizacji. Dodaj pierwszą powyżej.
         </p>
       )}
+      <LongListSearch
+        list={list}
+        placeholder="Szukaj realizacji po tytule albo slugu…"
+        noun="realizacji"
+      />
       <div className="grid gap-6">
-        {rows.map((row) => {
+        {list.visible.map((row) => {
           const projectMedia = media.filter(
             (item) => item.project_id === row.id,
           );
@@ -4100,6 +4214,7 @@ function ProjectsEditor({
           );
         })}
       </div>
+      <LongListMore list={list} noun="realizacji" />
     </Panel>
   );
 }
