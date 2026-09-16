@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Info, Palette, Search, X } from 'lucide-react';
+import { Camera, Check, Info, Palette, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -61,7 +61,18 @@ export function PaintSection({
 }: Props) {
   const [open, setOpen] = useState(false);
   const chosen = findColor(palettes, selection);
+  // Administrator może wyłączyć wszystkie palety dla modelu. Wtedy nie
+  // pokazujemy pustego wyboru koloru, tylko mówimy, co dalej.
+  const noPalettes = paintState === 'ready' && palettes.length === 0;
   const defaultPrice = choices.find((choice) => choice.sku === defaultSku)?.price ?? 0;
+
+  /** Paleta „custom” nie ma własnej ceny - kosztuje wymagany proces lakierowania. */
+  function requirementFor(palette: PaintPalette): PaintRequirement {
+    if (!palette.requiresPartSku) return null;
+    const choice = choices.find((item) => item.sku === palette.requiresPartSku);
+    if (!choice) return null;
+    return { name: choice.name, delta: (choice.price ?? 0) - defaultPrice };
+  }
 
   function openPicker() {
     onOpen();
@@ -87,7 +98,9 @@ export function PaintSection({
       })}
     </RadioGroup>}
 
-    <div className="mt-3 rounded-2xl border border-line p-3.5">
+    {noPalettes ? <p className="mt-3 rounded-2xl border border-line bg-ink-wash/40 p-3.5 text-sm text-ink-muted">
+      Dla tego modelu nie włączono jeszcze żadnej palety kolorów. Kolor ustalimy indywidualnie - napisz w uwagach, na czym Ci zależy.
+    </p> : <div className="mt-3 rounded-2xl border border-line p-3.5">
       {chosen ? <div className="flex items-center gap-3.5">
         <ColorPreview color={chosen.color} className="size-14 shrink-0 rounded-xl" />
         <div className="min-w-0 flex-1">
@@ -98,7 +111,7 @@ export function PaintSection({
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-sm font-semibold tabular-nums">{chosen.color.priceGross === 0 ? includedLabel : `+${formatPrice(chosen.color.priceGross)}`}</p>
+          <p className="text-sm font-semibold tabular-nums">{paletteNote(chosen.palette, requirementFor(chosen.palette), formatPrice, includedLabel, chosen.color.priceGross)}</p>
           <button type="button" onClick={openPicker} className="focus-ring mt-1 rounded text-sm font-medium text-ink underline underline-offset-4">Zmień</button>
         </div>
       </div> : <button type="button" onClick={openPicker} className="focus-ring flex w-full items-center gap-3.5 rounded-xl text-left">
@@ -106,11 +119,11 @@ export function PaintSection({
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Wybierz kolor</span>
           <span className="mt-0.5 block text-sm text-ink-muted">
-            {paintState === 'error' ? 'Nie udało się pobrać palet lakierów.' : 'Kolory Rexor w cenie, palety Porsche i Volkswagen z dopłatą.'}
+            {paintState === 'error' ? 'Nie udało się pobrać palet lakierów.' : 'Kolor producenta w cenie; palety Porsche i Volkswagen przy lakierowaniu jednokolorowym.'}
           </span>
         </span>
       </button>}
-    </div>
+    </div>}
 
     <p className="mt-3 flex gap-2 text-xs leading-relaxed text-ink-muted">
       <Info className="mt-0.5 size-3.5 shrink-0" />
@@ -126,6 +139,7 @@ export function PaintSection({
       onConfirm={(next, color) => { onSelect(next, color); setOpen(false); }}
       formatPrice={formatPrice}
       includedLabel={includedLabel}
+      requirementFor={requirementFor}
     />
   </>;
 }
@@ -157,6 +171,25 @@ function ColorPreview({ color, className, full = false }: { color: PaintColor; c
   </span>;
 }
 
+/**
+ * Etykieta palety. Dopłata za sam kolor jest dziś zerowa - klient płaci za
+ * proces lakierowania (część z grupy `paint`), więc w chipie pokazujemy tę
+ * kwotę, a nie mylące „w cenie”.
+ */
+type PaintRequirement = { name: string; delta: number } | null;
+
+function paletteNote(
+  palette: PaintPalette,
+  requirement: PaintRequirement,
+  formatPrice: (value: number) => string,
+  includedLabel: string,
+  price: number = palette.priceGross,
+): string {
+  if (price > 0) return `+${formatPrice(price)}`;
+  if (requirement && requirement.delta > 0) return `+${formatPrice(requirement.delta)} za lakierowanie`;
+  return includedLabel;
+}
+
 function PaintDialog({
   open,
   onOpenChange,
@@ -166,6 +199,7 @@ function PaintDialog({
   onConfirm,
   formatPrice,
   includedLabel,
+  requirementFor,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -175,9 +209,13 @@ function PaintDialog({
   onConfirm: (selection: PaintSelection, color: PaintColor) => void;
   formatPrice: (value: number) => string;
   includedLabel: string;
+  requirementFor: (palette: PaintPalette) => PaintRequirement;
 }) {
   const [query, setQuery] = useState('');
   const [paletteFilter, setPaletteFilter] = useState<string | null>(null);
+  // Renderów jest kilkaset na ~690 lakierów, więc sama kropka na próbce nie
+  // wystarczy do ich znalezienia - potrzebny jest filtr.
+  const [onlyWithRender, setOnlyWithRender] = useState(false);
   // Podgląd jest stanem modala, nie konfiguracji: klik w próbkę pokazuje
   // lakier, ale ceny nie zmienia dopóki klient nie potwierdzi. Przy 680
   // kolorach przypadkowe trafienie nie może przestawić zamówienia.
@@ -185,7 +223,15 @@ function PaintDialog({
 
   useEffect(() => { if (open) setPreview(selection); }, [open, selection]);
 
-  const results = useMemo(() => searchColors(palettes, query, paletteFilter), [palettes, query, paletteFilter]);
+  const renderCount = useMemo(
+    () => palettes.reduce((sum, palette) => sum + palette.colors.filter((color) => bestRender(color) !== null).length, 0),
+    [palettes],
+  );
+
+  const results = useMemo(() => {
+    const found = searchColors(palettes, query, paletteFilter);
+    return onlyWithRender ? found.filter(({ color }) => bestRender(color) !== null) : found;
+  }, [palettes, query, paletteFilter, onlyWithRender]);
   const previewed = findColor(palettes, preview);
   const previewHasRender = previewed !== null && bestRender(previewed.color) !== null;
 
@@ -245,8 +291,13 @@ function PaintDialog({
           <FilterChip active={paletteFilter === null} onClick={() => setPaletteFilter(null)}>Wszystkie</FilterChip>
           {palettes.map((palette) => <FilterChip key={palette.slug} active={paletteFilter === palette.slug} onClick={() => setPaletteFilter(palette.slug)}>
             {palette.name}
-            <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{palette.priceGross === 0 ? includedLabel : `+${formatPrice(palette.priceGross)}`}</span>
+            <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{paletteNote(palette, requirementFor(palette), formatPrice, includedLabel)}</span>
           </FilterChip>)}
+          {renderCount > 0 && <FilterChip active={onlyWithRender} onClick={() => setOnlyWithRender(!onlyWithRender)}>
+            <Camera className="mr-1.5 inline size-3.5 align-[-2px]" />
+            Z wizualizacją
+            <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{renderCount}</span>
+          </FilterChip>}
         </div>
       </div>
 
@@ -254,7 +305,7 @@ function PaintDialog({
         <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           {paintState === 'loading' && <p className="py-10 text-center text-sm text-ink-muted">Wczytuję palety lakierów…</p>}
           {paintState === 'error' && <p className="py-10 text-center text-sm text-ink-muted">Nie udało się pobrać palet. Odśwież stronę i spróbuj ponownie.</p>}
-          {paintState === 'ready' && results.length === 0 && <p className="py-10 text-center text-sm text-ink-muted">Nic nie pasuje do „{query}”.</p>}
+          {paintState === 'ready' && results.length === 0 && <p className="py-10 text-center text-sm text-ink-muted">{query.trim() === '' ? 'Brak lakierów spełniających wybrane filtry.' : `Nic nie pasuje do „${query}”.`}</p>}
           {sections.map(([label, rows]) => <section key={label} className="mb-5">
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink-subtle">{label}</h4>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-2">
@@ -297,8 +348,11 @@ function PaintDialog({
                 {previewed.color.code ? ` · ${previewed.color.code}` : ''} · {FINISH_LABELS[previewed.color.finish]}
               </p>
               <p className="mt-2 text-base font-semibold tabular-nums">
-                {previewed.color.priceGross === 0 ? includedLabel : `+${formatPrice(previewed.color.priceGross)}`}
+                {paletteNote(previewed.palette, requirementFor(previewed.palette), formatPrice, includedLabel, previewed.color.priceGross)}
               </p>
+              {requirementFor(previewed.palette) && <p className="mt-1 text-xs text-ink-muted">
+                Ten lakier wymaga opcji „{requirementFor(previewed.palette)!.name}” - ustawimy ją automatycznie po wyborze koloru.
+              </p>}
               <p className="mt-2 text-[11px] leading-relaxed text-ink-subtle">
                 {bestRender(previewed.color)
                   ? 'Wizualizacja poglądowa przygotowana komputerowo. Rzeczywisty odcień lakieru może się różnić od obrazu na ekranie.'
