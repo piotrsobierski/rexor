@@ -68,6 +68,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { compressUploadImage } from '@/lib/image-compression';
 import { isAdminTabSlug, type AdminTabSlug } from '@/lib/admin-tabs';
 import { mergeCopy, type SiteCopy } from '@/lib/copy';
 
@@ -834,7 +835,7 @@ function PartsEditor({
   async function uploadPartImage(part: Row, file?: File) {
     if (!file) return;
     const form = new FormData();
-    form.append('file', file);
+    form.append('file', await compressUploadImage(file));
     setMessage('Wysyłam zdjęcie…');
     try {
       const result = await request('/admin/media', {
@@ -1384,7 +1385,7 @@ function CategoriesEditor({
   async function uploadImage(row: Row, file?: File) {
     if (!file) return;
     const form = new FormData();
-    form.append('file', file);
+    form.append('file', await compressUploadImage(file));
     form.append('ownerType', 'category');
     form.append('ownerId', String(row.id));
     form.append('role', 'default');
@@ -2042,7 +2043,7 @@ function ModelsEditor({
     try {
       for (const [index, file] of selected.entries()) {
         const form = new FormData();
-        form.append('file', file);
+        form.append('file', await compressUploadImage(file));
         form.append('ownerType', 'model');
         form.append('ownerId', String(model.id));
         form.append('role', 'gallery');
@@ -2481,7 +2482,7 @@ function ModelsEditor({
                       }}
                       onUploadImage={async (file) => {
                         const form = new FormData();
-                        form.append('file', file);
+                        form.append('file', await compressUploadImage(file));
                         form.append('altText', `Zdjęcie w opisie ${row.name}`);
                         const result = await request('/admin/media', {
                           method: 'POST',
@@ -2668,7 +2669,7 @@ function FramesEditor({
     try {
       for (const [index, file] of selected.entries()) {
         const form = new FormData();
-        form.append('file', file);
+        form.append('file', await compressUploadImage(file));
         form.append(
           'altText',
           role === 'geometry'
@@ -2839,7 +2840,7 @@ function FramesEditor({
 
   async function uploadInlineImage(frame: Row, file: File) {
     const form = new FormData();
-    form.append('file', file);
+    form.append('file', await compressUploadImage(file));
     form.append('altText', `Zdjęcie w opisie ramy ${String(frame.name)}`);
     const result = await request('/admin/media', {
       method: 'POST',
@@ -3440,7 +3441,7 @@ function ProjectsEditor({
     try {
       for (const [index, file] of selected.entries()) {
         const form = new FormData();
-        form.append('file', file);
+        form.append('file', await compressUploadImage(file));
         form.append('altText', String(project.title));
         const result = await request('/admin/media', {
           method: 'POST',
@@ -3944,7 +3945,7 @@ function ProjectsEditor({
                       }}
                       onUploadImage={async (file) => {
                         const form = new FormData();
-                        form.append('file', file);
+                        form.append('file', await compressUploadImage(file));
                         form.append(
                           'altText',
                           `Zdjęcie w opisie realizacji ${String(row.title)}`,
@@ -4755,7 +4756,7 @@ function PageEditor({
             minHeight="min-h-80"
             onUploadImage={async (file) => {
               const form = new FormData();
-              form.append('file', file);
+              form.append('file', await compressUploadImage(file));
               form.append('altText', `Zdjęcie w treści: ${title}`);
               const result = await request('/admin/media', {
                 method: 'POST',
@@ -5482,7 +5483,7 @@ function ConfigurationEmailTemplateEditor({
             minHeight="min-h-56"
             onUploadImage={async (file) => {
               const form = new FormData();
-              form.append('file', file);
+              form.append('file', await compressUploadImage(file));
               form.append(
                 'altText',
                 'Zdjęcie w mailu potwierdzenia konfiguracji',
