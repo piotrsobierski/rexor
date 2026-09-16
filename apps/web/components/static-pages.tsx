@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ArrowRight, BatteryCharging, Gauge, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { OptimizedImage } from '@/components/optimized-image';
 import { PageFrame } from '@/components/page-frame';
 import { CardGridSkeleton, ProductDetailSkeleton } from '@/components/page-loading';
 import { formatPrice, type BikeModel } from '@/lib/catalog';
@@ -22,7 +23,7 @@ function BikePickCard({ model, copy }: { model: BikeModel; copy: SiteCopy }) {
       <div>
         <a href={productHref} aria-label={`Poznaj ${model.name}`} className="block text-inherit no-underline">
           <div className="aspect-[4/3] bg-[var(--muted)] p-5">
-            <img src={model.image} alt={model.name} className="size-full object-contain mix-blend-multiply transition-transform duration-500 hover:scale-[1.03]" />
+            <OptimizedImage src={model.image} alt={model.name} className="size-full object-contain mix-blend-multiply transition-transform duration-500 hover:scale-[1.03]" />
           </div>
           <div className="p-6 pb-2">
             <span className="eyebrow">{model.category}</span>
@@ -92,7 +93,7 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
 
   const categoryImage = publicMediaUrl(category.default_image_path);
   return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
-    {categoryImage && <div className="mb-8 aspect-[21/9] w-full overflow-hidden rounded-[28px] bg-[var(--muted)]"><img src={categoryImage} alt="" className="size-full object-cover" /></div>}
+    {categoryImage && <div className="mb-8 aspect-[21/9] w-full overflow-hidden rounded-[28px] bg-[var(--muted)]"><OptimizedImage src={categoryImage} alt="" priority className="size-full object-cover" /></div>}
     <p className="eyebrow">{copy.category.eyebrow}</p>
     <h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{category.name}</h1>
     {category.short_description && <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-muted">{category.short_description}</p>}
@@ -163,9 +164,10 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
           {/* Gallery showcase */}
           <div className="space-y-4">
             <div className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)] p-6 sm:p-10">
-              <img
+              <OptimizedImage
                 src={activeImage}
                 alt={model.name}
+                priority
                 className="size-full object-contain mix-blend-multiply transition-all duration-300"
               />
             </div>
@@ -180,7 +182,7 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
                       selectedPhoto === idx ? 'border-ink shadow-sm' : 'border-transparent opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <img src={img} alt="" className="size-full object-contain mix-blend-multiply" />
+                    <OptimizedImage src={img} alt="" className="size-full object-contain mix-blend-multiply" />
                   </button>
                 ))}
               </div>

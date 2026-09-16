@@ -6,6 +6,7 @@ import { ArrowRight, CalendarCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FilteredCollection, type CollectionItem } from '@/components/filtered-collection';
+import { OptimizedImage } from '@/components/optimized-image';
 import { PageFrame } from '@/components/page-frame';
 import { ProductDetailSkeleton } from '@/components/page-loading';
 import { formatCompletedAt, projectHref, type ApiProject, type PublicProject } from '@/lib/projects';
@@ -88,7 +89,7 @@ function ProjectDetail({ project, copy }: { project: PublicProject; copy: SiteCo
               jednolitym tle - dlatego object-cover, bez mix-blend-multiply. */}
           <div className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)]">
             {activeImage
-              ? <img src={activeImage} alt={project.title} className="size-full object-cover transition-all duration-300" />
+              ? <OptimizedImage src={activeImage} alt={project.title} priority className="size-full object-cover transition-all duration-300" />
               : <div className="size-full bg-ink-wash" aria-hidden="true" />}
           </div>
           {project.gallery.length > 1 && (
@@ -100,7 +101,7 @@ function ProjectDetail({ project, copy }: { project: PublicProject; copy: SiteCo
                   onClick={() => setSelectedPhoto(index)}
                   className={`aspect-[4/3] h-20 shrink-0 overflow-hidden rounded-2xl border-2 transition-all ${selectedPhoto === index ? 'border-ink shadow-sm' : 'border-transparent opacity-70 hover:opacity-100'}`}
                 >
-                  <img src={img} alt="" className="size-full object-cover" />
+                  <OptimizedImage src={img} alt="" className="size-full object-cover" />
                 </button>
               ))}
             </div>

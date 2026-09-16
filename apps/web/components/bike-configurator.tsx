@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ConfiguratorSkeleton } from '@/components/page-loading';
+import { OptimizedImage } from '@/components/optimized-image';
 import { CUSTOMER_SUPPLIED_SKU, NONE_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
@@ -406,12 +407,12 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               <CarouselContent className="ml-0">
                 {gallery.map((image, index) => <CarouselItem key={image} className="pl-0">
                   <div className="stage-media p-4 sm:p-8">
-                    <img
+                    <OptimizedImage
                       src={image}
                       alt={index < paintSlides.length && chosenPaint
                         ? `${model.name} — ${paintSlides[index].variant === 'photo' ? 'zdjęcie' : 'wizualizacja'} w kolorze ${chosenPaint.color.name}`
                         : `${model.name} — zdjęcie ${index - paintSlides.length + 1}`}
-                      loading={index === 0 ? 'eager' : 'lazy'}
+                      priority={index === 0}
                     />
                   </div>
                 </CarouselItem>)}

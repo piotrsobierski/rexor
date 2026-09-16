@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CardGridSkeleton } from '@/components/page-loading';
+import { OptimizedImage } from '@/components/optimized-image';
 import type { PublicCategory } from '@/lib/catalog-merge';
 import type { SiteCopy } from '@/lib/copy';
 
@@ -113,7 +114,7 @@ function CollectionCard({ item, detailsCta }: { item: CollectionItem; detailsCta
       <a href={item.href} aria-label={`${item.title} — ${detailsCta}`} className="block text-inherit no-underline">
         <div className="relative aspect-[4/3] bg-[var(--muted)] p-5">
           {item.image
-            ? <img src={item.image} alt={item.title} className="size-full object-contain mix-blend-multiply transition-transform duration-500 hover:scale-[1.03]" />
+            ? <OptimizedImage src={item.image} alt={item.title} className="size-full object-contain mix-blend-multiply transition-transform duration-500 hover:scale-[1.03]" />
             : <div className="size-full rounded-2xl bg-ink-wash" aria-hidden="true" />}
           {item.badge && <Badge className="absolute left-4 top-4 h-auto bg-ink px-3 py-1 text-white">{item.badge}</Badge>}
         </div>

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ContactForm } from '@/components/contact-form';
 import { FilteredCollection, type CollectionItem } from '@/components/filtered-collection';
+import { OptimizedImage } from '@/components/optimized-image';
 import { PageFrame } from '@/components/page-frame';
 import { ProductDetailSkeleton } from '@/components/page-loading';
 import { Spinner } from '@/components/ui/spinner';
@@ -108,7 +109,7 @@ function FrameDetail({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
         <div className="space-y-4">
           <div className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)] p-6 sm:p-10">
             {activeImage
-              ? <img src={activeImage} alt={frame.name} className="size-full object-contain mix-blend-multiply transition-all duration-300" />
+              ? <OptimizedImage src={activeImage} alt={frame.name} priority className="size-full object-contain mix-blend-multiply transition-all duration-300" />
               : <div className="size-full rounded-2xl bg-ink-wash" aria-hidden="true" />}
           </div>
           {frame.gallery.length > 1 && (
@@ -120,7 +121,7 @@ function FrameDetail({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
                   onClick={() => setSelectedPhoto(index)}
                   className={`aspect-[4/3] h-20 shrink-0 overflow-hidden rounded-2xl border-2 bg-[var(--muted)] p-2 transition-all ${selectedPhoto === index ? 'border-ink shadow-sm' : 'border-transparent opacity-70 hover:opacity-100'}`}
                 >
-                  <img src={img} alt="" className="size-full object-contain mix-blend-multiply" />
+                  <OptimizedImage src={img} alt="" className="size-full object-contain mix-blend-multiply" />
                 </button>
               ))}
             </div>
@@ -176,7 +177,7 @@ function FrameDetail({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
             {frame.geometryImages.map((img) => (
               <a key={img} href={img} target="_blank" rel="noreferrer noopener" className="block overflow-hidden rounded-[24px] border border-line bg-white p-3">
-                <img src={img} alt={`Geometria ${frame.name}`} className="w-full object-contain" />
+                <OptimizedImage src={img} alt={`Geometria ${frame.name}`} className="w-full object-contain" />
               </a>
             ))}
           </div>

@@ -40,3 +40,11 @@ next-env.d.ts
 
 # incremental TS build cache - churns on every build
 tsconfig.tsbuildinfo
+
+# generated przy npm run build przez scripts/optimize-images.mjs
+public/categories/*.webp
+public/models/*.webp
+public/models/**/*.webp
+public/frames/*.webp
+public/frames/**/*.webp
+public/brand/*.webp
