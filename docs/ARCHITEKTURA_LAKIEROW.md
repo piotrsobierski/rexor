@@ -358,6 +358,7 @@ Klient przysyła **dwa slugi**, nigdy ceny ani identyfikatorów liczbowych.
 | POST/PATCH/DELETE | `/api/admin/paint-palettes[/{id}]` | admin | palety |
 | POST/PATCH/DELETE | `/api/admin/paint-colors[/{id}]` | admin | kolory |
 | POST | `/api/admin/paint-availability` | admin | przypnij/odepnij paletę do produktu |
+| POST | `/api/admin/paint-settings` | admin | globalne ustawienia palet |
 | POST/DELETE | `/api/admin/paint-renders[/{id}]` | admin | rendery |
 | GET | `/api/admin/paint-reference/…?token=` | admin | zdjęcie referencyjne |
 
@@ -397,6 +398,52 @@ na poziomie bazy, nie zaproszenie do kasowania.
 
 ---
 
+## 7a. Globalne ustawienia palet
+
+Jeden dokument w `site_settings` pod kluczem `paint_visibility`, czytany
+z domyślnymi wartościami - brak wiersza znaczy „ustawienia fabryczne”, więc
+funkcja nie wymagała migracji.
+
+```json
+{ "colorFilter": "all" | "with_image" | "with_photo" }
+```
+
+`colorFilter` rozstrzyga, **które kolory w ogóle jadą do klienta**:
+
+| wartość | co widzi klient |
+|---|---|
+| `all` | każdy włączony kolor z palet przypiętych do produktu (domyślnie) |
+| `with_image` | tylko kolory, dla których mamy zdjęcie ALBO render tego produktu |
+| `with_photo` | tylko kolory ze zdjęciem realnego roweru |
+
+Dlaczego ustawienie, a nie wyłączanie kolorów po jednym: paleta ma 686 pozycji,
+a renderów przybywa partiami. Właściciel, który chce pokazywać wyłącznie to, co
+ma obraz, potrzebuje jednego przełącznika, a nie 450 kliknięć - i drogi powrotnej
+w tę samą stronę, gdy renderów przybędzie.
+
+Trzy rzeczy, które trzymają to ustawienie uczciwym:
+
+1. **Filtruje serwer**, w `paintPalettesFor()`. Ta sama funkcja stoi pod
+   `resolvePaintSelection()`, więc ukrytego koloru nie da się zamówić
+   z pominięciem interfejsu - zapis konfiguracji odpowiada „kolor nie jest
+   dostępny dla tego produktu”, tak samo jak dla koloru wyłączonego.
+2. **Liczy się per produkt**, bo obraz należy do pary kolor + produkt. Ten sam
+   lakier bywa widoczny przy E55 i ukryty przy E82. Panel pokazuje to wprost
+   tabelką „co to znaczy dla poszczególnych produktów” i ostrzega na czerwono,
+   gdy któryś produkt zostaje bez ani jednego koloru.
+3. **Panel widzi komplet.** `adminPaints()` nie przechodzi przez filtr -
+   ukrywanie kolorów przed tym, kto ma im wgrać zdjęcia, byłoby absurdem.
+
+Paleta, której po filtrowaniu nie został żaden kolor, wypada z odpowiedzi -
+pusty chip filtra w pickerze to tylko zagadka dla klienta.
+
+Wartość jedzie też do przeglądarki (`colorFilter` w `/api/paints/…`), ale nie po
+to, żeby cokolwiek filtrowała - to już zrobił serwer - tylko żeby picker napisał
+klientowi, dlaczego widzi wycinek palety zamiast kompletu
+(`COLOR_FILTER_NOTES` w `lib/paints.ts`).
+
+---
+
 ## 8. Niezmienniki
 
 Rzeczy, które muszą zostać prawdziwe przy każdej zmianie w tym obszarze:
@@ -413,10 +460,15 @@ Rzeczy, które muszą zostać prawdziwe przy każdej zmianie w tym obszarze:
 5. **Zdjęcie referencyjne nie wycieka publicznie.** Publiczna odpowiedź
    `/api/paints/…` nie niesie nawet ścieżki, dopóki `reference_is_public`
    jest `FALSE`.
-6. **Migawka jest tekstem.** Nowe pole opisujące wybór lakieru dokładamy do
+6. **Filtr widoczności działa po stronie serwera.** Nowa reguła „które kolory
+   pokazujemy” wchodzi do `paintPalettesFor()`, nigdy do samego komponentu -
+   inaczej rozjedzie się z tym, co wolno zamówić.
+7. **Migawka jest tekstem.** Nowe pole opisujące wybór lakieru dokładamy do
    `configuration_paint` jako `*_snapshot`, nie jako join.
-7. **Import jest idempotentny.** Kluczem naturalnym koloru jest
-   `(palette_id, slug)`, renderu — `(color_id, produkt, variant)`.
+8. **Import jest idempotentny.** Kluczem naturalnym koloru jest
+   `(palette_id, slug)`, renderu — `(color_id, produkt, variant)`. Zdjęcia
+   (`variant = 'photo'`) są poza tą regułą: wgrywa się je ręcznie i każde jest
+   osobnym wierszem.
 
 ---
 

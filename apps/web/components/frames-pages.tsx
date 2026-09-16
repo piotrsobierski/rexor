@@ -221,7 +221,7 @@ function FramePaints({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
   const [requested, setRequested] = useState(false);
   const [open, setOpen] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const { palettes, state } = usePaints('frame', frame.slug, requested);
+  const { palettes, state, colorFilter } = usePaints('frame', frame.slug, requested);
 
   // Sekcja siedzi pod geometrią, więc kto do niej doscrollował, ten kolory
   // ogląda - pobieramy je wtedy, żeby próbki były na miejscu przed kliknięciem,
@@ -292,6 +292,7 @@ function FramePaints({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
       onOpenChange={setOpen}
       palettes={palettes}
       paintState={state}
+      colorFilter={colorFilter}
       mode="browse"
       title={copy.frames.paintBrowseDialogTitle}
     />

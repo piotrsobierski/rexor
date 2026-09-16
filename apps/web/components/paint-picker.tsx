@@ -7,6 +7,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
+  COLOR_FILTER_NOTES,
   FINISH_LABELS,
   bestRender,
   findColor,
@@ -14,6 +15,7 @@ import {
   paintImageUrl,
   paintImages,
   searchColors,
+  type ColorFilter,
   type PaintColor,
   type PaintPalette,
   type PaintRender,
@@ -30,6 +32,8 @@ type Props = {
   onChooseSku: (sku: string) => void;
   palettes: PaintPalette[];
   paintState: 'idle' | 'loading' | 'ready' | 'error';
+  /** Globalny filtr z panelu - tylko do wyjaśnienia krótszej palety. */
+  colorFilter?: ColorFilter;
   selection: PaintSelection | null;
   onSelect: (selection: PaintSelection | null, color: PaintColor | null) => void;
   /** Otwarcie pickera uruchamia pobranie palet - patrz usePaints(enabled). */
@@ -56,6 +60,7 @@ export function PaintSection({
   onChooseSku,
   palettes,
   paintState,
+  colorFilter = 'all',
   selection,
   onSelect,
   onOpen,
@@ -138,6 +143,7 @@ export function PaintSection({
       onOpenChange={setOpen}
       palettes={palettes}
       paintState={paintState}
+      colorFilter={colorFilter}
       selection={selection}
       onConfirm={(next, color) => { onSelect(next, color); setOpen(false); }}
       formatPrice={formatPrice}
@@ -215,6 +221,7 @@ export function PaintDialog({
   onOpenChange,
   palettes,
   paintState,
+  colorFilter = 'all',
   selection = null,
   onConfirm,
   formatPrice,
@@ -228,6 +235,7 @@ export function PaintDialog({
   onOpenChange: (open: boolean) => void;
   palettes: PaintPalette[];
   paintState: 'idle' | 'loading' | 'ready' | 'error';
+  colorFilter?: ColorFilter;
   selection?: PaintSelection | null;
   onConfirm?: (selection: PaintSelection, color: PaintColor) => void;
   formatPrice?: (value: number) => string;
@@ -356,6 +364,12 @@ export function PaintDialog({
             <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{photoCount}</span>
           </FilterChip>}
         </div>
+        {/* Gdy panel zwęził paletę, mówimy o tym wprost. Bez tego klient, który
+            zna pełną paletę Porsche, uznałby krótszą listę za błąd sklepu. */}
+        {COLOR_FILTER_NOTES[colorFilter] && paintState === 'ready' && <p className="flex gap-2 text-xs leading-relaxed text-ink-muted">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          <span>{COLOR_FILTER_NOTES[colorFilter]}</span>
+        </p>}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col-reverse sm:flex-row">
@@ -420,6 +434,7 @@ export function PaintDialog({
                   type="button"
                   onClick={() => setImageIndex(index)}
                   aria-pressed={image === previewImage}
+                  aria-label={image.variant === 'photo' ? `Zdjęcie ${index + 1}` : 'Wizualizacja'}
                   title={image.variant === 'photo' ? `Zdjęcie ${index + 1}` : 'Wizualizacja'}
                   className={`focus-ring size-12 shrink-0 overflow-hidden rounded-lg border transition-colors ${image === previewImage ? 'border-ink ring-1 ring-ink' : 'border-line hover:border-line-strong'}`}
                 >
@@ -498,6 +513,7 @@ export function PaintDialog({
               type="button"
               onClick={() => setImageIndex(index)}
               aria-pressed={image === previewImage}
+              aria-label={image.variant === 'photo' ? `Zdjęcie ${index + 1}` : 'Wizualizacja'}
               className={`focus-ring size-12 overflow-hidden rounded-lg border transition-colors ${image === previewImage ? 'border-white' : 'border-white/25 hover:border-white/60'}`}
             >
               <img src={paintImageUrl(image.thumb ?? image.image)} alt="" loading="lazy" className="size-full bg-white object-cover" />

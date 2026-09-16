@@ -45,6 +45,19 @@ export type PaintPalette = {
 
 export type PaintSelection = { paletteSlug: string; colorSlug: string };
 
+/**
+ * Globalne ustawienie z panelu: które kolory w ogóle jadą do klienta.
+ * Rozstrzyga je API (`paintPalettesFor`), tutaj jest tylko po to, żeby picker
+ * mógł napisać, dlaczego paleta jest krótsza, niż klient się spodziewa.
+ */
+export type ColorFilter = 'all' | 'with_image' | 'with_photo';
+
+export const COLOR_FILTER_NOTES: Record<ColorFilter, string | null> = {
+  all: null,
+  with_image: 'Pokazujemy lakiery, dla których mamy zdjęcie albo wizualizację na tym rowerze. Pozostałe kolory z palety malujemy na zamówienie - napisz do nas, a przygotujemy podgląd.',
+  with_photo: 'Pokazujemy wyłącznie lakiery, które mamy sfotografowane na gotowym rowerze. Pozostałe kolory z palety malujemy na zamówienie - napisz do nas, a przygotujemy podgląd.',
+};
+
 export const FINISH_LABELS: Record<PaintColor['finish'], string> = {
   uni: 'uni',
   metallic: 'metalik',
@@ -125,6 +138,10 @@ export function searchColors(palettes: PaintPalette[], query: string, paletteSlu
 export function usePaints(resource: 'model' | 'frame', slug: string | null, enabled: boolean) {
   const [palettes, setPalettes] = useState<PaintPalette[]>([]);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  // Globalny filtr z panelu. Nie filtrujemy nim niczego po tej stronie -
+  // serwer już to zrobił - służy wyłącznie do wyjaśnienia klientowi, czemu
+  // widzi wycinek palety zamiast kompletu.
+  const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
 
   useEffect(() => {
     if (!enabled || !slug) return;
@@ -133,20 +150,22 @@ export function usePaints(resource: 'model' | 'frame', slug: string | null, enab
     fetch(`${API_BASE}/paints/${resource}/${slug}`)
       .then(async (response) => {
         if (!response.ok) throw new Error('paints');
-        return response.json() as Promise<{ palettes: PaintPalette[] }>;
+        return response.json() as Promise<{ palettes: PaintPalette[]; colorFilter?: ColorFilter }>;
       })
       .then((data) => {
         if (!active) return;
         setPalettes(data.palettes);
+        setColorFilter(data.colorFilter ?? 'all');
         setState('ready');
       })
       .catch(() => {
         if (!active) return;
         setPalettes([]);
+        setColorFilter('all');
         setState('error');
       });
     return () => { active = false; };
   }, [resource, slug, enabled]);
 
-  return { palettes, state };
+  return { palettes, state, colorFilter };
 }

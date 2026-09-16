@@ -66,7 +66,29 @@ const VARIANT_LABELS: Record<Render['variant'], string> = {
 
 type Availability = { product_slug: string; palette_slug: string; price_gross_override: string | null; is_active: number | string };
 
+/** Globalny filtr „które kolory widzi klient”. Rozstrzyga go API, nie panel. */
+type ColorFilter = 'all' | 'with_image' | 'with_photo';
+
+const COLOR_FILTERS: Array<{ value: ColorFilter; label: string; help: string }> = [
+  {
+    value: 'all',
+    label: 'Pokazuj wszystkie kolory',
+    help: 'Klient widzi każdy włączony lakier z palet przypiętych do produktu. Lakiery bez zdjęcia i bez wizualizacji pokazujemy jako płaską próbkę koloru.',
+  },
+  {
+    value: 'with_image',
+    label: 'Pokazuj tylko kolory ze zdjęciem albo wizualizacją',
+    help: 'Klient widzi wyłącznie lakiery, dla których mamy obraz tego produktu — zdjęcie realnego roweru albo render. Reszta znika z wyboru koloru i nie da się jej zamówić.',
+  },
+  {
+    value: 'with_photo',
+    label: 'Pokazuj tylko kolory ze zdjęciem realnego roweru',
+    help: 'Najostrzejszy filtr: renderów nie wystarczy, potrzebne jest wgrane zdjęcie. Zwykle zostaje kilka lakierów, więc włączaj to świadomie.',
+  },
+];
+
 type PaintsData = {
+  settings: { colorFilter: ColorFilter };
   palettes: Palette[];
   colors: Color[];
   renders: Render[];
@@ -166,6 +188,7 @@ export function PaintsEditor({
   if (!data) return <p className="text-sm text-ink-muted">Wczytuję lakiery…</p>;
 
   return <div className="grid gap-6">
+    <PaintSettingsPanel data={data} models={models} frames={frames} request={request} reload={reload} setMessage={setMessage} />
     <PalettesPanel data={data} models={models} frames={frames} request={request} reload={reload} setMessage={setMessage} />
 
     <section className="rounded-3xl border border-line bg-white p-5 sm:p-7">
@@ -212,6 +235,140 @@ export function PaintsEditor({
       </Button>}
     </section>
   </div>;
+}
+
+/**
+ * Ustawienia wspólne dla wszystkich palet.
+ *
+ * Filtr rozstrzyga API (`paintPalettesFor`), więc ukrytego koloru nie da się
+ * ani zobaczyć, ani zamówić z pominięciem konfiguratora. Panel pokazuje go
+ * razem z tabelką skutków: liczby są liczone per produkt, bo obraz należy do
+ * PARY kolor + produkt - ten sam lakier bywa policzony na E55 i nie na E82.
+ */
+function PaintSettingsPanel({
+  data, models, frames, request, reload, setMessage,
+}: {
+  data: PaintsData;
+  models: Product[];
+  frames: Product[];
+  request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const current = data.settings.colorFilter;
+
+  // Ile kolorów zostanie klientowi przy każdym z ustawień - dla każdego
+  // produktu osobno. Wszystkie dane są już w panelu, więc liczymy na miejscu,
+  // zamiast dokładać endpoint podsumowania.
+  const impact = useMemo(() => {
+    const paletteById = new Map(data.palettes.map((palette) => [palette.id, palette]));
+    const activeColors = data.colors.filter((color) => color.isActive && (paletteById.get(color.paletteId)?.isActive ?? false));
+    const products = [
+      ...models.map((product) => ({ ...product, resource: 'model' as const })),
+      ...frames.map((product) => ({ ...product, resource: 'frame' as const })),
+    ];
+
+    return products.map((product) => {
+      const rows = product.resource === 'model' ? data.availability.models : data.availability.frames;
+      const paletteSlugs = new Set(rows
+        .filter((row) => row.product_slug === product.slug && Number(row.is_active) === 1)
+        .map((row) => row.palette_slug));
+      const colors = activeColors.filter((color) => {
+        const palette = paletteById.get(color.paletteId);
+        return palette !== undefined && paletteSlugs.has(palette.slug);
+      });
+
+      const imagesFor = new Map<number, Render[]>();
+      for (const render of data.renders) {
+        if (!render.isPublic) continue;
+        if (product.resource === 'model' ? render.modelSlug !== product.slug : render.frameSlug !== product.slug) continue;
+        imagesFor.set(render.colorId, [...(imagesFor.get(render.colorId) ?? []), render]);
+      }
+
+      return {
+        key: `${product.resource}:${product.slug}`,
+        name: product.resource === 'frame' ? `rama: ${product.name}` : product.name,
+        all: colors.length,
+        withImage: colors.filter((color) => (imagesFor.get(color.id)?.length ?? 0) > 0).length,
+        withPhoto: colors.filter((color) => (imagesFor.get(color.id) ?? []).some((render) => render.variant === 'photo')).length,
+      };
+    });
+  }, [data, models, frames]);
+
+  async function choose(value: ColorFilter) {
+    if (value === current || saving) return;
+    setSaving(true);
+    try {
+      await request('/admin/paint-settings', { method: 'POST', body: JSON.stringify({ colorFilter: value }) });
+      await reload();
+    } catch (error) { setMessage((error as Error).message); } finally { setSaving(false); }
+  }
+
+  const visible = (row: (typeof impact)[number]) => (current === 'with_photo' ? row.withPhoto : current === 'with_image' ? row.withImage : row.all);
+
+  return <section className="rounded-3xl border border-line bg-white p-5 sm:p-7">
+    <h2 className="text-2xl font-semibold tracking-tight">Ustawienia globalne palet</h2>
+    <p className="mt-1 max-w-3xl text-sm text-ink-muted">
+      Dotyczą wszystkich palet naraz i działają od razu po zapisaniu — także dla klientów, którzy mają już otwarty konfigurator.
+      Nic tu nie kasuje ani nie wyłącza kolorów: ukryte lakiery czekają w panelu i wracają, gdy zmienisz ustawienie
+      albo wgrasz brakujące zdjęcia.
+    </p>
+
+    <h3 className="mt-5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">Które kolory widzi klient</h3>
+    <div className="mt-2 grid gap-2">
+      {COLOR_FILTERS.map((option) => <label
+        key={option.value}
+        className={`flex cursor-pointer gap-3 rounded-2xl border p-4 transition-colors ${current === option.value ? 'border-ink bg-[#fafbfa]' : 'border-line hover:border-line-strong'}`}
+      >
+        <input
+          type="radio"
+          name="paint-color-filter"
+          className="mt-1 size-4 shrink-0 accent-black"
+          checked={current === option.value}
+          disabled={saving}
+          onChange={() => void choose(option.value)}
+        />
+        <span className="min-w-0">
+          <span className="block font-semibold">{option.label}</span>
+          <span className="mt-0.5 block text-sm text-ink-muted">{option.help}</span>
+        </span>
+      </label>)}
+    </div>
+
+    <h3 className="mt-6 text-xs font-semibold uppercase tracking-wider text-ink-subtle">Co to znaczy dla poszczególnych produktów</h3>
+    <p className="mt-1 max-w-3xl text-sm text-ink-muted">
+      Zdjęcia i wizualizacje są przypisane do pary <strong className="font-semibold text-ink">kolor + produkt</strong>, więc ten sam
+      lakier bywa policzony dla jednego roweru, a dla drugiego nie. Kolumna „widoczne teraz” pokazuje, ile kolorów zobaczy klient
+      przy obecnym ustawieniu.
+    </p>
+    <div className="mt-3 overflow-x-auto">
+      <table className="w-full min-w-[520px] text-sm">
+        <thead className="text-left text-xs uppercase tracking-wider text-ink-subtle">
+          <tr>
+            <th className="py-2 pr-3 font-semibold">Produkt</th>
+            <th className="py-2 pr-3 text-right font-semibold">Wszystkie</th>
+            <th className="py-2 pr-3 text-right font-semibold">Ze zdjęciem lub renderem</th>
+            <th className="py-2 pr-3 text-right font-semibold">Ze zdjęciem</th>
+            <th className="py-2 text-right font-semibold">Widoczne teraz</th>
+          </tr>
+        </thead>
+        <tbody>
+          {impact.map((row) => <tr key={row.key} className="border-t border-line">
+            <td className="py-2 pr-3">{row.name}</td>
+            <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{row.all}</td>
+            <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{row.withImage}</td>
+            <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{row.withPhoto}</td>
+            <td className={`py-2 text-right font-semibold tabular-nums ${visible(row) === 0 ? 'text-red-600' : ''}`}>{visible(row)}</td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>
+    {impact.some((row) => visible(row) === 0) && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+      Przy tym ustawieniu któryś produkt nie ma ani jednego koloru do wyboru — sekcja lakierowania będzie u niego pusta.
+      Wgraj zdjęcia albo wróć do łagodniejszego filtra.
+    </p>}
+  </section>;
 }
 
 function PalettesPanel({

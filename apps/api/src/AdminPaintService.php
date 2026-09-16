@@ -50,6 +50,7 @@ function adminPaints(PDO $pdo): array
     )->fetchAll();
 
     return [
+        'settings' => paintSettings($pdo),
         'palettes' => array_map(static fn (array $row): array => [
             'id' => (int) $row['id'],
             'slug' => $row['slug'],
@@ -106,6 +107,34 @@ function adminPaints(PDO $pdo): array
             )->fetchAll(),
         ],
     ];
+}
+
+/**
+ * Globalne ustawienia palet (dziś: filtr „które kolory widzi klient”).
+ *
+ * Zapis jest całym dokumentem, tak samo jak motyw czy teksty - kluczy jest
+ * kilka, a nie kilkadziesiąt, więc scalanie pól nie zarabia na swoją złożoność.
+ */
+function saveAdminPaintSettings(PDO $pdo, array $input): array
+{
+    $filter = (string) ($input['colorFilter'] ?? 'all');
+    if (!in_array($filter, PAINT_COLOR_FILTERS, true)) {
+        throw new InvalidArgumentException('Nieznany filtr kolorów.');
+    }
+
+    $pdo->prepare(
+        "INSERT INTO site_settings (setting_key, value) VALUES ('paint_visibility', :value) " .
+        'ON DUPLICATE KEY UPDATE value = VALUES(value)'
+    )->execute(['value' => json_encode(['colorFilter' => $filter], JSON_THROW_ON_ERROR)]);
+
+    $labels = [
+        'all' => 'wszystkie kolory',
+        'with_image' => 'tylko kolory ze zdjęciem albo renderem',
+        'with_photo' => 'tylko kolory ze zdjęciem realnego roweru',
+    ];
+    logActivity($pdo, 'paint_settings_saved', 'admin', currentAdmin()['email'] ?? null, "Widoczność lakierów: {$labels[$filter]}.", ['colorFilter' => $filter]);
+
+    return paintSettings($pdo);
 }
 
 function saveAdminPaintPalette(PDO $pdo, ?int $id, array $input): array

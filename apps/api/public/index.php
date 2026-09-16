@@ -394,6 +394,11 @@ if ($method === 'DELETE' && preg_match('~^/admin/paint-colors/(\d+)$~', $path, $
     jsonResponse(deleteAdminPaintColor($pdo, (int) $matches[1]));
 }
 
+if ($method === 'POST' && $path === '/admin/paint-settings') {
+    requireAdmin($pdo);
+    jsonResponse(saveAdminPaintSettings($pdo, requestJson()));
+}
+
 if ($method === 'POST' && $path === '/admin/paint-availability') {
     requireAdmin($pdo);
     jsonResponse(saveAdminPaintAvailability($pdo, requestJson()));

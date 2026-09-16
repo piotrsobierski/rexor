@@ -25,10 +25,62 @@ declare(strict_types=1);
 const PAINT_GROUP_SLUG = 'paint';
 
 /**
+ * Filtr „które kolory w ogóle pokazujemy klientowi”.
+ *
+ *   all         - wszystkie aktywne kolory (domyślnie)
+ *   with_image  - tylko te, dla których mamy zdjęcie ALBO render produktu
+ *   with_photo  - tylko te ze zdjęciem realnego roweru
+ *
+ * Kompletna paleta 686 lakierów jest atutem tylko wtedy, gdy klient widzi,
+ * jak one wyglądają. Zanim renderów i zdjęć będzie komplet, właściciel może
+ * chcieć pokazywać wyłącznie to, co ma obraz - stąd ustawienie, a nie
+ * wyłączanie kilkuset kolorów po jednym.
+ */
+const PAINT_COLOR_FILTERS = ['all', 'with_image', 'with_photo'];
+
+/**
+ * Globalne ustawienia palet. Jeden dokument w `site_settings`, tak samo jak
+ * motyw i teksty - to ustawienie całego sklepu, nie własność pojedynczej
+ * palety, więc nie ma po co kolumny w `paint_palettes`.
+ *
+ * Czyta z domyślnymi wartościami, więc brak wiersza nie jest błędem i nie
+ * wymagał migracji.
+ *
+ * @return array{colorFilter:string}
+ */
+function paintSettings(PDO $pdo): array
+{
+    $value = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'paint_visibility'")->fetchColumn();
+    $stored = is_string($value) ? json_decode($value, true) : null;
+    $filter = is_array($stored) ? (string) ($stored['colorFilter'] ?? 'all') : 'all';
+
+    return ['colorFilter' => in_array($filter, PAINT_COLOR_FILTERS, true) ? $filter : 'all'];
+}
+
+/** Czy kolor z takim kompletem obrazów przechodzi przez globalny filtr. */
+function paintColorPassesFilter(array $renders, string $filter): bool
+{
+    if ($filter === 'with_photo') {
+        return ($renders['photos'] ?? []) !== [];
+    }
+    if ($filter === 'with_image') {
+        return $renders !== [];
+    }
+
+    return true;
+}
+
+/**
  * Palety dostępne dla produktu wraz z kolorami i renderami.
  *
  * $resource to 'model' albo 'frame' - nazwa tabeli NIGDY nie pochodzi
  * z żądania, tylko z tej whitelisty.
+ *
+ * Globalny filtr kolorów działa TU, a nie w przeglądarce: to on rozstrzyga
+ * też o dostępności przy zapisie konfiguracji (`resolvePaintSelection` woła
+ * tę samą funkcję), więc ukrytego koloru nie da się wybrać z pominięciem
+ * interfejsu. Filtr jest liczony per produkt, bo obrazy należą do PARY
+ * kolor + produkt: ten sam lakier może mieć render na E55 i nie mieć na E82.
  */
 function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includeAdminOnly = false): array
 {
@@ -54,6 +106,10 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
     if ($palettes === []) {
         return [];
     }
+
+    // Panel ogląda komplet - filtr ma ukrywać kolory klientowi, a nie temu,
+    // kto ma je uzupełnić o zdjęcia.
+    $colorFilter = $includeAdminOnly ? 'all' : paintSettings($pdo)['colorFilter'];
 
     $colorStatement = $pdo->prepare(
         'SELECT id, palette_id, slug, code, name, hex, finish, group_name, search_alt, price_gross_override, ' .
@@ -98,6 +154,10 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
         $colors = [];
         foreach ($colorStatement->fetchAll() as $color) {
             $colorId = (int) $color['id'];
+            $colorRenders = $renders[$colorId] ?? [];
+            if (!paintColorPassesFilter($colorRenders, $colorFilter)) {
+                continue;
+            }
             $entry = [
                 'id' => $colorId,
                 'slug' => $color['slug'],
@@ -108,7 +168,7 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
                 'groupName' => $color['group_name'],
                 'searchAlt' => $color['search_alt'],
                 'priceGross' => $color['price_gross_override'] !== null ? (float) $color['price_gross_override'] : $palettePrice,
-                'renders' => $renders[$colorId] ?? [],
+                'renders' => $colorRenders,
             ];
             // Zdjęcia referencyjne aut pochodzą z zewnętrznych galerii.
             // Publiczna odpowiedź nie niesie nawet ścieżki, dopóki
@@ -122,6 +182,12 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
                 $entry['referenceSourceUrl'] = $color['reference_source_url'];
             }
             $colors[] = $entry;
+        }
+
+        // Paleta bez ani jednego widocznego koloru to pusty filtr i pusta
+        // sekcja w pickerze - lepiej jej nie pokazywać wcale.
+        if ($colors === []) {
+            continue;
         }
 
         $result[] = [
@@ -154,9 +220,13 @@ function publicPaints(PDO $pdo, string $resource, string $slug): ?array
         return null;
     }
 
+    // `colorFilter` jedzie do przeglądarki nie po to, żeby cokolwiek filtrowała
+    // (to już zrobił serwer), tylko żeby picker mógł napisać klientowi, czemu
+    // widzi 40 lakierów zamiast 686.
     return [
         'resource' => $resource,
         'slug' => $slug,
+        'colorFilter' => paintSettings($pdo)['colorFilter'],
         'palettes' => paintPalettesFor($pdo, $resource, (int) $owner['id']),
     ];
 }
