@@ -15,7 +15,6 @@ CREATE TABLE bike_categories (
     description_document JSON NULL,
     default_image_path VARCHAR(500) NULL,
     icon_path VARCHAR(500) NULL,
-    icon_key VARCHAR(60) NULL,
     sort_order INT NOT NULL DEFAULT 0,
     is_published BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
