@@ -48,6 +48,11 @@ import { requiredMailboxCredentials, openMailbox, waitForMail } from './lib/mail
 //           round trip ADM-07 never exercised. Polls the public API for the
 //           write to land before checking the rendered page, since the save
 //           and the public read hit the same DB but aren't in one request.
+//   VIS-10  The image-resize control (the "Rozmiar zaznaczonego zdjęcia"
+//           toolbar, 25/50/75/100%) actually sets a persisted inline width
+//           on the <img>, and that width is still respected -- visually,
+//           not just as an attribute -- on the public page after save,
+//           rather than being overridden by the .rich-content img CSS.
 //
 // Run with: npm run test:visual
 // Requires QA_ADMIN_EMAIL / QA_ADMIN_PASSWORD in the environment.
@@ -113,6 +118,76 @@ async function waitForPublicPageContent(slug: string, predicate: (html: string) 
     await new Promise((r) => setTimeout(r, 500));
   }
   return lastHtml;
+}
+
+/**
+ * Root cause found (confirmed with a 5x repro, 5/5 hits) of what looked like
+ * a cross-session DB race corrupting the "Serwis" page: PagesEditor mounts
+ * defaulting to `pages[0]`, which is "Kontakt" (site_pages query is
+ * `ORDER BY navigation_label`, alphabetically first) -- clicking "Serwis"
+ * right after opening the "Strony" tab, then immediately reading the
+ * editor's innerHTML, reliably captures *Kontakt's* still-on-screen
+ * placeholder content, because the click only dispatches a React state
+ * update; the editor DOM doesn't repaint to the new page until a later
+ * effect flushes. `editor.waitFor()` doesn't help -- the contenteditable
+ * node already exists (same instance, reused across page switches). Both
+ * our sessions' "restore" logic then dutifully wrote that captured
+ * *wrong* snapshot back over Serwis's real content. Waiting for the panel
+ * heading to actually say "Strona: Serwis" before reading anything closes
+ * the gap.
+ */
+async function selectSitePage(page: Page, label: string) {
+  await page.getByRole('button', { name: label, exact: true }).click();
+  await page.getByRole('heading', { name: `Strona: ${label}` }).waitFor({ timeout: 10_000 });
+  // The heading text updates one render ahead of the editor's own DOM-sync
+  // effect (WysiwygEditor's useEffect on its `content` prop) -- confirmed by
+  // this still occasionally reading Kontakt's placeholder right after the
+  // heading above already said "Strona: Serwis". Poll the editor itself,
+  // not just the heading, before trusting its content.
+  if (label !== 'Kontakt') {
+    const editor = page.locator('[contenteditable=true]').first();
+    await expect(editor, `Editor never repainted away from the "Kontakt" placeholder after selecting "${label}".`).not.toContainText(
+      'Uzupełnij dane w nawiasach kwadratowych',
+      { timeout: 10_000 },
+    );
+  }
+}
+
+/**
+ * Restoring a page's content by mutating the live editor's DOM and clicking
+ * Save (in the same session that just saved the test edit) was unreliable:
+ * once caught it saving stale/wrong content while the on-screen editor still
+ * *looked* like the right page was selected -- some race between the first
+ * save's `loadCatalog()` re-render and our follow-up DOM mutation. A full
+ * page reload gets a clean React tree with no leftover closures before we
+ * write the original HTML back, which has been reliable in repeated runs.
+ */
+async function restorePageContent(page: Page, evidence: string, originalHtml: string) {
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('tab', { name: 'Modele i zdjęcia' }).waitFor({ timeout: 15_000 });
+  await page.getByRole('tab', { name: 'Strony' }).click();
+  await selectSitePage(page, 'Serwis');
+
+  const editor = page.locator('[contenteditable=true]').first();
+  await editor.waitFor();
+  await editor.evaluate((el, html) => {
+    el.innerHTML = html;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, originalHtml);
+  const restoredHtml = await editor.innerHTML();
+  expect(restoredHtml, 'The editor must actually hold the original HTML right before we save it back.').toBe(originalHtml);
+
+  // force:true skips scrolling the button into view -- do it explicitly, in
+  // case the editor content being restored FROM (e.g. a tall test image) had
+  // pushed the button below the fold (see VIS-10's save-button note).
+  const restoreSaveButton = page.getByRole('button', { name: /Zapisz stronę/ });
+  await restoreSaveButton.scrollIntoViewIfNeeded();
+  await restoreSaveButton.click({ force: true });
+  await expect(page.getByRole('status')).toHaveText('Zmiany zapisane.', { timeout: 10_000 });
+  await page.screenshot({ path: `${evidence}/05-editor-restored.png`, fullPage: true });
+
+  const publicHtml = await waitForPublicPageContent('serwis', (html) => html === originalHtml);
+  expect(publicHtml, 'The public page must show the exact original content again after restoring.').toBe(originalHtml);
 }
 
 async function fetchModelBySlug(slug: string) {
@@ -480,11 +555,15 @@ test.describe('rexor visual regression (admin editor)', () => {
 
     await loginAdmin(page);
     await page.getByRole('tab', { name: 'Strony' }).click();
-    await page.getByRole('button', { name: 'Serwis', exact: true }).click();
+    await selectSitePage(page, 'Serwis');
 
     const editor = page.locator('[contenteditable=true]').first();
     await editor.waitFor();
     const originalHtml = await editor.innerHTML();
+    expect(
+      originalHtml,
+      'Sanity check: captured "Kontakt" placeholder content instead of Serwis\'s -- selectSitePage()\'s heading wait did not close the render gap (see its note).',
+    ).not.toContain('Uzupełnij dane w nawiasach kwadratowych');
     await page.screenshot({ path: `${evidence}/01-editor-before.png`, fullPage: true });
 
     try {
@@ -542,14 +621,116 @@ test.describe('rexor visual regression (admin editor)', () => {
       await page.screenshot({ path: `${evidence}/99-failure.png`, fullPage: true }).catch(() => {});
       throw error;
     } finally {
-      // Always restore the real page content, even if an assertion above failed.
-      await editor.evaluate((el, html) => {
-        el.innerHTML = html;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-      }, originalHtml);
-      await page.getByRole('button', { name: /Zapisz stronę/ }).click({ force: true });
+      await restorePageContent(page, evidence, originalHtml);
+    }
+  });
+
+  test('VIS-10: resizing an image in the WYSIWYG editor is respected on the public page after save', async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(60_000);
+    const evidence = await evidenceDir('VIS-10');
+
+    // Minimal 1x1 red PNG -- no fixture file needed, upload accepts any
+    // image/* payload.
+    const pngBuffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    );
+
+    await loginAdmin(page);
+    await page.getByRole('tab', { name: 'Strony' }).click();
+    await selectSitePage(page, 'Serwis');
+
+    const editor = page.locator('[contenteditable=true]').first();
+    await editor.waitFor();
+    const originalHtml = await editor.innerHTML();
+    expect(
+      originalHtml,
+      'Sanity check: captured "Kontakt" placeholder content instead of Serwis\'s -- selectSitePage()\'s heading wait did not close the render gap (see its note).',
+    ).not.toContain('Uzupełnij dane w nawiasach kwadratowych');
+    await page.screenshot({ path: `${evidence}/01-editor-before.png`, fullPage: true });
+
+    try {
+      // Insert a real image via the toolbar's file input (the same path a
+      // user takes -- not injecting an <img> tag directly).
+      await page
+        .getByLabel('Wstaw zdjęcia')
+        .locator('input[type="file"]')
+        .setInputFiles({ name: 'vis-10.png', mimeType: 'image/png', buffer: pngBuffer });
+
+      const insertedImage = editor.locator('img').last();
+      await expect(insertedImage).toBeVisible({ timeout: 10_000 });
+      const src = await insertedImage.getAttribute('src');
+      expect(src, 'Upload must produce a src for the inserted image before we can resize it.').toBeTruthy();
+
+      // Clicking the image selects it, which reveals the "Rozmiar
+      // zaznaczonego zdjęcia" size toolbar (see admin-panel.tsx
+      // setSelectedImageWidth) -- same interaction a real admin uses.
+      await insertedImage.click();
+      const sizeToolbar = page.locator('span', { hasText: 'Rozmiar zaznaczonego zdjęcia:' }).locator('..');
+      await expect(sizeToolbar).toBeVisible();
+      await sizeToolbar.getByRole('button', { name: '75%' }).click();
+
+      const editedHtml = await editor.innerHTML();
+      expect(
+        editedHtml,
+        'Clicking "75%" must set an inline width on the selected <img>, not just visually preview it.',
+      ).toMatch(/<img[^>]*width:\s*75%[^>]*>/);
+      await page.screenshot({ path: `${evidence}/02-editor-resized.png`, fullPage: true });
+
+      // The 1x1 test image, at 75% width with height:auto, renders as a tall
+      // square that pushes "Zapisz stronę" below the viewport -- force:true
+      // (needed to click through a lingering toast, as elsewhere in this
+      // file) does NOT auto-scroll like a plain click does, so without this
+      // the click silently lands outside the viewport and no save request is
+      // ever sent (caught by hand: this is a test-authoring gotcha, not an
+      // app bug -- see the mailbox-lib style header notes in this file).
+      const saveButton = page.getByRole('button', { name: /Zapisz stronę/ });
+      await saveButton.scrollIntoViewIfNeeded();
+      await saveButton.click({ force: true });
       await expect(page.getByRole('status')).toHaveText('Zmiany zapisane.', { timeout: 10_000 });
-      await page.screenshot({ path: `${evidence}/05-editor-restored.png`, fullPage: true });
+      await page.screenshot({ path: `${evidence}/03-editor-saved.png`, fullPage: true });
+
+      // The write and the public GET /pages/serwis don't share a request --
+      // poll instead of asserting on the very first read (same as VIS-09).
+      const publicHtml = await waitForPublicPageContent('serwis', (html) => html.includes(String(src)));
+      expect(publicHtml, 'GET /pages/serwis never returned the resized image within 10s.').not.toBeNull();
+      expect(
+        publicHtml,
+        'The saved page must keep the 75% width style on the image, not just the image itself.',
+      ).toMatch(/<img[^>]*width:\s*75%[^>]*>/);
+
+      const publicPage = await context.newPage();
+      await publicPage.goto(`${BASE_URL}/serwis`, { waitUntil: 'domcontentloaded' });
+      const article = publicPage.locator('article.rich-content');
+      const publicImage = article.locator(`img[src="${src}"]`);
+      await expect(publicImage, 'The resized image must render on the public /serwis page.').toBeVisible({
+        timeout: 10_000,
+      });
+
+      // Confirm the resize is respected visually, not just present as a
+      // style attribute the site's CSS could still be overriding (e.g. the
+      // .rich-content img max-width rule).
+      const [articleBox, imageBox] = await Promise.all([
+        article.boundingBox(),
+        publicImage.boundingBox(),
+      ]);
+      expect(articleBox && imageBox, 'Both the article and the image must have a layout box.').toBeTruthy();
+      const ratio = imageBox!.width / articleBox!.width;
+      expect(
+        ratio,
+        `Image should render at ~75% of the article width, but rendered at ${(ratio * 100).toFixed(1)}%.`,
+      ).toBeGreaterThan(0.65);
+      expect(ratio).toBeLessThan(0.85);
+      await publicPage.screenshot({ path: `${evidence}/04-public-serwis.png`, fullPage: true });
+      await publicPage.close();
+    } catch (error) {
+      await page.screenshot({ path: `${evidence}/99-failure.png`, fullPage: true }).catch(() => {});
+      throw error;
+    } finally {
+      await restorePageContent(page, evidence, originalHtml);
     }
   });
 });
