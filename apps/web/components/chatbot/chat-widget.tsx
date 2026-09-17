@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { MessageSquareText, X, Sparkles } from 'lucide-react';
 import { ChatWindow } from './chat-window';
 
 export function ChatWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [showNotificationBadge, setShowNotificationBadge] = useState(false);
 
@@ -16,6 +18,12 @@ export function ChatWidget() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Doradca AI jest przeznaczony dla klientów na stronie publicznej — w panelu
+  // administracyjnym tylko przeszkadza i zasłania elementy interfejsu.
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
 
   const handleOpen = () => {
     setIsOpen(true);
@@ -81,8 +89,8 @@ export function ChatWidget() {
             <MessageSquareText className="size-6 text-white transition-transform duration-200 group-hover:scale-110" />
             {/* Wskaźnik online / AI */}
             <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-amber-400 ring-2 ring-white" />
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
             </span>
           </>
         )}

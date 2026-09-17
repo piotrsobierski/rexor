@@ -490,15 +490,37 @@ test.describe('rexor visual regression (admin editor)', () => {
     try {
       // A real, typed edit (not innerHTML injection) -- move to the end of
       // the content, start a new paragraph, and type the marker.
+      //
+      // Ctrl+End is NOT reliable here: the content ends with a <ul>, and
+      // Chromium's "end of document" caret can land inside the last <li>
+      // instead of after the whole editor, which turns "Enter + type" into a
+      // new bogus list item instead of a trailing paragraph (this bit us
+      // once -- see the incident note below). Collapsing a Selection Range
+      // to the end of the editor's contents is unambiguous.
       await editor.click();
-      await page.keyboard.press('ControlOrMeta+End');
+      await editor.evaluate((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      });
       await page.keyboard.press('Enter');
       await page.keyboard.type(marker, { delay: 20 });
       const editedHtml = await editor.innerHTML();
       expect(editedHtml, 'Typing into the editor must reach its innerHTML before we save.').toContain(marker);
+      expect(
+        editedHtml.match(new RegExp(`<li[^>]*>[^<]*${marker}`)),
+        'The marker must land in a trailing paragraph, not get folded into the last <li> of the feature list.',
+      ).toBeNull();
       await page.screenshot({ path: `${evidence}/02-editor-edited.png`, fullPage: true });
 
-      await page.getByRole('button', { name: /Zapisz stronę/ }).click();
+      // A toast ("Zapisano") pops up over the bottom-right area on every
+      // save and can still be animating out when we go to click Save again
+      // for the restore below -- force the click through it rather than
+      // let Playwright's actionability check flake on the overlay.
+      await page.getByRole('button', { name: /Zapisz stronę/ }).click({ force: true });
       await expect(page.getByRole('status')).toHaveText('Zmiany zapisane.', { timeout: 10_000 });
       await page.screenshot({ path: `${evidence}/03-editor-saved.png`, fullPage: true });
 
@@ -516,13 +538,16 @@ test.describe('rexor visual regression (admin editor)', () => {
       });
       await publicPage.screenshot({ path: `${evidence}/04-public-serwis.png`, fullPage: true });
       await publicPage.close();
+    } catch (error) {
+      await page.screenshot({ path: `${evidence}/99-failure.png`, fullPage: true }).catch(() => {});
+      throw error;
     } finally {
       // Always restore the real page content, even if an assertion above failed.
       await editor.evaluate((el, html) => {
         el.innerHTML = html;
         el.dispatchEvent(new Event('input', { bubbles: true }));
       }, originalHtml);
-      await page.getByRole('button', { name: /Zapisz stronę/ }).click();
+      await page.getByRole('button', { name: /Zapisz stronę/ }).click({ force: true });
       await expect(page.getByRole('status')).toHaveText('Zmiany zapisane.', { timeout: 10_000 });
       await page.screenshot({ path: `${evidence}/05-editor-restored.png`, fullPage: true });
     }
