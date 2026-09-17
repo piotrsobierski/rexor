@@ -1218,6 +1218,28 @@ function adminModelPricing(PDO $pdo): array
         }
         $model['adjustments'] = modelPriceAdjustments($pdo, $modelId);
         $result = priceConfiguration($model, $groups, null, $defaultBattery, []);
+
+        // priceConfiguration() liczy tylko cenę "od" (rozmiar i bateria mogą
+        // być NULL bez błędu, bo cena składników i tak wychodzi) - nie zgłasza
+        // więc braku rozmiaru/baterii, choć bez nich model przechodzi przez
+        // configurator, ale nie da się go zamówić (patrz guard w
+        // updateAdminRecord() blokujący publikację). Dokładamy to tutaj jako
+        // checklistę gotowości widoczną w panelu, zanim ktoś w ogóle spróbuje
+        // opublikować model.
+        $readinessIssues = [];
+        $activeBatteries = modelBatteries($pdo, $modelId);
+        if (empty(modelSizes($pdo, $modelId))) {
+            $readinessIssues[] = 'Brak aktywnego rozmiaru - dodaj co najmniej jeden w zakładce „Modele”.';
+        }
+        if (empty($activeBatteries)) {
+            $readinessIssues[] = 'Brak aktywnej baterii - dodaj co najmniej jedną w zakładce „Baterie”.';
+        } elseif ($defaultBattery === null) {
+            $readinessIssues[] = 'Żadna bateria nie jest oznaczona jako domyślna - ustaw to w zakładce „Baterie”.';
+        }
+        if (empty($groups)) {
+            $readinessIssues[] = 'Model nie ma przypisanego żadnego osprzętu - uzupełnij grupy części w zakładce „Osprzęt i cena modelu”.';
+        }
+
         $pricing[(string) $modelId] = [
             'modelId' => $modelId,
             'framePriceGross' => $result['framePriceGross'],
@@ -1228,7 +1250,7 @@ function adminModelPricing(PDO $pdo): array
             'marginAmountGross' => $result['marginAmountGross'],
             'adjustments' => $result['adjustments'],
             'grossTotal' => $result['grossTotal'],
-            'issues' => $result['issues'],
+            'issues' => [...$readinessIssues, ...$result['issues']],
             'notes' => $result['notes'],
             'lines' => array_map(static fn (array $line): array => [
                 'groupSlug' => $line['groupSlug'],
