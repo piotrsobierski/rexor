@@ -47,6 +47,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { adminFlagEnabled } from '@/lib/admin-flags';
+import { CATEGORY_ICON_PRESETS, resolveCategoryIcon } from '@/lib/category-icons';
 import { isSavedRecordId } from '@/lib/saved-record';
 import { Toaster, toast } from '@/components/ui/toast';
 import {
@@ -1536,6 +1537,61 @@ function CategoriesEditor({
                     <Trash2 className="size-3.5" />
                   </Button>
                 )}
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs text-ink-muted">
+                  Znaczek (ikona)
+                </Label>
+                {(() => {
+                  const CurrentIcon = resolveCategoryIcon(
+                    row.icon_key === undefined || row.icon_key === null
+                      ? null
+                      : String(row.icon_key),
+                    String(row.slug ?? ''),
+                  );
+                  return (
+                    <div className="flex items-center gap-2 text-xs text-ink-subtle">
+                      <span className="grid size-7 place-items-center rounded-full border border-line bg-white">
+                        <CurrentIcon className="size-3.5" />
+                      </span>
+                      aktualny znaczek na stronie głównej
+                    </div>
+                  );
+                })()}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {CATEGORY_ICON_PRESETS.map((preset) => {
+                    const Icon = preset.icon;
+                    const selected =
+                      String(row.icon_key ?? '') === preset.key;
+                    return (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        title={preset.label}
+                        aria-label={preset.label}
+                        aria-pressed={selected}
+                        disabled={!isSavedRecordId(row.id)}
+                        onClick={() =>
+                          void patch('categories', row.id, {
+                            icon_key: selected ? null : preset.key,
+                          })
+                        }
+                        className={cn(
+                          'focus-ring grid aspect-square place-items-center rounded-lg border text-ink-muted disabled:cursor-not-allowed disabled:opacity-40',
+                          selected
+                            ? 'border-ink bg-ink text-white'
+                            : 'border-line hover:bg-ink-wash',
+                        )}
+                      >
+                        <Icon className="size-4" />
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[0.68rem] text-ink-subtle">
+                  Widoczny jako znaczek kategorii na stronie głównej. Kliknij
+                  ponownie zaznaczoną ikonę, aby wrócić do domyślnej.
+                </p>
               </div>
             </div>
             <div className="grid gap-3">

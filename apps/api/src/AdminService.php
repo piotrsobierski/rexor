@@ -66,7 +66,7 @@ function normalizeAdminFlags(array $rows, array $fields): array
 function adminCatalog(PDO $pdo): array
 {
     $catalog = [
-        'categories' => $pdo->query('SELECT id, slug, name, short_description, description_html, default_image_path, is_published, sort_order FROM bike_categories ORDER BY sort_order')->fetchAll(),
+        'categories' => $pdo->query('SELECT id, slug, name, short_description, description_html, default_image_path, icon_key, is_published, sort_order FROM bike_categories ORDER BY sort_order')->fetchAll(),
         'models' => $pdo->query('SELECT m.id, m.category_id, m.slug, m.name, m.short_description, m.description_html, m.computed_base_price_gross, m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.default_image_path, m.status, COUNT(mm.media_id) AS media_count FROM bike_models m LEFT JOIN model_media mm ON mm.model_id = m.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll(),
         'partGroups' => $pdo->query('SELECT id, slug, name, description, sort_order, is_required FROM part_groups ORDER BY sort_order, id')->fetchAll(),
         'modelParts' => $pdo->query('SELECT mp.model_id, mp.part_id, pg.slug AS group_slug, p.group_id, mp.is_default, mp.is_customer_configurable, mp.customer_supplied_allowed, mp.customer_supplied_gross_price, mp.gross_price_override, mp.sort_order, mp.notes FROM model_parts mp JOIN parts p ON p.id = mp.part_id JOIN part_groups pg ON pg.id = p.group_id ORDER BY mp.model_id, pg.sort_order, mp.sort_order')->fetchAll(),
@@ -131,7 +131,7 @@ function adminCatalog(PDO $pdo): array
 function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): array
 {
     $definitions = [
-        'categories' => ['table' => 'bike_categories', 'fields' => ['name', 'short_description', 'description_html', 'default_image_path', 'is_published', 'sort_order']],
+        'categories' => ['table' => 'bike_categories', 'fields' => ['name', 'short_description', 'description_html', 'default_image_path', 'icon_key', 'is_published', 'sort_order']],
         'models' => ['table' => 'bike_models', 'fields' => ['category_id', 'name', 'short_description', 'description_html', 'frame_price_gross', 'assembly_price_gross', 'margin_percent', 'default_image_path', 'status', 'sort_order', 'specifications']],
         'parts' => ['table' => 'parts', 'fields' => ['name', 'group_id', 'description', 'gross_price', 'price_status', 'image_path', 'is_active']],
         'sizes' => ['table' => 'model_sizes', 'fields' => ['label', 'price_delta_gross', 'sort_order', 'is_active']],
@@ -466,14 +466,17 @@ function createAdminCategory(PDO $pdo, array $input): array
     $slug = uniqueSlug($pdo, 'bike_categories', slugify($name, 'kategoria'));
     $nextSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM bike_categories')->fetchColumn();
 
+    $iconKey = trim((string) ($input['icon_key'] ?? ''));
+
     $statement = $pdo->prepare(
-        'INSERT INTO bike_categories (slug, name, short_description, sort_order, is_published) ' .
-        'VALUES (:slug, :name, :short_description, :sort_order, 0)'
+        'INSERT INTO bike_categories (slug, name, short_description, icon_key, sort_order, is_published) ' .
+        'VALUES (:slug, :name, :short_description, :icon_key, :sort_order, 0)'
     );
     $statement->execute([
         'slug' => $slug,
         'name' => $name,
         'short_description' => ($short = trim((string) ($input['short_description'] ?? ''))) !== '' ? $short : null,
+        'icon_key' => $iconKey !== '' ? $iconKey : null,
         'sort_order' => $nextSort,
     ]);
 

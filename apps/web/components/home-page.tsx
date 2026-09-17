@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Bike, Map, Mountain, Route, SlidersHorizontal, Wrench, Zap } from 'lucide-react';
+import { ArrowRight, SlidersHorizontal, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OptimizedImage } from '@/components/optimized-image';
 import { CardGridSkeleton } from '@/components/page-loading';
@@ -9,23 +9,22 @@ import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { formatPrice } from '@/lib/catalog';
 import { categoryCardDescription } from '@/lib/category-descriptions';
+import { resolveCategoryIcon } from '@/lib/category-icons';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
 
 /**
- * Ikona i zapasowy opis dla kategorii startowych.
- *
- * Sama lista kategorii pochodzi z API, nie stąd: kategoria założona w panelu
- * ma się pokazać bez builda. Wcześniej pasek kategorii brał tylko te pięć
- * slugów, więc nowa kategoria nie pojawiała się na stronie głównej nigdy.
+ * Zapasowy opis dla kategorii startowych, gdy panel nie ma jeszcze własnego
+ * krótkiego opisu. Ikona jest teraz konfigurowalna w panelu (zakładka
+ * Kategorie) — patrz `resolveCategoryIcon` w `lib/category-icons.ts`.
  */
-const categoryIcons: Record<string, { icon: typeof Bike; description: string }> = {
-  szosa: { icon: Route, description: 'Szybkość na asfalcie' },
-  gravel: { icon: Map, description: 'Asfalt, szuter, wyprawa' },
-  mtb: { icon: Mountain, description: 'Kontrola poza asfaltem' },
-  'miejski-turystyczny': { icon: Bike, description: 'Komfort każdego dnia' },
-  elektryczne: { icon: Zap, description: 'Moc i zasięg bez kompromisów' },
+const categoryFallbackDescriptions: Record<string, string> = {
+  szosa: 'Szybkość na asfalcie',
+  gravel: 'Asfalt, szuter, wyprawa',
+  mtb: 'Kontrola poza asfaltem',
+  'miejski-turystyczny': 'Komfort każdego dnia',
+  elektryczne: 'Moc i zasięg bez kompromisów',
 };
 
 export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
@@ -34,12 +33,12 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
   // „Wkrótce" bierze się z katalogu, a nie z listy w kodzie: kategoria bez
   // modeli dostaje znaczek, a gdy pierwszy model do niej trafi - znika sam.
   const visibleCategories = apiCategories.map((category) => {
-    const known = categoryIcons[category.slug];
+    const fallbackDescription = categoryFallbackDescriptions[category.slug] ?? '';
     return {
       slug: category.slug,
       name: category.name,
-      description: categoryCardDescription(category.slug, category.short_description) || known?.description || '',
-      icon: known?.icon ?? Bike,
+      description: categoryCardDescription(category.slug, category.short_description) || fallbackDescription,
+      icon: resolveCategoryIcon(category.icon_key, category.slug),
       empty: loaded && !models.some((model) => model.categorySlug === category.slug),
       image: publicMediaUrl(category.default_image_path),
     };

@@ -2,7 +2,7 @@ import { bikeModels, type BikeBattery, type BikeModel, type BikeSize, type Optio
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
-export type PublicCategory = { slug: string; name: string; short_description: string | null; description_html: string | null; default_image_path: string | null };
+export type PublicCategory = { slug: string; name: string; short_description: string | null; description_html: string | null; default_image_path: string | null; icon_key: string | null };
 
 export type ApiModel = {
   slug: string;
