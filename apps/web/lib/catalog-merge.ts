@@ -58,7 +58,10 @@ export function mergeCatalog(data: { models: ApiModel[]; categories: PublicCateg
       const fallback = bikeModels.find((item) => item.id === apiModel.slug);
       const categoryName = data.categories.find((item) => item.slug === apiModel.category_slug)?.name ?? fallback?.category ?? apiModel.category_slug;
       const gallery = apiModel.media.map((item) => publicMediaUrl(item.storage_path)).filter(Boolean);
-      const image = publicMediaUrl(apiModel.default_image_path) || gallery[0] || fallback?.image || '';
+      // Pierwsze zdjęcie galerii jest zdjęciem głównym na stronie modelu.
+      // Ta sama reguła musi obowiązywać na liście /rowery, inaczej po
+      // wgraniu nowego zdjęcia karta i strona szczegółów pokazują co innego.
+      const image = gallery[0] || publicMediaUrl(apiModel.default_image_path) || fallback?.image || '';
       return {
         id: apiModel.slug,
         name: apiModel.name,
