@@ -101,6 +101,11 @@ function publicId(): string
 
 function sanitizeRichHtml(string $html): string
 {
+    // Chrome's execCommand('bold'/'italic') emits <b>/<i>, not <strong>/<em> -
+    // without this, strip_tags() below silently unwraps them (they aren't in
+    // $allowedTags), so bold/italic applied in the WYSIWYG editor visibly
+    // vanish the moment the page is saved.
+    $html = preg_replace(['/<b(\s[^>]*)?>/i', '/<\/b>/i', '/<i(\s[^>]*)?>/i', '/<\/i>/i'], ['<strong>', '</strong>', '<em>', '</em>'], $html) ?? $html;
     $allowedTags = '<p><br><h2><h3><h4><strong><em><ul><ol><li><blockquote><a><img><table><thead><tbody><tfoot><tr><th><td><span><hr>';
     $html = strip_tags($html, $allowedTags);
     $document = new DOMDocument('1.0', 'UTF-8');
