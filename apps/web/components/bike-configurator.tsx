@@ -408,7 +408,20 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
             <DialogTitle className="text-2xl font-semibold tracking-tight text-ink">{copy.configurator.changeModelCta}</DialogTitle>
           </DialogHeader>
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => { selectModel(item.id); setModelPickerOpen(false); }} className={`pick-card focus-ring ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}><span className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span><span className={`grid size-6 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span></span><span className="mt-1 text-xl font-semibold tracking-tight">{item.name}</span><span className="mt-1 text-sm text-ink-muted">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span></button>; })}
+            {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => { selectModel(item.id); setModelPickerOpen(false); }} className={`pick-card focus-ring overflow-hidden p-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}>
+              <span className="block aspect-[4/3] w-full overflow-hidden bg-ink-wash">
+                {item.image && <OptimizedImage src={item.image} alt={item.name} className="size-full object-contain mix-blend-multiply" />}
+              </span>
+              <span className="block p-4">
+                <span className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span>
+                  <span className={`grid size-6 shrink-0 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span>
+                </span>
+                <span className="mt-1 block text-xl font-semibold tracking-tight">{item.name}</span>
+                {item.eyebrow && <span className="mt-1 block text-sm text-ink-muted">{item.eyebrow}</span>}
+                <span className="mt-2 block text-sm font-medium text-ink">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span>
+              </span>
+            </button>; })}
           </div>
         </DialogContent>
       </Dialog>
