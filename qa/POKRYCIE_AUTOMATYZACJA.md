@@ -17,6 +17,8 @@ uznawać za automatycznie zweryfikowany.
 | CFG-06 | PASS (zapis + dziennik + e-mail) | `run-configuration-save.cjs`, `qa/playwright/test-visual.spec.ts` (`VIS-05`, `VIS-07`) | Wszystko POTWIERDZONE. E-mail pierwotnie nie docierał (`.env` testowy: `MAIL_TRANSPORT=log`) — naprawione wdrożeniem poprawnego `SMTP_HOST` (patrz `VIS-07/WYNIK.md`) |
 | CFG-07 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-06`, `VIS-13`) | POTWIERDZONE: modal lakieru (`VIS-06`), karuzela zdjęć i akordeon opisu poza modalem (`VIS-13`) |
 | ADM-01 | PASS | `run-admin-session.cjs` | DO PONOWNEGO URUCHOMIENIA po poprawce |
+| ADM-04 | PASS | `qa/playwright/test-adm-parts-batteries.spec.ts` (`VIS-16`) | POTWIERDZONE |
+| ADM-05 | PASS | `qa/playwright/test-adm-parts-batteries.spec.ts` (`VIS-17`) | POTWIERDZONE |
 | ADM-07 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-08`, `VIS-09`, `VIS-10`) | POTWIERDZONE: formatowanie zaznaczenia (`VIS-08`), pełny zapis widoczny publicznie (`VIS-09`), zmiana rozmiaru zdjęcia respektowana publicznie po naprawie sanitizera (`VIS-10`) |
 | ADM-10 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-05`) | POTWIERDZONE |
 
@@ -52,3 +54,5 @@ jest pomijany) — logika połączenia IMAP jest w reużywalnym helperze
 | VIS-11 | Dopełnienie PUB-01/02: dokładny zestaw modeli per kategoria na `/rowery` (nie tylko stan aktywnego filtra) | PASS | POTWIERDZONE |
 | VIS-12 | Dopełnienie CFG-05 na środowisku testowym: opis modelu zwinięty na telefonie / rozwinięty na desktopie | PASS | POTWIERDZONE |
 | VIS-13 | Dopełnienie CFG-07 poza modalem lakieru: fokus klawiatury w karuzeli zdjęć i akordeonie opisu | PASS | POTWIERDZONE |
+| VIS-16 | ADM-04: testowa część w „Osprzęt i cena modelu” (opcjonalna/domyślna, przeliczenie ceny, zakres modelu) | PASS | POTWIERDZONE |
+| VIS-17 | ADM-05: testowy pakiet baterii przypisany do jednego modelu (Wh, cena, zakres) | PASS | POTWIERDZONE |

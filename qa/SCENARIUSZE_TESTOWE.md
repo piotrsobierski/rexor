@@ -33,7 +33,9 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | ADM-01 | PASS | test — `qa/evidence/2026-09-17/test/ADM-01/` | Logowanie na podane konto działa; panel modeli i galerie są widoczne bez błędów konsoli. |
 | ADM-07 | PASS | test — `qa/evidence/2026-09-17/test/ADM-07/` | Edytor modelu zachowuje zaznaczenie przy użyciu „Pogrubienia”; zmiana pozostała niezapisana i została odrzucona odświeżeniem. |
 | ADM-10 | PASS | test — `qa/evidence/2026-09-17/test/ADM-10/`, `VIS-05/` | `VIS-05` tworzy własną konfigurację testową i otwiera ją przez prawdziwy przepływ „Zapytania” → „Szczegóły”, oraz potwierdza wpis w „Dzienniku aktywności” — bez ponownego logowania, bez błędu. |
-| ADM-02–06, ADM-08–09, REL-01 | NOT RUN | — | Do wykonania według kolejności i wymaganych uprawnień. |
+| ADM-04 | PASS | test — `qa/evidence/2026-09-17/test/VIS-16/` (`npm run test:visual -- -g VIS-16`) | Część testowa: przypisanie opcjonalne i domyślne przelicza cenę „od”, widoczna tylko w E82, cofnięcie i usunięcie działa bez śladu. |
+| ADM-05 | PASS | test — `qa/evidence/2026-09-17/test/VIS-17/` (`npm run test:visual -- -g VIS-17`) | Pakiet baterii jest z natury przypisany do jednego modelu (FK `model_id`) — brak osobnego kroku przypisania; Wh i cena w konfiguratorze aktualizują się po wyborze; usunięcie działa bez śladu. |
+| ADM-02–03, ADM-06, ADM-08–09, REL-01 | NOT RUN | — | Do wykonania według kolejności i wymaganych uprawnień. |
 | VIS-01 | PASS | test — `qa/evidence/2026-09-17/test/VIS-01/` (`npm run test:visual`) | Zdjęcie główne na `/rowery` nie odtworzyło zgłoszonego błędu; zgodne z detalem od razu po reorderze w panelu. |
 | VIS-02 | FAIL (oczekiwane) | test — `qa/evidence/2026-09-17/test/VIS-02/` (`npm run test:visual`) | Ani „Rowery”, ani „Ramy” nie mają filtra kategorii w panelu — brakująca funkcja, nie regresja jednej zakładki. |
 | VIS-03 | PASS | test — `qa/evidence/2026-09-17/test/VIS-03/` (`npm run test:visual`) | Podgląd świeżo zapisanej konfiguracji w panelu otworzył się bez błędu dla ścieżki standardowej (E82, domyślne opcje). |
@@ -44,6 +46,8 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | VIS-11 | PASS | test — `qa/evidence/2026-09-17/test/VIS-11/` (`npm run test:visual`) | Dopełnia PUB-01/02: dokładny zestaw modeli per kategoria na `/rowery` (nie tylko stan aktywnego filtra), porównany z `GET /api/catalog`; powrót do „Wszystkie” przywraca pełną listę. |
 | VIS-12 | PASS | test — `qa/evidence/2026-09-17/test/VIS-12/` (`npm run test:visual`) | Dopełnia CFG-05 na środowisku testowym: opis modelu domyślnie zwinięty na telefonie (390×844), rozwinięty na desktopie; przełączanie „Rozwiń”/„Zwiń” działa w obie strony. |
 | VIS-13 | PASS | test — `qa/evidence/2026-09-17/test/VIS-13/` (`npm run test:visual`) | Dopełnia CFG-07 poza modalem lakieru: audyt fokusu klawiatury karuzeli zdjęć i akordeonu opisu — fokus pozostaje widoczny, nigdy nie znika ani nie trafia na `<body>`. |
+| VIS-16 | PASS | test — `qa/evidence/2026-09-17/test/VIS-16/` (`npm run test:visual -- -g VIS-16`) | ADM-04: testowa część w „Osprzęt i cena modelu” — przypisanie opcjonalne i domyślne poprawnie przelicza „Cena od”, widoczna tylko w przypisanym modelu (E82, nie E55); cofnięcie i usunięcie bez śladu. |
+| VIS-17 | PASS | test — `qa/evidence/2026-09-17/test/VIS-17/` (`npm run test:visual -- -g VIS-17`) | ADM-05: testowy pakiet baterii przypisany do jednego modelu — widoczny tylko tam, Wh i cena w konfiguratorze aktualizują się po wyborze; usunięcie bez śladu. |
 
 ## Publiczna strona i konfigurator
 
