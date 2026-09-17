@@ -27,7 +27,7 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | CFG-03 | PASS | test — `qa/evidence/2026-09-16/test/CFG-03/` | Bateria zmienia wspólnie pojemność, cenę i zasięg. |
 | CFG-04 | PASS | test — `qa/evidence/2026-09-16/test/CFG-04/`, `qa/evidence/2026-09-17/test/VIS-04/` | Picker, wyszukiwanie, dopłata i powiększenie renderu działają (E82 ma 0 kolorów z renderem w danych testowych — powiększenie dopełniono na E55, który ma 229/680). |
 | CFG-05 | PASS (local) | lokalnie — `qa/evidence/2026-09-16/local/CFG-05/` | „Rozwiń/Zwiń” działa; czeka na wdrożenie do testu. |
-| CFG-06 | PARTIAL | test — `qa/evidence/2026-09-17/test/CFG-06/`, `VIS-05/` | Walidacja (brak zgody blokuje POST) i pełny zapis + wpis w Dzienniku aktywności potwierdzone (`VIS-05`). Wciąż niepotwierdzone: faktyczne dostarczenie e-maila — IMAP do `mail.sobierski.com:993` timeoutuje z tego środowiska (patrz `VIS-05/WYNIK.md`). |
+| CFG-06 | PASS (po naprawie) | test — `qa/evidence/2026-09-17/test/CFG-06/`, `VIS-05/`, `VIS-07/` | Walidacja i zapis działają (`VIS-05`). `VIS-07` wykrył, że e-mail „Nowe zapytanie ofertowe” nie docierał (`.env` środowiska testowego miał `MAIL_TRANSPORT=log`) — naprawiono wdrożeniem `SMTP_HOST=de1.sohost.pl` (nie Cloudflare-proxowany `mail.sobierski.com`) do `.env.remote`; po naprawie e-mail dociera (~8 s). |
 | CFG-07 | PARTIAL | test — `qa/evidence/2026-09-17/test/CFG-07/`, `VIS-06/` | Enter i Escape działają; `VIS-06` potwierdza, że 25× Tab w otwartym modalu lakieru nie wyprowadza fokusu poza modal. Pozostaje do zrobienia: audyt fokusu karuzeli zdjęć i akordeonu opisu poza modalem. |
 | API-02 | PASS | test — `qa/evidence/2026-09-17/test/API-02/` | API odrzuca brak/zły token oraz niepełny payload zapisu. |
 | ADM-01 | PASS | test — `qa/evidence/2026-09-17/test/ADM-01/` | Logowanie na podane konto działa; panel modeli i galerie są widoczne bez błędów konsoli. |
@@ -38,8 +38,9 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | VIS-02 | FAIL (oczekiwane) | test — `qa/evidence/2026-09-17/test/VIS-02/` (`npm run test:visual`) | Ani „Rowery”, ani „Ramy” nie mają filtra kategorii w panelu — brakująca funkcja, nie regresja jednej zakładki. |
 | VIS-03 | PASS | test — `qa/evidence/2026-09-17/test/VIS-03/` (`npm run test:visual`) | Podgląd świeżo zapisanej konfiguracji w panelu otworzył się bez błędu dla ścieżki standardowej (E82, domyślne opcje). |
 | VIS-04 | PASS | test — `qa/evidence/2026-09-17/test/VIS-04/` (`npm run test:visual`) | Dopełnia CFG-04: filtr „Z wizualizacją”, wybór koloru i powiększenie renderu działają na E55 (E82 nie ma renderów w danych testowych). |
-| VIS-05 | PASS | test — `qa/evidence/2026-09-17/test/VIS-05/` (`npm run test:visual`) | Dopełnia CFG-06 + ADM-10: pełny zapis konfiguracji, wpis w Dzienniku aktywności, otwarcie przez „Zapytania” → „Szczegóły”. Dostarczenie e-maila nadal niepotwierdzone (IMAP timeout). |
+| VIS-05 | PASS | test — `qa/evidence/2026-09-17/test/VIS-05/` (`npm run test:visual`) | Dopełnia CFG-06 (zapis) + ADM-10: pełny zapis konfiguracji, wpis w Dzienniku aktywności, otwarcie przez „Zapytania” → „Szczegóły”. |
 | VIS-06 | PASS | test — `qa/evidence/2026-09-17/test/VIS-06/` (`npm run test:visual`) | Dopełnia CFG-07 (część modalu lakieru): 25× Tab w otwartym modalu nie wyprowadza fokusu poza niego; Escape wraca fokus w sensowne miejsce. |
+| VIS-07 | PASS (po naprawie) | test — `qa/evidence/2026-09-17/test/VIS-07/` (`npm run test:visual -- -g VIS-07`, wymaga `QA_MAILBOX_EMAIL`/`QA_MAILBOX_PASSWORD`) | Dopełnia CFG-06 (e-mail). Pierwszy przebieg: FAIL — `.env` środowiska testowego miał `MAIL_TRANSPORT=log`. Naprawiono (`.env.remote` → `MAIL_TRANSPORT=smtp`, `SMTP_HOST=de1.sohost.pl`, wdrożone przez FTP tylko dla `.env`). Drugi przebieg: PASS, e-mail dociera w ~8 s. |
 
 ## Publiczna strona i konfigurator
 

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { requiredMailboxCredentials, openMailbox, waitForMail } from './lib/mailbox';
 
 // Consolidated regression coverage for the three issues reported against the
 // admin editor (2026-09-17):
@@ -20,13 +21,33 @@ import { resolve } from 'node:path';
 //           paint renders in the test catalog; E55 has 229/680, so this
 //           runs against E55).
 //   VIS-05  CFG-06 + ADM-10: full save → admin "Dziennik aktywności" shows
-//           the event → open the same record from "Zapytania" → "Szczegóły"
-//           through the real UI flow (not a direct URL). Email *delivery*
-//           to the order-notification inbox still cannot be verified from
-//           this environment (IMAPS to mail.sobierski.com:993 times out
-//           even outside the shell sandbox) — see VIS-05's WYNIK.md.
+//           the event → order-notification inbox receives the email (via
+//           IMAP) → open the same record from "Zapytania" → "Szczegóły"
+//           through the real UI flow (not a direct URL).
+//
+//           IMAP note: `mail.sobierski.com` is Cloudflare-proxied (resolves
+//           to Cloudflare anycast IPs), and Cloudflare's proxy only forwards
+//           80/443 — so IMAPS on :993 times out through that hostname from
+//           ANY network, not just this sandbox. The real mailserver IP is
+//           found via the domain's MX record (`_dc-mx.<id>.sobierski.com`),
+//           which resolves to the actual (non-proxied) host; connecting
+//           there directly (with TLS SNI still set to the mail hostname)
+//           works — see qa/playwright/lib/mailbox.ts. Requires
+//           QA_MAILBOX_EMAIL / QA_MAILBOX_PASSWORD; skipped (not failed) if
+//           unset.
 //   VIS-06  CFG-07: keyboard focus stays trapped inside the paint-picker
 //           modal while Tabbing, and Escape returns focus to the trigger.
+//
+// Plus WYSIWYG editor coverage (ADM-07), which previously only checked that
+// toolbar buttons touch the current selection without ever saving
+// (2026-09-17):
+//   VIS-08  The "Akapit" (paragraph) toolbar button actually turns a heading
+//           block back into a <p>, not just "innerHTML changed somehow".
+//   VIS-09  A real edit (typed via the keyboard, not injected) saved from the
+//           "Strony" editor shows up on the live public page — the full
+//           round trip ADM-07 never exercised. Polls the public API for the
+//           write to land before checking the rendered page, since the save
+//           and the public read hit the same DB but aren't in one request.
 //
 // Run with: npm run test:visual
 // Requires QA_ADMIN_EMAIL / QA_ADMIN_PASSWORD in the environment.
@@ -71,6 +92,27 @@ async function loginAdmin(page: Page) {
   await page.waitForTimeout(150);
   await page.getByRole('button', { name: 'Zaloguj' }).click();
   await page.getByRole('tab', { name: 'Modele i zdjęcia' }).waitFor({ timeout: 15_000 });
+}
+
+async function fetchPublicPageHtml(slug: string): Promise<string | null> {
+  const response = await fetch(`${API_BASE}/pages/${slug}`);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`GET /pages/${slug} failed: ${response.status}`);
+  const data = (await response.json()) as { page: { content_html: string } };
+  return data.page.content_html;
+}
+
+/** Save can lag slightly behind the public read (see VIS-09 header note) — poll instead of a single check. */
+async function waitForPublicPageContent(slug: string, predicate: (html: string) => boolean, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastHtml: string | null = null;
+  while (Date.now() < deadline) {
+    lastHtml = await fetchPublicPageHtml(slug);
+    if (lastHtml !== null && predicate(lastHtml)) return lastHtml;
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return lastHtml;
 }
 
 async function fetchModelBySlug(slug: string) {
@@ -326,5 +368,163 @@ test.describe('rexor visual regression (admin editor)', () => {
     });
     await page.screenshot({ path: `${evidence}/02-dialog-closed.png`, fullPage: true });
     expect(focusReturnedToTrigger, 'Escape must close the dialog and leave focus somewhere sane, not on <body>.').toBe(true);
+  });
+
+  test('VIS-07: order-notification email actually arrives in the inbox (CFG-06 email leg)', async ({
+    page,
+    context,
+  }) => {
+    const mailbox = requiredMailboxCredentials();
+    test.skip(!mailbox, 'Set QA_MAILBOX_EMAIL / QA_MAILBOX_PASSWORD to run the email-delivery check.');
+    if (!mailbox) return;
+
+    // Default 60s test timeout is too tight for "wait up to 60s for mail"
+    // PLUS setup/cleanup — this test flips a shared setting, so cleanup
+    // must always get to run within the timeout, not get killed by it.
+    test.setTimeout(120_000);
+
+    const evidence = await evidenceDir('VIS-07');
+    const marker = `[QA] test-visual VIS-07 ${Date.now()}`;
+
+    await loginAdmin(page);
+    await page.getByRole('tab', { name: 'Poczta' }).click();
+    const orderEmailField = page.locator('#mail-order_email');
+    await orderEmailField.waitFor();
+    const originalOrderEmail = await orderEmailField.inputValue();
+    await page.screenshot({ path: `${evidence}/01-mail-routing-before.png`, fullPage: true });
+
+    try {
+      // Point the order-notification recipient at the mailbox we can read,
+      // for just long enough to send and verify one QA submission. Test
+      // environment only — see qa/README.md on why this is acceptable here.
+      if (originalOrderEmail.trim().toLowerCase() !== mailbox.email.toLowerCase()) {
+        await orderEmailField.fill(mailbox.email);
+        await page.getByRole('button', { name: /Zapisz adresy/i }).click();
+        await page.waitForTimeout(500);
+      }
+
+      const configPage = await context.newPage();
+      await configPage.goto(`${BASE_URL}/konfigurator?model=e82`, { waitUntil: 'domcontentloaded' });
+      await configPage.waitForTimeout(3000);
+      await configPage.getByRole('button', { name: /Zapisz i przejdź/i }).click();
+      await configPage.getByLabel('Imię i nazwisko').fill(marker);
+      await configPage.getByLabel('E-mail').fill('qa-configurator@example.invalid');
+      await configPage.getByRole('checkbox', { name: /Zgadzam się/ }).click({ force: true });
+      await configPage.getByRole('button', { name: /Utwórz prywatny link/i }).click();
+      await configPage.waitForURL(/\/konfiguracja\//, { timeout: 15_000 });
+      const publicId = (
+        await configPage.getByText('Numer projektu').locator('xpath=following-sibling::*[1]').innerText()
+      ).trim();
+      await configPage.close();
+
+      const client = await openMailbox(mailbox);
+      let found;
+      try {
+        found = await waitForMail(client, (subject) => subject.includes('Nowe zapytanie ofertowe'), {
+          timeoutMs: 60_000,
+        });
+      } finally {
+        await client.logout();
+      }
+      expect(
+        found,
+        `Order-notification inbox (${mailbox.email}) never received "Nowe zapytanie ofertowe" for ${publicId} within 60s.`,
+      ).not.toBeNull();
+      await page.screenshot({ path: `${evidence}/02-mail-received.png`, fullPage: true });
+    } finally {
+      // Always restore the real order recipient, even if the assertion above failed.
+      await page.getByRole('tab', { name: 'Poczta' }).click();
+      const field = page.locator('#mail-order_email');
+      await field.fill(originalOrderEmail);
+      await page.getByRole('button', { name: /Zapisz adresy/i }).click();
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${evidence}/03-mail-routing-restored.png`, fullPage: true });
+    }
+  });
+
+  test('VIS-08: "Akapit" toolbar button turns a heading block back into a paragraph', async ({ page }) => {
+    const evidence = await evidenceDir('VIS-08');
+
+    await loginAdmin(page);
+    await page.getByRole('tab', { name: 'Strony' }).click();
+
+    const editor = page.locator('[contenteditable=true]').first();
+    await editor.waitFor();
+    await editor.click();
+    await page.keyboard.press('ControlOrMeta+A');
+
+    // Toolbar buttons here carry no aria-label -- their accessible name is
+    // their visible text ("H3" / "P"), and `title` is only a tooltip, so
+    // locate by title directly rather than by accessible name.
+    await page.locator('button[title="Nagłówek H3"]').first().click();
+    const asHeading = await editor.innerHTML();
+    expect(asHeading, 'The H3 button should wrap the selection in a heading, as a precondition for testing reverting it.').toMatch(/<h3[ >]/i);
+    await page.screenshot({ path: `${evidence}/01-heading-applied.png`, fullPage: true });
+
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.locator('button[title="Akapit"]').first().click();
+    const asParagraph = await editor.innerHTML();
+    await page.screenshot({ path: `${evidence}/02-paragraph-applied.png`, fullPage: true });
+
+    expect(asParagraph, 'The "Akapit" button must turn the heading block back into a <p>.').toMatch(/<p[ >]/i);
+    expect(asParagraph, 'The "Akapit" button must remove the heading tag, not just add a paragraph next to it.').not.toMatch(/<h3[ >]/i);
+
+    // Never saved (no "Zapisz stronę" click) -- reload discards it, same as ADM-07.
+    await page.reload();
+  });
+
+  test('VIS-09: a real WYSIWYG edit, saved from "Strony", shows up on the public page', async ({ page, context }) => {
+    test.setTimeout(60_000);
+    const evidence = await evidenceDir('VIS-09');
+    const marker = `QA test-visual VIS-09 ${Date.now()}`;
+
+    await loginAdmin(page);
+    await page.getByRole('tab', { name: 'Strony' }).click();
+    await page.getByRole('button', { name: 'Serwis', exact: true }).click();
+
+    const editor = page.locator('[contenteditable=true]').first();
+    await editor.waitFor();
+    const originalHtml = await editor.innerHTML();
+    await page.screenshot({ path: `${evidence}/01-editor-before.png`, fullPage: true });
+
+    try {
+      // A real, typed edit (not innerHTML injection) -- move to the end of
+      // the content, start a new paragraph, and type the marker.
+      await editor.click();
+      await page.keyboard.press('ControlOrMeta+End');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type(marker, { delay: 20 });
+      const editedHtml = await editor.innerHTML();
+      expect(editedHtml, 'Typing into the editor must reach its innerHTML before we save.').toContain(marker);
+      await page.screenshot({ path: `${evidence}/02-editor-edited.png`, fullPage: true });
+
+      await page.getByRole('button', { name: /Zapisz stronę/ }).click();
+      await expect(page.getByRole('status')).toHaveText('Zmiany zapisane.', { timeout: 10_000 });
+      await page.screenshot({ path: `${evidence}/03-editor-saved.png`, fullPage: true });
+
+      // The write and the public GET /pages/serwis don't share a request --
+      // poll instead of asserting on the very first read.
+      const publicHtml = await waitForPublicPageContent('serwis', (html) => html.includes(marker));
+      expect(publicHtml, `GET /pages/serwis never returned the saved marker ("${marker}") within 10s.`).not.toBeNull();
+      expect(publicHtml).toContain(marker);
+
+      const publicPage = await context.newPage();
+      await publicPage.goto(`${BASE_URL}/serwis`, { waitUntil: 'domcontentloaded' });
+      const article = publicPage.locator('article.rich-content');
+      await expect(article, 'The saved marker paragraph must render on the public /serwis page.').toContainText(marker, {
+        timeout: 10_000,
+      });
+      await publicPage.screenshot({ path: `${evidence}/04-public-serwis.png`, fullPage: true });
+      await publicPage.close();
+    } finally {
+      // Always restore the real page content, even if an assertion above failed.
+      await editor.evaluate((el, html) => {
+        el.innerHTML = html;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }, originalHtml);
+      await page.getByRole('button', { name: /Zapisz stronę/ }).click();
+      await expect(page.getByRole('status')).toHaveText('Zmiany zapisane.', { timeout: 10_000 });
+      await page.screenshot({ path: `${evidence}/05-editor-restored.png`, fullPage: true });
+    }
   });
 });

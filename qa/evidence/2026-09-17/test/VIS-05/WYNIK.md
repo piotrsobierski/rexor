@@ -30,26 +30,18 @@
   (nie przez wpisanie adresu wprost) — dokładnie ta ścieżka, której dotyczyło
   zgłoszenie użytkownika.
 
-## Czego NIE udało się potwierdzić (pozostały blocker)
+## Aktualizacja: dostarczenie e-maila sprawdzone i naprawione w VIS-07
 
-**Rzeczywiste dostarczenie e-maila** (potwierdzenie do klienta i
-powiadomienie na adres zamówień) pozostaje niepotwierdzone. Kod
-(`apps/api/src/MailService.php`) zapisuje próbę wysyłki w tabeli
-`email_outbox` (`status: sent|failed`) i próbuje SMTP „best effort” poza
-transakcją zapisu — ale:
-
-- Nie ma w panelu admina widoku statusu `email_outbox` (tylko „Poczta —
-  adresaci zgłoszeń”, czyli konfiguracja adresów, nie log wysyłek).
-- Test mailbox `rexor@sobierski.com` (IMAP `mail.sobierski.com:993`)
-  **odpowiada timeoutem połączenia** (`CONNECT_TIMEOUT`) zarówno w
-  sandboxie Claude Code, jak i z wyłączonym sandboxem — więc problem nie
-  jest ograniczeniem środowiska agenta, tylko realną niedostępnością tego
-  portu/hosta stąd.
-
-Rekomendacja: jeśli zależy nam na automatycznym potwierdzeniu dostarczenia
-e-maila, albo dodać w panelu admina widok statusu `email_outbox` (łatwe do
-przetestowania przez Playwright), albo zweryfikować IMAP ręcznie z innej
-sieci / poprosić hosting o dostęp do innego portu (np. 143 + STARTTLS).
+Ten wynik pierwotnie zaznaczał IMAP jako niedostępny z tego środowiska.
+To była błędna diagnoza: `mail.sobierski.com` jest za Cloudflare (proxy
+przepuszcza tylko 80/443), stąd timeout — ale po połączeniu bezpośrednio z
+adresem IP z rekordu MX (patrz `qa/playwright/lib/mailbox.ts`) IMAP działa
+poprawnie. Właściwe sprawdzenie dostarczenia e-maila jest w osobnym teście
+`VIS-07` (`qa/evidence/2026-09-17/test/VIS-07/WYNIK.md`): pierwszy przebieg
+wykrył realny problem (`.env` środowiska testowego miał
+`MAIL_TRANSPORT=log`, e-maile nigdy nie wychodziły), który naprawiono
+wdrożeniem poprawnego `SMTP_HOST` (`de1.sohost.pl`, nie Cloudflare-proxowany
+`mail.sobierski.com`). Po naprawie `VIS-07` przechodzi — e-mail dociera.
 
 ## Konsola i sieć
 
