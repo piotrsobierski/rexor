@@ -2,7 +2,7 @@
 
 - Data i czas: 2026-09-17, uruchomienie automatyczne (Playwright)
 - Środowisko: test — https://rexor.sobierski.com
-- Adres: /admin (zakładka „Modele i zdjęcia”)
+- Adres: /admin (zakładka „Modele”)
 - Viewport / przeglądarka: 1440 × 1000 / Chromium (Playwright)
 - Dane testowe: brak (tylko odczyt)
 

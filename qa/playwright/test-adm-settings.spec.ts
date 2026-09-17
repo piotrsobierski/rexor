@@ -206,7 +206,7 @@ test.describe('rexor admin global settings (Kolory / Chatbot AI / Poczta / smoke
       // No public GET for mail routing -- confirm the rejected value never
       // reached the DB by reloading the admin panel itself.
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.getByRole('tab', { name: 'Modele i zdjęcia' }).waitFor({ timeout: 15_000 });
+      await page.getByRole('tab', { name: 'Modele' }).waitFor({ timeout: 15_000 });
       await page.getByRole('tab', { name: 'Poczta' }).click();
       await expect(orderEmailField).toHaveValue(originalOrderEmail, { timeout: 10_000 });
 
@@ -406,7 +406,7 @@ test.describe('rexor admin global settings (Kolory / Chatbot AI / Poczta / smoke
 
       // ADM-01: admin session works, protected tab loads.
       await loginAdmin(page);
-      await expect(page.getByRole('tab', { name: 'Modele i zdjęcia' })).toBeVisible();
+      await expect(page.getByRole('tab', { name: 'Modele' })).toBeVisible();
       await page.screenshot({ path: `${evidence}/05-adm01-session.png`, fullPage: true });
 
       const seriousBadResponses = badResponses.filter((r) => !r.startsWith('404 ') || !r.includes('/favicon'));

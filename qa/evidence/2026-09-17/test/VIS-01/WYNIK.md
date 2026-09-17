@@ -2,7 +2,7 @@
 
 - Data i czas: 2026-09-17, uruchomienie automatyczne (Playwright)
 - Środowisko: test — https://rexor.sobierski.com
-- Adres: /admin (Modele i zdjęcia) → /rowery → /rowery/{kategoria}/e82
+- Adres: /admin (Modele) → /rowery → /rowery/{kategoria}/e82
 - Viewport / przeglądarka: 1440 × 1000 / Chromium (Playwright)
 - Dane testowe: model Rexor E82 (id z /api/catalog), zmiana kolejności cofnięta po teście
 

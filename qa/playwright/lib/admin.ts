@@ -41,7 +41,7 @@ export async function loginAdmin(page: Page) {
   }
   await page.waitForTimeout(150);
   await page.getByRole('button', { name: 'Zaloguj' }).click();
-  await page.getByRole('tab', { name: 'Modele i zdjęcia' }).waitFor({ timeout: 15_000 });
+  await page.getByRole('tab', { name: 'Modele' }).waitFor({ timeout: 15_000 });
 }
 
 export async function fetchPublicPageHtml(slug: string): Promise<string | null> {
@@ -117,7 +117,7 @@ export async function restorePageContent(
   originalHtml: string,
 ) {
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByRole('tab', { name: 'Modele i zdjęcia' }).waitFor({ timeout: 15_000 });
+  await page.getByRole('tab', { name: 'Modele' }).waitFor({ timeout: 15_000 });
   await page.getByRole('tab', { name: 'Strony' }).click();
   await selectSitePage(page, pageLabel);
 

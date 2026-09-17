@@ -15,7 +15,7 @@ import {
 // Consolidated regression coverage for the three issues reported against the
 // admin editor (2026-09-17):
 //   VIS-01  /rowery listing card keeps a stale main photo after a reorder in
-//           the admin "Modele i zdjęcia" tab, while the model detail page
+//           the admin "Modele" tab, while the model detail page
 //           already shows the new order.
 //   VIS-02  The admin "Rowery" (models) tab has no category filter, unlike
 //           what was expected from the "Ramy" tab (which, per investigation,

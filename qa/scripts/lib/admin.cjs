@@ -18,7 +18,7 @@ async function launchAdminPage(base, viewport = { width: 1440, height: 1000 }) {
   }
   await page.waitForTimeout(150);
   await page.getByRole('button', { name: 'Zaloguj' }).click();
-  await page.getByRole('tab', { name: 'Modele i zdjęcia' }).waitFor({ timeout: 15_000 });
+  await page.getByRole('tab', { name: 'Modele' }).waitFor({ timeout: 15_000 });
   return { browser, page };
 }
 

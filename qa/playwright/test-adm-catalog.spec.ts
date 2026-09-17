@@ -8,7 +8,7 @@ import {
 } from './lib/admin';
 
 // Catalog CRUD coverage for the admin panel (2026-09-17):
-//   VIS-14  ADM-02: "Modele i zdjęcia" -- edit an existing model's name,
+//   VIS-14  ADM-02: "Modele" -- edit an existing model's name,
 //           short description, spec ("Fakty o ramie"), description (rich
 //           text), category and availability ("Status"); add/reorder/delete
 //           a gallery image; confirm every change on the public listing
@@ -176,7 +176,7 @@ test.describe('rexor admin catalog CRUD (ADM-02 / ADM-03)', () => {
       // A full reload gets a clean React tree before writing originals back
       // (same rationale as restorePageContent in lib/admin.ts).
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.getByRole('tab', { name: 'Modele i zdjęcia' }).waitFor({ timeout: 15_000 });
+      await page.getByRole('tab', { name: 'Modele' }).waitFor({ timeout: 15_000 });
       article = page.locator('article').filter({ has: page.locator(`#model-name-${modelId}`) });
       await article.scrollIntoViewIfNeeded();
 

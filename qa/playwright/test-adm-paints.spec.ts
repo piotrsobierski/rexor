@@ -274,7 +274,7 @@ test.describe('rexor admin paints (ADM-06)', () => {
 
       // --- 8. Cleanup: delete color (UI), palette (API) ----------------
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.getByRole('tab', { name: 'Modele i zdjęcia' }).waitFor({ timeout: 15_000 });
+      await page.getByRole('tab', { name: 'Modele' }).waitFor({ timeout: 15_000 });
       await page.getByRole('tab', { name: 'Lakiery' }).click();
       await page.getByRole('heading', { name: 'Palety' }).waitFor();
       await page.getByPlaceholder('Szukaj po nazwie, kodzie, hexie…').fill(COLOR_NAME);
