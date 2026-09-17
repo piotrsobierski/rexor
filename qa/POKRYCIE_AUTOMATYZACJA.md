@@ -19,6 +19,7 @@ uznawać za automatycznie zweryfikowany.
 | ADM-01 | PASS | `run-admin-session.cjs` | DO PONOWNEGO URUCHOMIENIA po poprawce |
 | ADM-02 | PASS | `qa/playwright/test-adm-catalog.spec.ts` (`VIS-14`) | POTWIERDZONE |
 | ADM-03 | PASS | `qa/playwright/test-adm-catalog.spec.ts` (`VIS-15`) | POTWIERDZONE |
+| ADM-06 | PASS | `qa/playwright/test-adm-paints.spec.ts` (`VIS-18`) | POTWIERDZONE |
 | ADM-08 | PASS | `qa/playwright/test-adm-settings.spec.ts` (`VIS-19`) | POTWIERDZONE |
 | ADM-09 | PASS | `qa/playwright/test-adm-settings.spec.ts` (`VIS-20`) | POTWIERDZONE (walidacja + rzeczywista wysyłka) |
 | REL-01 | PASS | `qa/playwright/test-adm-settings.spec.ts` (`VIS-21`, tag `@smoke`) | POTWIERDZONE |
@@ -61,6 +62,7 @@ jest pomijany) — logika połączenia IMAP jest w reużywalnym helperze
 | VIS-13 | Dopełnienie CFG-07 poza modalem lakieru: fokus klawiatury w karuzeli zdjęć i akordeonie opisu | PASS | POTWIERDZONE |
 | VIS-14 | ADM-02: edycja modelu E82 (nazwa/opis/spec/kategoria/status) + galeria (dodanie/reorder/usunięcie) | PASS | POTWIERDZONE |
 | VIS-15 | ADM-03: testowa rama/realizacja (tworzenie+media+publikacja+usunięcie), edycja opisu kategorii | PASS | POTWIERDZONE |
+| VIS-18 | ADM-06: palety/kolory lakierów — CRUD, izolacja dostępności model/rama, render+zoom, dopłata w cenie | PASS | POTWIERDZONE |
 | VIS-19 | ADM-08: zmiana koloru akcentu, widoczna publicznie, przywrócona | PASS | POTWIERDZONE |
 | VIS-20 | ADM-09: walidacja Poczta/Chatbot AI + rzeczywista wysyłka testowa (temat+treść) | PASS | POTWIERDZONE |
 | VIS-21 | REL-01: pakiet smoke po wdrożeniu, tag `@smoke` | PASS | POTWIERDZONE |
