@@ -18,25 +18,28 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | API-01 | PASS | test — `qa/evidence/2026-09-16/test/API-01/` | Health i katalog publiczny odpowiadają poprawnie. |
 | PUB-01 | PASS | test — `qa/evidence/2026-09-16/test/PUB-01/`, `qa/evidence/2026-09-17/test/PUB-01/` | Menu na desktopie i telefonie nie zawiera „Części”; aktualny test potwierdza też otwieranie oraz przejście z menu mobilnego. |
 | PUB-02 | PASS | test — `qa/evidence/2026-09-16/test/PUB-02/` | Filtry kategorii zawężają listę modeli. |
-| PUB-03 | PARTIAL | test — `qa/evidence/2026-09-17/test/PUB-03/` | Bieżące obrazy E82 są spójne; brak sesji blokuje test wgrania z panelu. |
+| PUB-03 | PASS | test — `qa/evidence/2026-09-17/test/PUB-03/`, `VIS-01/` | Reorder zdjęć E82 w panelu i zdjęcie główne na `/rowery`/detalu zgodne od razu po zmianie (dopełnione przez `VIS-01`). |
 | PUB-04 | PASS | test — `qa/evidence/2026-09-17/test/PUB-04/` | Wszystkie zbadane strony i dwa detale odpowiadają bez błędów konsoli. |
 | PUB-05 | PASS | test — `qa/evidence/2026-09-17/test/PUB-05/` | Komunikat prawny poprzedza ofertę elektryczną i po potwierdzeniu filtruje modele. |
 | PUB-06 | PASS | test — `qa/evidence/2026-09-17/test/PUB-06/` | Puste wymagane pola kontaktu zatrzymują wysyłkę w przeglądarce; nie wykonano POST. |
 | CFG-01 | PASS | test — `qa/evidence/2026-09-16/test/CFG-01/` | Wybór baterii E82 przetrwał przełączenie E82 → E55 → E82. |
 | CFG-02 | PASS | test — `qa/evidence/2026-09-16/test/CFG-02/` | Cztery kontrolne ceny zmieniły się o oczekiwane kwoty. |
 | CFG-03 | PASS | test — `qa/evidence/2026-09-16/test/CFG-03/` | Bateria zmienia wspólnie pojemność, cenę i zasięg. |
-| CFG-04 | PARTIAL | test — `qa/evidence/2026-09-16/test/CFG-04/` | Picker, wyszukiwanie i dopłata działają; brak renderów/zdjęć blokuje test powiększenia. |
+| CFG-04 | PASS | test — `qa/evidence/2026-09-16/test/CFG-04/`, `qa/evidence/2026-09-17/test/VIS-04/` | Picker, wyszukiwanie, dopłata i powiększenie renderu działają (E82 ma 0 kolorów z renderem w danych testowych — powiększenie dopełniono na E55, który ma 229/680). |
 | CFG-05 | PASS (local) | lokalnie — `qa/evidence/2026-09-16/local/CFG-05/` | „Rozwiń/Zwiń” działa; czeka na wdrożenie do testu. |
-| CFG-06 | PARTIAL | test — `qa/evidence/2026-09-17/test/CFG-06/` | Brak zgody blokuje POST; brak testowej skrzynki blokuje końcowy zapis. |
-| CFG-07 | PARTIAL | test — `qa/evidence/2026-09-17/test/CFG-07/` | Enter i Escape działają; pełny audyt Tab nadal do wykonania. |
+| CFG-06 | PARTIAL | test — `qa/evidence/2026-09-17/test/CFG-06/`, `VIS-05/` | Walidacja (brak zgody blokuje POST) i pełny zapis + wpis w Dzienniku aktywności potwierdzone (`VIS-05`). Wciąż niepotwierdzone: faktyczne dostarczenie e-maila — IMAP do `mail.sobierski.com:993` timeoutuje z tego środowiska (patrz `VIS-05/WYNIK.md`). |
+| CFG-07 | PARTIAL | test — `qa/evidence/2026-09-17/test/CFG-07/`, `VIS-06/` | Enter i Escape działają; `VIS-06` potwierdza, że 25× Tab w otwartym modalu lakieru nie wyprowadza fokusu poza modal. Pozostaje do zrobienia: audyt fokusu karuzeli zdjęć i akordeonu opisu poza modalem. |
 | API-02 | PASS | test — `qa/evidence/2026-09-17/test/API-02/` | API odrzuca brak/zły token oraz niepełny payload zapisu. |
 | ADM-01 | PASS | test — `qa/evidence/2026-09-17/test/ADM-01/` | Logowanie na podane konto działa; panel modeli i galerie są widoczne bez błędów konsoli. |
 | ADM-07 | PASS | test — `qa/evidence/2026-09-17/test/ADM-07/` | Edytor modelu zachowuje zaznaczenie przy użyciu „Pogrubienia”; zmiana pozostała niezapisana i została odrzucona odświeżeniem. |
-| ADM-10 | PARTIAL | test — `qa/evidence/2026-09-17/test/ADM-10/` | Zakładka „Zapytania” otwiera się bez błędów, ale środowisko testowe nie ma zapisanej konfiguracji do otwarcia. |
+| ADM-10 | PASS | test — `qa/evidence/2026-09-17/test/ADM-10/`, `VIS-05/` | `VIS-05` tworzy własną konfigurację testową i otwiera ją przez prawdziwy przepływ „Zapytania” → „Szczegóły”, oraz potwierdza wpis w „Dzienniku aktywności” — bez ponownego logowania, bez błędu. |
 | ADM-02–06, ADM-08–09, REL-01 | NOT RUN | — | Do wykonania według kolejności i wymaganych uprawnień. |
 | VIS-01 | PASS | test — `qa/evidence/2026-09-17/test/VIS-01/` (`npm run test:visual`) | Zdjęcie główne na `/rowery` nie odtworzyło zgłoszonego błędu; zgodne z detalem od razu po reorderze w panelu. |
 | VIS-02 | FAIL (oczekiwane) | test — `qa/evidence/2026-09-17/test/VIS-02/` (`npm run test:visual`) | Ani „Rowery”, ani „Ramy” nie mają filtra kategorii w panelu — brakująca funkcja, nie regresja jednej zakładki. |
 | VIS-03 | PASS | test — `qa/evidence/2026-09-17/test/VIS-03/` (`npm run test:visual`) | Podgląd świeżo zapisanej konfiguracji w panelu otworzył się bez błędu dla ścieżki standardowej (E82, domyślne opcje). |
+| VIS-04 | PASS | test — `qa/evidence/2026-09-17/test/VIS-04/` (`npm run test:visual`) | Dopełnia CFG-04: filtr „Z wizualizacją”, wybór koloru i powiększenie renderu działają na E55 (E82 nie ma renderów w danych testowych). |
+| VIS-05 | PASS | test — `qa/evidence/2026-09-17/test/VIS-05/` (`npm run test:visual`) | Dopełnia CFG-06 + ADM-10: pełny zapis konfiguracji, wpis w Dzienniku aktywności, otwarcie przez „Zapytania” → „Szczegóły”. Dostarczenie e-maila nadal niepotwierdzone (IMAP timeout). |
+| VIS-06 | PASS | test — `qa/evidence/2026-09-17/test/VIS-06/` (`npm run test:visual`) | Dopełnia CFG-07 (część modalu lakieru): 25× Tab w otwartym modalu nie wyprowadza fokusu poza niego; Escape wraca fokus w sensowne miejsce. |
 
 ## Publiczna strona i konfigurator
 

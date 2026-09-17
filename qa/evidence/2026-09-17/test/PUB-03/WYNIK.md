@@ -14,5 +14,15 @@
 ## Konsola i wniosek
 
 Brak ostrzeżeń i błędów konsoli. Bieżąca spójność karty i detalu jest
-potwierdzona. Test propagacji nowo wgranego zdjęcia pozostaje do wykonania po
-udostępnieniu kontrolowanej sesji administratora.
+potwierdzona.
+
+## Aktualizacja 2026-09-17 (druga sesja) — krok 3 odblokowany
+
+Kontrolowana sesja administratora jest już dostępna (`QA_ADMIN_EMAIL`/
+`QA_ADMIN_PASSWORD`, zapisane w pamięci agenta). Krok 3 wykonano automatem
+`npm run test:visual` jako `VIS-01`
+(`qa/evidence/2026-09-17/test/VIS-01/`): zmieniono kolejność zdjęć E82 w
+panelu i porównano zdjęcie główne na `/rowery` ze zdjęciem na detalu w tej
+samej sesji przeglądarki, bez twardego odświeżenia. **PASS** — zgodne od
+razu po zmianie. Scenariusz uznaje się za w pełni wykonany; wynik
+kompletny w `VIS-01/WYNIK.md`.
