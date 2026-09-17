@@ -73,7 +73,11 @@ export function mergeFrame(frame: ApiFrame, categories: Array<{ slug: string; na
 
   return {
     ...rest,
-    image: publicMediaUrl(default_image_path) || gallery[0] || '',
+    // Tak samo jak modele (catalog-merge.ts): pierwsze zdjęcie galerii (wg
+    // sort_order) bije `default_image_path`, żeby przesunięcie zdjęcia na
+    // pierwsze miejsce w panelu od razu zmieniało miniaturkę na /ramy i w
+    // galerii, zamiast czekać, aż ktoś ręcznie nadpisze default_image_path.
+    image: gallery[0] || publicMediaUrl(default_image_path) || '',
     gallery,
     geometryImages,
     facts: frame.specifications?.facts ?? [],
