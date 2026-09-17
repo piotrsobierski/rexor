@@ -456,6 +456,33 @@ function deleteAdminModel(PDO $pdo, int $id): array
     return ['id' => $id, 'deleted' => true];
 }
 
+function createAdminCategory(PDO $pdo, array $input): array
+{
+    $name = trim((string) ($input['name'] ?? ''));
+    if ($name === '') {
+        throw new InvalidArgumentException('Podaj nazwę kategorii.');
+    }
+
+    $slug = uniqueSlug($pdo, 'bike_categories', slugify($name, 'kategoria'));
+    $nextSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM bike_categories')->fetchColumn();
+
+    $statement = $pdo->prepare(
+        'INSERT INTO bike_categories (slug, name, short_description, sort_order, is_published) ' .
+        'VALUES (:slug, :name, :short_description, :sort_order, 0)'
+    );
+    $statement->execute([
+        'slug' => $slug,
+        'name' => $name,
+        'short_description' => ($short = trim((string) ($input['short_description'] ?? ''))) !== '' ? $short : null,
+        'sort_order' => $nextSort,
+    ]);
+
+    $newId = (int) $pdo->lastInsertId();
+    logActivity($pdo, 'category_created', 'admin', currentAdmin()['email'] ?? null, "Utworzono kategorię \"{$name}\" (#{$newId}).", ['id' => $newId, 'slug' => $slug, 'name' => $name]);
+
+    return ['id' => $newId, 'slug' => $slug];
+}
+
 /**
  * Usuwanie kategorii. Modele i ramy wskazują na kategorię przez RESTRICT
  * (kategoria jest ich wymaganą częścią), realizacje przez SET NULL - te

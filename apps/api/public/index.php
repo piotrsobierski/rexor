@@ -185,6 +185,11 @@ if ($method === 'DELETE' && preg_match('~^/admin/models/(\d+)$~', $path, $matche
     jsonResponse(deleteAdminModel($pdo, (int) $matches[1]));
 }
 
+if ($method === 'POST' && $path === '/admin/categories') {
+    requireAdmin($pdo);
+    jsonResponse(createAdminCategory($pdo, requestJson()), 201);
+}
+
 if ($method === 'DELETE' && preg_match('~^/admin/categories/(\d+)$~', $path, $matches)) {
     requireAdmin($pdo);
     jsonResponse(deleteAdminCategory($pdo, (int) $matches[1]));

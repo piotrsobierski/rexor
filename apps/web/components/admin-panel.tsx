@@ -1361,6 +1361,36 @@ function CategoriesEditor({
   reload: () => Promise<void>;
   setMessage: (value: string) => void;
 }) {
+  const [newCategory, setNewCategory] = useState({ name: '', short_description: '' });
+
+  async function addCategory() {
+    if (!newCategory.name.trim()) {
+      setMessage('Podaj nazwę nowej kategorii.');
+      return;
+    }
+    setMessage('Dodaję kategorię…');
+    try {
+      await request('/admin/categories', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newCategory.name.trim(),
+          short_description: newCategory.short_description.trim() || null,
+        }),
+      });
+      setNewCategory({ name: '', short_description: '' });
+      await reload();
+      setMessage(
+        'Kategoria dodana. Uzupełnij zdjęcie i widoczność w edytorze poniżej.',
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Nie udało się dodać kategorii.',
+      );
+    }
+  }
+
   async function deleteCategory(row: Row) {
     if (
       !window.confirm(
@@ -1430,6 +1460,38 @@ function CategoriesEditor({
       title="Kategorie"
       description="Nazwa, krótki opis i zdjęcie widoczne na stronie głównej oraz na liście kategorii."
     >
+      <div className="mb-6 rounded-2xl border border-line p-5 sm:p-6">
+        <h3 className="text-sm font-semibold tracking-tight text-ink">
+          Dodaj nową kategorię
+        </h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr]">
+          <Input
+            placeholder="Nazwa kategorii (np. Gravel)"
+            value={newCategory.name}
+            onChange={(e) =>
+              setNewCategory({ ...newCategory, name: e.target.value })
+            }
+            className="h-9 text-sm"
+          />
+          <Input
+            placeholder="Krótki opis (opcjonalnie)"
+            value={newCategory.short_description}
+            onChange={(e) =>
+              setNewCategory({
+                ...newCategory,
+                short_description: e.target.value,
+              })
+            }
+            className="h-9 text-sm"
+          />
+        </div>
+        <Button size="sm" className="mt-3" onClick={() => void addCategory()}>
+          <Plus /> Dodaj kategorię
+        </Button>
+        <p className="mt-3 text-xs text-ink-muted">
+          Najpierw zapisz element. Zdjęcie dodasz w jego edytorze poniżej.
+        </p>
+      </div>
       <div className="grid gap-4">
         {rows.map((row) => (
           <article
