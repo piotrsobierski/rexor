@@ -77,6 +77,8 @@ export const defaultCopy = {
     priceSoon: 'Wycena w przygotowaniu',
     priceNote: 'Cena brutto wyliczana z sumy ramy, wybranego napędu, baterii, części domyślnych i montażu.',
     descriptionEyebrow: 'Opis i specyfikacja',
+    expandDescriptionCta: 'Rozwiń',
+    collapseDescriptionCta: 'Zwiń',
     descriptionTitlePrefix: 'Poznaj',
     bannerEyebrow: 'Konfigurator Rexor',
     bannerTitlePrefix: 'Zbuduj swój',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, BatteryCharging, Bike, Check, Gauge, ShieldCheck, Zap } from 'lucide-react';
+import { ArrowRight, BatteryCharging, Bike, Check, ChevronDown, Gauge, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -82,6 +82,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   const [modelId, setModelId] = useState<BikeModel['id']>(models[0]?.id ?? 'e82');
   const [size, setSize] = useState('M');
   const [galleryIndex, setGalleryIndex] = useState(0);
+  // Na komputerze opis pozostaje od razu dostępny. Na telefonie jest zwinięty,
+  // żeby po wyborze modelu nie zasłaniał całego właściwego konfiguratora.
+  const [modelDescriptionOpen, setModelDescriptionOpen] = useState(false);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -139,6 +142,10 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     [paintSlides, model.gallery],
   );
   const paintSlide = galleryIndex < paintSlides.length ? paintSlides[galleryIndex] : null;
+
+  useEffect(() => {
+    setModelDescriptionOpen(window.matchMedia('(min-width: 1024px)').matches);
+  }, []);
 
   // Grupy opcji przychodzą z API, więc domyślne wybory ustawiamy po ich
   // wczytaniu — ale tylko dla modeli, których klient jeszcze nie ruszył.
@@ -425,12 +432,22 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
             </div>
           </div>
           {(model.descriptionHtml || model.description) && (
-            <details className="mt-4 rounded-[28px] border border-line bg-white p-5 sm:p-6" open>
-              <summary className="cursor-pointer text-base font-semibold tracking-tight text-ink flex items-center justify-between">
-                <span>{copy.configurator.aboutModelPrefix} {model.name}</span>
-                <span className="text-xs font-normal text-ink-muted">{copy.model.descriptionEyebrow}</span>
+            <details
+              className="mt-4 rounded-[28px] border border-line bg-white p-3 sm:p-4"
+              open={modelDescriptionOpen}
+              onToggle={(event) => setModelDescriptionOpen(event.currentTarget.open)}
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[20px] px-2 py-2 text-left text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0">
+                  <span className="block text-base font-semibold tracking-tight">{copy.configurator.aboutModelPrefix} {model.name}</span>
+                  <span className="mt-0.5 block text-xs font-normal text-ink-muted">{copy.model.descriptionEyebrow}</span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-white px-3 py-2 text-xs font-semibold text-ink shadow-sm">
+                  <span>{modelDescriptionOpen ? copy.model.collapseDescriptionCta : copy.model.expandDescriptionCta}</span>
+                  <ChevronDown className={`size-4 transition-transform ${modelDescriptionOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </span>
               </summary>
-              <div className="rich-content mt-4 border-t border-line pt-4 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: model.descriptionHtml || model.description }} />
+              <div className="rich-content mx-2 mt-3 border-t border-line pt-4 text-sm leading-relaxed sm:mx-3" dangerouslySetInnerHTML={{ __html: model.descriptionHtml || model.description }} />
             </details>
           )}
         </div>
