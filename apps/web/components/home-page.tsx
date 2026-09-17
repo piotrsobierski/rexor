@@ -52,7 +52,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
     </section>
 
     <section className="mx-auto max-w-[1480px] px-4 sm:px-8 lg:px-12">
-      <Reveal delayMs={80} className="overflow-hidden rounded-[30px] border border-line bg-white">
+      <Reveal delayMs={80} className="overflow-hidden rounded-[30px] border border-line bg-white" data-testid="home-categories-section">
         <div className="no-scrollbar flex snap-x overflow-x-auto" data-testid="categories-carousel">
           {visibleCategories.map(({ slug, name, description, icon: Icon, empty, image }, idx) => <a key={slug} href={`/rowery/${slug}`} className="group flex min-w-[58vw] snap-start flex-col border-r border-line last:border-r-0 sm:min-w-[260px] lg:min-w-0 lg:flex-1" data-testid={`category-link-${slug}`}>
             <div className="relative aspect-[4/3] overflow-hidden bg-ink-wash">
@@ -68,7 +68,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
     </section>
 
     <section className="mx-auto max-w-[1480px] px-4 py-16 sm:px-8 lg:px-12 lg:py-24">
-      <Reveal className="mb-8 flex items-end justify-between"><div><p className="eyebrow">{copy.home.modelsEyebrow}</p><h2 className="mt-2 text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">{copy.home.modelsTitle}</h2></div><Button render={<a href="/rowery" />} variant="ghost" className="hidden sm:inline-flex">{copy.home.modelsAllCta} <ArrowRight data-icon="inline-end" /></Button></Reveal>
+      <Reveal className="mb-8 flex items-end justify-between"><div><p className="eyebrow">{copy.home.modelsEyebrow}</p><h2 className="mt-2 text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">{copy.home.modelsTitle}</h2></div><Button render={<a href="/rowery" data-testid="home-models-all-button" />} variant="ghost" className="hidden sm:inline-flex">{copy.home.modelsAllCta} <ArrowRight data-icon="inline-end" /></Button></Reveal>
       {/* Bez bramki na `loaded` sekcja pokazywała modele z listy zapasowej
           (z cenami sprzed wczytania katalogu) i podmieniała je w locie. */}
       {!loaded ? <CardGridSkeleton /> : <div className="grid gap-4 lg:grid-cols-3">{models.map((model, idx) => {
