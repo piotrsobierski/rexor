@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+// ADM-01: login, reload, logout. Credentials come only from environment.
+const { mkdir } = require('node:fs/promises'); const { resolve } = require('node:path'); const { launchAdminPage } = require('./lib/admin.cjs');
+const [, , baseArg, evidenceArg] = process.argv; if (!baseArg||!evidenceArg) throw new Error('Usage: run-admin-session.cjs BASE EVIDENCE');
+(async()=>{const out=resolve(evidenceArg);await mkdir(out,{recursive:true});const { browser:b,page:p }=await launchAdminPage(baseArg);try{await p.screenshot({path:`${out}/01-login.png`,fullPage:true});await p.reload({waitUntil:'commit',timeout:10000});await p.getByRole('tab',{name:'Modele i zdjęcia'}).waitFor({timeout:15000});const persisted=1;await p.getByRole('button',{name:/Wyloguj/}).click();await p.locator('#admin-password').waitFor({timeout:10000});await p.screenshot({path:`${out}/02-logout.png`,fullPage:true});console.log(JSON.stringify({persisted,loggedOut:true},null,2));}finally{await b.close();}})().catch(e=>{console.error(e);process.exit(1)});

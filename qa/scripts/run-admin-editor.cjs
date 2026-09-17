@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+// ADM-07: WYSIWYG selection and toolbar; no Save action is used.
+const { mkdir } = require('node:fs/promises');const { resolve }=require('node:path');const { launchAdminPage }=require('./lib/admin.cjs');const[, ,baseArg,outArg]=process.argv;if(!baseArg||!outArg)throw new Error('Usage: run-admin-editor.cjs BASE EVIDENCE');
+(async()=>{const out=resolve(outArg);await mkdir(out,{recursive:true});const {browser:b,page:p}=await launchAdminPage(baseArg);try{const e=p.locator('[contenteditable=true]').first(),before=await e.innerHTML();await e.click();await p.keyboard.press('ControlOrMeta+A');await p.getByRole('button',{name:'Pogrubienie'}).first().click();const after=await e.innerHTML();await p.screenshot({path:`${out}/01-toolbar.png`,fullPage:true});console.log(JSON.stringify({changed:before!==after,saveClicked:false},null,2));}finally{await b.close()}})().catch(e=>{console.error(e);process.exit(1)});

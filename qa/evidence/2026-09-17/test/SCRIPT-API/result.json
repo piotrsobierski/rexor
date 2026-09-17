@@ -1,0 +1,7 @@
+{
+  "health": 200,
+  "catalog": 200,
+  "models": 3,
+  "adminWithoutToken": 401,
+  "invalidConfiguration": 422
+}

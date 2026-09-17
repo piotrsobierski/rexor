@@ -1,9 +1,332 @@
 # Dziennik zmian
 
+## 2026-09-17 — Domyślny silnik E82
+
+Automatyczny przebieg CFG-06 wykazał, że E82 nie miał domyślnej pozycji w
+stałej grupie „Silnik”, więc API prawidłowo odrzucało zapis jako konfigurację
+wymagającą wyceny indywidualnej. W panelu administratora przypisano i ustawiono
+jako domyślny „Silnik Bafang M510 250 W / 95 Nm” (`motor-m510-250w`, 3 700 zł).
+Katalog po zmianie zwraca cenę bazową E82 20 680 zł; ponowiony CFG-06 utworzył
+rekord (HTTP 201), a ADM-10 otworzył jego szczegóły w tej samej sesji.
+
 Zapis prac: co zostało zrobione, dlaczego i jakie pliki objęła zmiana.
 Nowe wpisy dopisujemy na górze.
 
+## Zasada kontynuacji pracy
+
+Każdy agent, który zmienia kod lub dane projektu, dopisuje przed zakończeniem
+pracy wpis do tego pliku. Wpis ma zawierać: zgłoszony objaw, potwierdzoną
+przyczynę, zmianę wraz z uzasadnieniem decyzji, objęte pliki, wykonane testy
+oraz świadomie nierozwiązane ryzyka. Dzięki temu następny agent może odróżnić
+fakty sprawdzone od założeń i nie powtarza diagnostyki.
+
 ---
+
+## 2026-09-17 — Dalsze testy publiczne: menu i kontakt
+
+### Wynik
+
+- `PUB-01`: menu mobilne otwiera się, zawiera wyłącznie Rowery, Ramy,
+  Realizacje i Serwis, a link „Rowery” prowadzi do właściwej strony. Nie było
+  ostrzeżeń ani błędów konsoli.
+- `PUB-06`: natywna walidacja oznacza puste pola imienia, e-maila i wiadomości;
+  automat nie zaobserwował `POST /contact`. To bezpiecznie potwierdza blokadę
+  przed przypadkową wysyłką.
+
+Dowody: `qa/evidence/2026-09-17/test/PUB-01/` i
+`qa/evidence/2026-09-17/test/PUB-06/`. Aktualny stan scenariuszy z
+uzasadnieniami jest w `qa/SCENARIUSZE_TESTOWE.md`.
+
+Nie wykonano celowo prawidłowej wysyłki kontaktu: wymaga ona uzgodnionej
+skrzynki testowej oraz zgody na wysłanie wiadomości.
+
+---
+
+## 2026-09-17 — Weryfikacja dostępu administratora i renderów
+
+Logowanie na `https://rexor.sobierski.com/admin` działa poprawnie z kontem
+przekazanym przez właściciela. Wcześniejsze `401` było artefaktem automatu:
+szybkie `fill()` wysłało pustą wartość stanu hasła. Dla tego formularza testy
+muszą używać wpisywania znak po znaku; regułę zapisano w `qa/OBSERWACJE.md`.
+Panel modeli i galerii otworzył się bez błędów konsoli (`ADM-01`: **PASS**).
+
+Bez zapisu danych sprawdzono też pierwszy edytor HTML modelu: zaznaczenie
+pozostało aktywne po kliknięciu „Pogrubienie”, a HTML edytora uległ zmianie.
+Następnie strona została odświeżona bez użycia „Zapisz model”, więc test nie
+zmienił danych na serwerze (`ADM-07`: **PASS**).
+
+Ponowny odczyt publicznego katalogu produkcyjnego potwierdził, że modele mają
+media galerii, ale żadna opcja konfiguratora nie ma przypisanego
+`render_path`, `image_path` ani `photo_path`. Dlatego `CFG-04` pozostaje
+**PARTIAL**: nie można rzetelnie sprawdzić powiększenia renderu lakieru bez
+danych wejściowych. Nie zmieniano kodu ani danych.
+
+Zakładka „Zapytania” otwiera się bez błędów, ale testowa baza nie zawiera
+rekordu konfiguracji, więc nie można było kliknąć „Szczegóły” i odtworzyć
+zgłoszonego błędu podglądu (`ADM-10`: **PARTIAL**). Dowody są w
+`qa/evidence/2026-09-17/test/ADM-01/` i `qa/evidence/2026-09-17/test/ADM-10/`.
+
+---
+
+## 2026-09-17 — Kontynuacja testów konfiguratora i API
+
+### Wynik wykonanych scenariuszy
+
+Na środowisku testowym zapisano dowody i raporty `CFG-01`–`CFG-04`,
+`CFG-06`–`CFG-07`, `PUB-03`–`PUB-04` oraz `API-02` w
+`qa/evidence/2026-09-16/` i `qa/evidence/2026-09-17/`. Pełny, aktualny
+rejestr PASS/PARTIAL/BLOCKED/NOT RUN znajduje się w
+`qa/SCENARIUSZE_TESTOWE.md`.
+
+- PASS: pamięć wyboru baterii między modelami, cztery kontrolne wyceny,
+  przeliczenie zasięgów, picker i dopłata lakieru, strony publiczne, bieżąca
+  spójność obrazu E82, walidacja zgody, podstawowa obsługa klawiatury i
+  autoryzacja API;
+- PARTIAL: brak renderów/zdjęć lakieru blokuje powiększenie, brak kontrolowanej
+  skrzynki blokuje pełny zapis konfiguracji, a brak sesji administratora
+  blokuje propagację nowego zdjęcia i panel;
+- nie potwierdzono nowego błędu aplikacji. Jedno początkowe wejście automatu
+  na `/rowery` utknęło w stanie ładowania, lecz pięć kolejnych niezależnych
+  świeżych sesji zwróciło katalog HTTP 200, modele i filtry poprawnie —
+  obserwację zapisano, ale nie uznano jej za reprodukowalny defekt.
+
+### Narzędzia przekazane dalej
+
+`qa/scripts/capture-page.cjs` zapisuje bezpieczny odczytowy PNG jednej strony,
+a `qa/scripts/run-public-pages.cjs` wykonuje i dokumentuje pakiet `PUB-04`.
+Instrukcje zależności i użycia są w `qa/scripts/README.md`.
+
+`ADM-01` jest PARTIAL: anonimowe wejście na `/admin` pokazuje tylko formularz
+logowania i nie renderuje katalogu CMS, bez błędów konsoli. Logowanie,
+odświeżenie sesji i wylogowanie są zablokowane brakiem kontrolowanego konta
+testowego; nie podjęto próby zgadywania danych logowania.
+
+`API-02` jest PASS: `GET /admin/catalog` bez tokenu i z błędnym tokenem
+zwraca 401, zaś niepełny `POST /configurations` zwraca 422 przed utworzeniem
+konfiguracji. `PUB-05` jest PASS: kategoria elektryczna najpierw pokazuje
+komunikat prawny, a po potwierdzeniu wyświetla E82 i E55 bez CFR707. Dowody
+są w `qa/evidence/2026-09-17/test/API-02/` i `PUB-05/`.
+
+Założono `qa/OBSERWACJE.md`: klientowe ładowanie katalogu po eksporcie
+statycznym czasem pozostawia stronę główną bez widocznej karty przez ponad
+3 s, mimo poprawnego HTTP 200 i danych katalogu. To obserwacja wydajnościowa,
+nie potwierdzony błąd — pomiary i kryterium ponownej weryfikacji są w pliku.
+
+---
+
+## 2026-09-16 — Pierwsze wykonanie testów przeglądarkowych
+
+### Zakres
+
+Na środowisku testowym wykonano odczytowe scenariusze `PUB-01`, `PUB-02` i
+`API-01` z nowego protokołu QA. Dowody są zapisane w
+`qa/evidence/2026-09-16/test/`; każdy scenariusz ma własny `WYNIK.md` i PNG.
+
+### Wynik
+
+- menu na desktopie i telefonie pokazuje wyłącznie Rowery, Ramy, Realizacje i
+  Serwis — brak „Części” i pustej pozycji;
+- `/rowery` poprawnie filtruje: Gravel → tylko CFR707, Pojazdy elektryczne →
+  E82 i E55 bez CFR707;
+- `GET /api/health` zwrócił połączenie z bazą, a katalog: 3 modele, 6
+  kategorii i 14 elementów mediów;
+- w czasie badanych wejść i kliknięć nie było ostrzeżeń ani błędów konsoli.
+
+Dodatkowo lokalnie wykonano `CFG-05` dla niewdrożonego jeszcze kontrolera
+„Rozwiń/Zwiń”; dowody są w `qa/evidence/2026-09-16/local/CFG-05/`. Telefon
+startuje z zamkniętym opisem i etykietą „Rozwiń”, po kliknięciu widoczna jest
+etykieta „Zwiń”, a desktop startuje z opisem otwartym.
+
+Następnie na środowisku testowym wykonano `CFG-01`, `CFG-02` i `CFG-03`.
+Wybór baterii E82 przetrwał przełączenie modelu E82 → E55 → E82. Kontrola
+ceny: 16 980 zł (domyślna), 16 380 zł (-600 zł bateria), 17 380 zł (+1000 zł
+FOX) i 15 380 zł (własna część zamiast FOX) dała dokładnie oczekiwane różnice.
+Zmiana 982,8 Wh → 655,2 Wh zmieniła także zasięgi Eco/asfalt z 140–246 km na
+94–164 km. Wszystkie trzy scenariusze PASS, bez błędów konsoli; raporty i PNG
+są w odpowiadających katalogach `qa/evidence/2026-09-16/test/CFG-0*/`.
+
+`CFG-04` potwierdził działanie pickera lakierów, wyszukiwania Riviera Blue,
+chipa Porsche oraz automatycznej dopłaty +800 zł (16 980 zł → 17 780 zł).
+Krok powiększenia renderu ma status BLOCKED: środowisko testowe zwraca 0
+renderów i 0 zdjęć dla dostępnych lakierów, więc interfejs poprawnie nie
+pokazuje filtrów „Z wizualizacją” i „Ze zdjęciem”. Jest to brak danych do
+testu, nie błąd kodu. Dodano też `qa/scripts/capture-page.cjs` i instrukcję
+uruchamiania, aby kolejne agenty mogły powtarzalnie tworzyć odczytowe PNG.
+
+Kolejna tura przyniosła `PUB-03` (PARTIAL) i `PUB-04` (PASS). Karta E82 oraz
+detal używają aktualnie tego samego obrazu `/models/e82/01.jpg`; wgranie i
+przełożenie nowego obrazu jest świadomie zablokowane bez sesji administratora.
+`PUB-04` obejmuje Ramy, Realizacje, Serwis, Kontakt, Regulamin, Politykę
+prywatności oraz detale `/ramy/scott-spark-test` i
+`/realizacje/scott-spark-konwersja-test` — wszystkie PASS, bez błędów konsoli.
+Dodano powtarzalny `qa/scripts/run-public-pages.cjs`, który zapisuje ten pakiet
+odczytowy i JSON wyników.
+
+`CFG-06` (PARTIAL) potwierdził, że brak zgody prywatności wyświetla komunikat
+walidacyjny i nie wysyła `POST /api/configurations`; pełny zapis wymaga
+kontrolowanej skrzynki testowej. `CFG-07` (PARTIAL) potwierdził fokus na
+`summary`, przełączenie opisu Enterem, otwieranie pickera lakierów Enterem i
+zamykanie Escapem. Pełne przejście klawiszem Tab i test czytnika ekranu są
+świadomie odłożone do osobnego audytu dostępności.
+
+Nie znaleziono błędu wymagającego naprawy. Test nie dotykał zapisu, sesji
+administratora, konfiguracji ani danych klientów; są one kolejnymi blokami
+scenariuszy.
+
+---
+
+## 2026-09-16 — Czytelne rozwijanie opisu i protokół testów E2E
+
+### Wskazówka rozwijania na telefonie
+
+Pierwsza wersja mobilnej sekcji `details` miała jedynie tytuł oraz mały opis
+„Opis i specyfikacja”. Technicznie była klikalna, ale nie komunikowała
+jednoznacznie, że użytkownik może ją rozwinąć. Podsumowanie sekcji ma teraz
+wyraźny, obramowany kontroler „Rozwiń” ze strzałką; po otwarciu pokazuje
+„Zwiń” i odwróconą strzałkę. Zachowano natywny element `summary`, więc działa
+on również z klawiatury i technologiami asystującymi.
+
+Teksty kontrolera są częścią `defaultCopy`, zamiast być zaszytym napisem w
+komponencie. Dzięki temu panel „Teksty” może je później zmienić bez nowego
+wdrożenia, a stare nadpisania tekstów bez tych pól dostają bezpieczne wartości
+domyślne przez `mergeCopy`.
+
+### Przekazywalne scenariusze testów
+
+Dodano `qa/SCENARIUSZE_TESTOWE.md` oraz `qa/README.md`. Dokumenty dzielą testy
+na niezależne bloki dla osobnych agentów i obejmują stronę publiczną,
+konfigurator, wszystkie zakładki administratora, API oraz smoke test po
+wdrożeniu. Każdy scenariusz ma kroki, kryterium zaliczenia i wymagany dowód.
+`qa/README.md` wymaga zapisu zrzutu dla każdego kroku w
+`qa/evidence/RRRR-MM-DD/<srodowisko>/<ID>/`, pliku `WYNIK.md`, ochrony haseł
+i danych klientów, pracy najpierw na testowym środowisku oraz opisania
+potwierdzonej przyczyny przed ewentualną naprawą.
+
+### Pliki
+
+`apps/web/components/bike-configurator.tsx`, `apps/web/lib/copy.ts`,
+`qa/README.md`, `qa/SCENARIUSZE_TESTOWE.md`, `qa/evidence/README.md`.
+
+### Weryfikacja
+
+- `npm --prefix apps/web run build`: sukces;
+- przeglądarka, lokalnie przy 390 × 844: opis E82 startuje zamknięty, pokazuje
+  „Rozwiń”, po kliknięciu otwiera treść i zmienia etykietę na „Zwiń”.
+
+### Status wdrożenia
+
+Te ostatnie zmiany są gotowe lokalnie, ale **nie zostały jeszcze wdrożone** na
+środowisko testowe ani produkcję. Wdrożenie wymaga osobnej decyzji, aby nie
+zmieniać publicznej strony bez wyraźnego polecenia.
+
+---
+
+## 2026-09-16 — Wdrożenie poprawek katalogu, konfiguratora i panelu
+
+### Cele i wynik
+
+Pakiet wdrożono kolejno na środowisko testowe `https://rexor.sobierski.com`
+i na produkcję `https://rexorbikes.com`, zawsze z osobnym plikiem środowiska
+i bazą danych właściwą dla danego celu. Przed wdrożeniem dla obu celów wykonano
+dry-run FTP; po nim właściwe przesłanie, migracje i kontrolę `GET /api/health`.
+Oba endpointy zwróciły `status: ok` oraz `database: connected`.
+
+### Testy po wdrożeniu
+
+- środowisko testowe: brak „Części” w menu; filtry `/rowery` działają
+  (po wybraniu „Gravel” widoczny jest tylko CFR707); na 390 px opis E82 jest
+  domyślnie zwinięty; bez ostrzeżeń i błędów konsoli;
+- produkcja: powtórzono test menu, filtrów i konfiguratora przy 390 px;
+  karta E82 używa aktualnego obrazu z API `/api/uploads/...webp`, a nie
+  historycznego pliku statycznego; bez ostrzeżeń i błędów konsoli.
+
+### Świadomie poza zakresem
+
+Nie wykonano testu autoryzowanego podglądu konfiguracji ani ręcznego zapisu w
+edytorze WYSIWYG na serwerze, ponieważ wymaga to zalogowanej sesji administratora.
+Przyczynę błędu i poprawkę zweryfikowano w kodzie oraz w kompilacji; test ten
+warto wykonać podczas najbliższej pracy w panelu.
+
+---
+
+## 2026-09-16 — Poprawki po przeglądzie produkcyjnym: katalog, konfigurator i panel
+
+### Zakres i status wdrożenia
+
+Przegląd wykonano odczytowo na `https://rexorbikes.com`; opisane poprawki
+zostały następnie wdrożone na środowisko testowe i produkcję. Wynik wdrożenia
+i testów jest zapisany we wpisie bezpośrednio powyżej.
+
+### Menu „Części"
+
+Po wyczyszczeniu etykiety „Części" w panelu publiczne menu nadal zawsze
+tworzyło link `/czesci`. Efektem była pusta, klikalna pozycja między
+„Realizacje" a „Serwis". Usunięto ten link z listy nawigacji, a nie ukryto
+go warunkowo po pustym tekście: obecna decyzja biznesowa mówi o wyłączeniu
+zakładki z nawigacji, a przyszłe przywrócenie sklepu powinno być jawną decyzją
+i własnym wdrożeniem. Sama trasa `/czesci` pozostaje w projekcie.
+
+### Filtrowanie listy „Rowery"
+
+Strona `/rowery` wyświetlała wszystkie modele, mimo że `/ramy` miały już
+filtry kategorii. Lista rowerów buduje teraz przyciski wyłącznie dla kategorii
+z co najmniej jednym modelem i filtruje lokalnie pobrany katalog. Wybrany
+filtr sam wraca do „Wszystkie", gdy administrator usunie ostatni model danej
+kategorii — użytkownik nie zostaje na pustym ekranie.
+
+### Opis modelu w konfiguratorze mobilnym
+
+Na ekranie 390 px opis E82 wraz z tabelą specyfikacji był od razu rozwinięty
+przed wszystkimi wyborami. Sekcja nadal jest semantycznym `details`, ale na
+telefonie startuje zwinięta; na desktopie (od 1024 px) otwiera się domyślnie.
+To zachowuje istniejący układ komputerowy i skraca drogę do konfiguracji na
+telefonie bez usuwania informacji.
+
+### Zdjęcie główne na liście i karcie modelu
+
+Katalog produkcyjny dla E82 zwracał nowe zdjęcie jako pierwsze w galerii, ale
+`default_image_path` nadal wskazywał stary plik. Karta szczegółów używała
+pierwszego zdjęcia galerii, natomiast lista `/rowery` — starego pola default.
+Reguła wyboru obrazu jest teraz jedna: pierwszy obraz galerii, potem
+`default_image_path`, potem obraz zapasowy. Dzięki temu nowe zdjęcie dodane
+przez panel jest identyczne na liście i na stronie modelu.
+
+### Podgląd konfiguracji z panelu
+
+Przycisk „Szczegóły" otwierał konfigurację w nowej karcie z `noopener`.
+Autoryzacja administratora jest przechowywana w `sessionStorage`, które przy
+takim otwarciu nie jest dostępne w nowym kontekście, więc podgląd zgłaszał
+błąd logowania. Link otwiera się teraz w tej samej karcie, przez co zachowuje
+aktywną sesję. Nie przeniesiono tokenu do `localStorage` ani do adresu URL,
+bo pogarszałoby to bezpieczeństwo sesji.
+
+### Edytory WYSIWYG
+
+Przy klikaniu narzędzi formatowania przeglądarka przenosiła fokus z edytora
+na przycisk. Chromium tracił wtedy zaznaczenie i wykonywał komendę na pustym
+fragmencie, co wyglądało jak niedziałający edytor. Przyciski pogrubienia,
+kursywy, nagłówka, akapitu i listy zachowują teraz zaznaczenie podczas
+kliknięcia; użyty nadal jest ten sam wspólny edytor dla stron, modeli, ram,
+realizacji i szablonu e-maila.
+
+### Pliki
+
+`apps/web/components/site-header.tsx`,
+`apps/web/components/static-pages.tsx`,
+`apps/web/components/bike-configurator.tsx`,
+`apps/web/lib/catalog-merge.ts`,
+`apps/web/components/admin-panel.tsx`.
+
+### Weryfikacja
+
+- produkcja: ręczny test strony głównej, `/rowery`, `/konfigurator?model=e82`
+  przy szerokości 390 px oraz odczyt `GET /api/catalog`; potwierdzono opisane
+  objawy i brak błędów konsoli na badanych stronach;
+- `npm --prefix apps/web run build`: sukces;
+- `php -l` dla wszystkich plików `apps/api`: sukces;
+- pełny `npm --prefix apps/web run lint` nadal zgłasza istniejące błędy w wielu
+  niezwiązanych komponentach (m.in. dostępność i stare reguły React); nie jest
+  obecnie testem blokującym dla tego pakietu zmian.
 
 ## 2026-09-16 — Przeglądanie kolorów na podstronie ramy
 
