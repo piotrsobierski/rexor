@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { ArrowRight, CalendarCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FilteredCollection, type CollectionItem } from '@/components/filtered-collection';
@@ -60,7 +60,7 @@ export function ProjectDetailPage({ project: initialProject, catalog, copy: init
     return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
       <p className="eyebrow">{copy.projects.notFoundEyebrow}</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.projects.notFoundTitle}</h1>
-      <Button render={<a href="/realizacje" />} variant="outline" className="mt-6 rounded-full">{copy.projects.backToAllCta} <ArrowRight data-icon="inline-end" /></Button>
+      <Button render={<a href="/realizacje" />} variant="outline" className="mt-6 rounded-full">{copy.projects.backToAllCta} <ArrowLeft data-icon="inline-end" /></Button>
     </section></PageFrame>;
   }
 

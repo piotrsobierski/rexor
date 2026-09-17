@@ -115,7 +115,7 @@ function sanitizeRichHtml(string $html): string
 
     $allowedAttributes = [
         'a' => ['href', 'title', 'target', 'rel', 'class'],
-        'img' => ['src', 'alt', 'title', 'class', 'width', 'height'],
+        'img' => ['src', 'alt', 'title', 'class', 'width', 'height', 'style'],
         'table' => ['class'],
         'th' => ['colspan', 'rowspan', 'scope', 'class'],
         'td' => ['colspan', 'rowspan', 'class'],
@@ -150,6 +150,16 @@ function sanitizeRichHtml(string $html): string
         }
         if (strtolower($element->tagName) === 'a' && $element->getAttribute('target') === '_blank') {
             $element->setAttribute('rel', 'noopener noreferrer');
+        }
+        // The WYSIWYG editor's image-resize toolbar (setSelectedImageWidth in
+        // admin-panel.tsx) writes `style="width: NN%; height: auto;"` -- allow
+        // exactly that shape rather than arbitrary CSS (no url(), no
+        // expression(), no injecting unrelated properties).
+        if (strtolower($element->tagName) === 'img' && $element->hasAttribute('style')) {
+            $style = trim($element->getAttribute('style'));
+            if (!preg_match('/^width:\s*\d{1,3}%;\s*height:\s*auto;?$/', $style)) {
+                $element->removeAttribute('style');
+            }
         }
     }
 

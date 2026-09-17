@@ -1,0 +1,1 @@
+PASS: category visibility survives API refresh for boolean, numeric and string flags

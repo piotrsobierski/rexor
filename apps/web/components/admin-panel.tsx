@@ -46,6 +46,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { adminFlagEnabled } from '@/lib/admin-flags';
 import { Toaster, toast } from '@/components/ui/toast';
 import {
   NativeSelect,
@@ -245,6 +246,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
           title: 'Nie zapisano',
           description: `${data.error ?? 'Operacja nie powiodła się.'} (HTTP ${response.status})`,
           type: 'error',
+          timeout: 6000,
         });
       }
       throw new Error(data.error ?? 'Operacja nie powiodła się.');
@@ -254,6 +256,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
         title: 'Zapisano',
         description: `HTTP ${response.status}`,
         type: 'success',
+        timeout: 1800,
       });
     }
     return data;
@@ -1275,11 +1278,7 @@ function PartsEditor({
                     </TableCell>
                     <TableCell className="text-center">
                       <Switch
-                        checked={Boolean(
-                          Number(
-                            drafts[row.id]?.is_active ?? row.is_active ?? 1,
-                          ),
-                        )}
+                        checked={adminFlagEnabled(drafts[row.id]?.is_active ?? row.is_active ?? 1)}
                         onCheckedChange={(checked) => {
                           setDrafts({
                             ...drafts,
@@ -1507,7 +1506,7 @@ function CategoriesEditor({
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <Switch
-                  checked={Boolean(
+                  checked={adminFlagEnabled(
                     drafts[row.id]?.is_published ?? row.is_published,
                   )}
                   onCheckedChange={(checked) => {
@@ -2927,8 +2926,8 @@ function FramesEditor({
       status: draft.status ?? row.status,
       short_description: optionalText(draft.short_description),
       price_gross: optionalNumber(draft.price_gross),
-      paint_available: Boolean(draft.paint_available),
-      is_recommended: Boolean(draft.is_recommended),
+      paint_available: adminFlagEnabled(draft.paint_available),
+      is_recommended: adminFlagEnabled(draft.is_recommended),
       source_url: optionalText(draft.source_url),
       sort_order: Number(draft.sort_order ?? row.sort_order ?? 0),
       description_html:
@@ -3296,7 +3295,7 @@ function FramesEditor({
                 <div className="flex flex-wrap gap-x-6 gap-y-3">
                   <label className="flex items-center gap-2 text-sm">
                     <Switch
-                      checked={Boolean(Number(draft.paint_available ?? 1))}
+                      checked={adminFlagEnabled(draft.paint_available ?? 1)}
                       onCheckedChange={(checked) =>
                         setDrafts({
                           ...drafts,
@@ -3308,7 +3307,7 @@ function FramesEditor({
                   </label>
                   <label className="flex items-center gap-2 text-sm">
                     <Switch
-                      checked={Boolean(Number(draft.is_recommended ?? 0))}
+                      checked={adminFlagEnabled(draft.is_recommended ?? 0)}
                       onCheckedChange={(checked) =>
                         setDrafts({
                           ...drafts,
@@ -3717,7 +3716,7 @@ function ProjectsEditor({
           ? null
           : Number(draft.category_id),
       completed_at: optionalText(draft.completed_at),
-      is_published: Boolean(draft.is_published),
+      is_published: adminFlagEnabled(draft.is_published),
       sort_order: Number(draft.sort_order ?? row.sort_order ?? 0),
       content_html:
         contentRefs.current[row.id]?.innerHTML ??
@@ -3865,7 +3864,7 @@ function ProjectsEditor({
                         >
                           /realizacje/{String(row.slug ?? '')}
                         </span>
-                        {Boolean(Number(row.is_published ?? 0)) && (
+                        {adminFlagEnabled(row.is_published ?? 0) && (
                           <a
                             href={`/realizacje/${String(row.slug ?? '')}`}
                             target="_blank"
@@ -3985,7 +3984,7 @@ function ProjectsEditor({
                   </div>
                   <label className="flex w-fit items-center gap-2 text-sm">
                     <Switch
-                      checked={Boolean(Number(draft.is_published ?? 0))}
+                      checked={adminFlagEnabled(draft.is_published ?? 0)}
                       onCheckedChange={(checked) =>
                         setDrafts({
                           ...drafts,
@@ -4275,8 +4274,8 @@ function cleanBatteryPayload(draft: Row): Record<string, unknown> {
     charge_voltage_v:
       Math.round(seriesCount * cellSpec.maxCellVoltage * 100) / 100,
     gross_price: parseNum(draft.gross_price),
-    is_default: Boolean(draft.is_default),
-    is_active: draft.is_active !== undefined ? Boolean(draft.is_active) : true,
+    is_default: adminFlagEnabled(draft.is_default),
+    is_active: draft.is_active !== undefined ? adminFlagEnabled(draft.is_active) : true,
   };
 }
 
@@ -4561,12 +4560,12 @@ function BatteriesEditor({
                           <span className="font-mono text-xs font-semibold text-ink-subtle">
                             {String(row.code)}
                           </span>
-                          {Boolean(draft.is_default) && (
+                          {adminFlagEnabled(draft.is_default) && (
                             <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                               Domyślna w modelu
                             </span>
                           )}
-                          {!draft.is_active && (
+                          {!adminFlagEnabled(draft.is_active) && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
                               Ukryta
                             </span>
@@ -4615,7 +4614,7 @@ function BatteriesEditor({
                         <div className="flex flex-wrap items-center gap-4">
                           <label className="flex items-center gap-2 text-sm font-medium">
                             <Switch
-                              checked={Boolean(draft.is_default)}
+                              checked={adminFlagEnabled(draft.is_default)}
                               onCheckedChange={(checked) =>
                                 setDrafts({
                                   ...drafts,
@@ -4629,7 +4628,7 @@ function BatteriesEditor({
                             <Switch
                               checked={
                                 draft.is_active !== undefined
-                                  ? Boolean(draft.is_active)
+                                  ? adminFlagEnabled(draft.is_active)
                                   : true
                               }
                               onCheckedChange={(checked) =>
@@ -4731,7 +4730,7 @@ function BatteriesEditor({
                         <Switch
                           checked={
                             draftNew.is_active !== undefined
-                              ? Boolean(draftNew.is_active)
+                              ? adminFlagEnabled(draftNew.is_active)
                               : true
                           }
                           onCheckedChange={(checked) =>
@@ -4748,7 +4747,7 @@ function BatteriesEditor({
                       </label>
                       <label className="flex items-center gap-2 text-sm font-medium">
                         <Switch
-                          checked={Boolean(draftNew.is_default)}
+                          checked={adminFlagEnabled(draftNew.is_default)}
                           onCheckedChange={(checked) =>
                             setNewRows({
                               ...newRows,
@@ -4842,13 +4841,13 @@ function PageEditor({
   const [contentHtml, setContentHtml] = useState(
     String(page?.content_html ?? ''),
   );
-  const [published, setPublished] = useState(Boolean(page?.is_published));
+  const [published, setPublished] = useState(adminFlagEnabled(page?.is_published));
 
   useEffect(() => {
     if (page) {
       setTitle(String(page.title ?? ''));
       setContentHtml(String(page.content_html ?? ''));
-      setPublished(Boolean(page.is_published));
+      setPublished(adminFlagEnabled(page.is_published));
     }
   }, [page]);
 
@@ -6000,9 +5999,7 @@ function ModelEquipmentEditor({
           model_id: modelId,
           group_id: groupId,
           selection_mode: current?.selection_mode ?? 'select_one',
-          customer_part_allowed: Boolean(
-            Number(current?.customer_part_allowed ?? 0),
-          ),
+          customer_part_allowed: adminFlagEnabled(current?.customer_part_allowed ?? 0),
           customer_part_gross_price: Number(
             current?.customer_part_gross_price ?? 0,
           ),
@@ -6327,9 +6324,7 @@ function ModelEquipmentEditor({
               <div className="flex flex-wrap items-center gap-3">
                 <Label className="flex items-center gap-2 text-sm cursor-pointer">
                   <Switch
-                    checked={Boolean(
-                      Number(settings?.customer_part_allowed ?? 0),
-                    )}
+                    checked={adminFlagEnabled(settings?.customer_part_allowed ?? 0)}
                     onCheckedChange={(checked) =>
                       void saveGroup(groupId, {
                         customer_part_allowed: checked,
@@ -6341,7 +6336,7 @@ function ModelEquipmentEditor({
                     <InfoTooltip text="Włącza w konfiguratorze opcję 'Dostarczam własną część' z określoną wartością rozliczeniową." />
                   </span>
                 </Label>
-                {Boolean(Number(settings?.customer_part_allowed ?? 0)) && (
+                {adminFlagEnabled(settings?.customer_part_allowed ?? 0) && (
                   <div className="grid gap-1">
                     <Label
                       className="text-xs text-ink-muted"
@@ -6399,7 +6394,7 @@ function ModelEquipmentEditor({
                   </span>
                   <NativeSelect
                     value={String(
-                      candidates.find((c) => c.row?.is_default)?.part.id ??
+                      candidates.find((c) => adminFlagEnabled(c.row?.is_default))?.part.id ??
                         candidates.find((c) => c.row)?.part.id ??
                         '',
                     )}
@@ -6538,14 +6533,12 @@ function ModelEquipmentEditor({
                       <TableCell>
                         {row ? (
                           <Switch
-                            checked={Boolean(Number(row.is_default))}
+                            checked={adminFlagEnabled(row.is_default)}
                             onCheckedChange={(checked) =>
                               void saveModelPart({
                                 part_id: Number(part.id),
                                 is_default: checked,
-                                is_customer_configurable: Boolean(
-                                  Number(row.is_customer_configurable),
-                                ),
+                                is_customer_configurable: adminFlagEnabled(row.is_customer_configurable),
                               })
                             }
                           />

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Bike, Map, Mountain, Route, Wrench, Zap } from 'lucide-react';
+import { ArrowRight, Bike, Map, Mountain, Route, SlidersHorizontal, Wrench, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OptimizedImage } from '@/components/optimized-image';
 import { CardGridSkeleton } from '@/components/page-loading';
@@ -8,6 +8,7 @@ import { Reveal } from '@/components/reveal';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { formatPrice } from '@/lib/catalog';
+import { categoryCardDescription } from '@/lib/category-descriptions';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
 import { usePublicCopy } from '@/lib/use-public-copy';
@@ -37,7 +38,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
     return {
       slug: category.slug,
       name: category.name,
-      description: category.short_description ?? known?.description ?? '',
+      description: categoryCardDescription(category.slug, category.short_description) || known?.description || '',
       icon: known?.icon ?? Bike,
       empty: loaded && !models.some((model) => model.categorySlug === category.slug),
       image: publicMediaUrl(category.default_image_path),
@@ -47,7 +48,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
     <section className="mx-auto max-w-[1480px] px-4 pb-7 pt-10 sm:px-8 sm:pb-10 sm:pt-14 lg:px-12">
       <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
         <Reveal><p className="eyebrow">{copy.home.eyebrow}</p><h1 className="mt-3 max-w-3xl text-[clamp(1.6rem,4.2vw,3.6rem)] font-semibold leading-[0.95] tracking-[-0.045em]">{copy.home.heroTitle}</h1></Reveal>
-        <Reveal delayMs={120} className="flex flex-col items-start gap-6 lg:items-end"><p className="max-w-lg text-base leading-relaxed text-ink-muted lg:text-right lg:text-lg">{copy.home.heroSubtitle}</p><Button render={<a href="/konfigurator" />} size="lg" className="h-12 rounded-full bg-ink px-6 text-white transition-transform hover:scale-[1.03] active:scale-[0.98]" data-testid="home-hero-button">{copy.home.heroCta} <ArrowRight data-icon="inline-end" /></Button></Reveal>
+        <Reveal delayMs={120} className="flex flex-col items-start gap-6 lg:items-end"><p className="max-w-lg text-base leading-relaxed text-ink-muted lg:text-right lg:text-lg">{copy.home.heroSubtitle}</p><Button render={<a href="/konfigurator" />} size="lg" className="h-12 rounded-full bg-ink px-6 text-white transition-transform hover:scale-[1.03] active:scale-[0.98]" data-testid="home-hero-button">{copy.home.heroCta} <SlidersHorizontal data-icon="inline-end" /></Button></Reveal>
       </div>
     </section>
 
@@ -59,8 +60,8 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
               {image ? <OptimizedImage src={image} alt="" width={900} height={600} priority={idx === 0} loading={idx < 3 ? 'eager' : 'lazy'} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" data-testid={`category-image-${slug}`} /> : null}
               <div className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-white/90 shadow-sm backdrop-blur transition-colors duration-300 group-hover:bg-[var(--accent-brand)]"><Icon className="size-4.5 transition-transform duration-300 group-hover:rotate-6" /></div>
             </div>
-            <div className="p-5 lg:p-6">
-              <strong className="text-lg tracking-tight">{name}</strong><span className="mt-1 block text-sm text-ink-muted">{description}</span>{empty && <span className="mt-4 inline-block w-fit rounded-full bg-ink-wash px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-ink-subtle">{copy.home.comingSoonBadge}</span>}
+            <div className="flex flex-1 flex-col p-5 lg:p-6">
+              <strong className="text-lg tracking-tight">{name}</strong><span className="mt-1 block min-h-16 text-sm leading-relaxed text-ink-muted">{description}</span>{empty && <span className="mt-auto inline-block w-fit rounded-full bg-ink-wash px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-ink-subtle">{copy.home.comingSoonBadge}</span>}
             </div>
           </a>)}
         </div>
@@ -79,7 +80,7 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
           <article className="group relative overflow-hidden rounded-[28px] bg-[var(--muted)] transition-shadow duration-300 hover:shadow-[0_10px_34px_rgba(0,0,0,0.09)] hover:-translate-y-1 focus-within:shadow-[0_10px_34px_rgba(0,0,0,0.09)] flex flex-col justify-between" data-testid={`model-card-${model.id}`}>
             <div>
               <a href={productHref} className="block overflow-hidden p-5 aspect-[4/3]" data-testid={`model-image-link-${model.id}`}>
-                <OptimizedImage src={model.image} alt={model.name} className="size-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-[1.035]" data-testid={`model-image-${model.id}`} />
+                <OptimizedImage src={model.image} alt={model.name} className="size-full object-contain mix-blend-multiply" data-testid={`model-image-${model.id}`} />
               </a>
               <div className="bg-white p-5 sm:p-6 pb-2">
                 <div className="flex items-start justify-between gap-4">
@@ -94,11 +95,11 @@ export function HomePage({ catalog, copy: initialCopy }: { catalog?: PublicCatal
             </div>
             <div className="bg-white px-5 pb-5 sm:px-6 sm:pb-6 pt-0">
               <div className="flex items-center gap-2 mt-4 border-t border-line/60 pt-4">
-                <Button render={<a href={productHref} />} variant="ghost" size="sm" className="rounded-full text-xs" data-testid={`model-learn-more-${model.id}`}>
+                <Button render={<a href={productHref} />} variant="ghost" size="card" data-testid={`model-learn-more-${model.id}`}>
                   {copy.home.modelLearnMoreCta}
                 </Button>
-                <Button render={<a href={configHref} />} variant="outline" size="sm" className="flex-1 rounded-full border-line-strong text-xs font-medium" data-testid={`model-action-${model.id}`}>
-                  {model.available ? copy.home.modelConfigureCta : copy.home.modelDetailsCta} <ArrowRight data-icon="inline-end" className="size-3.5" />
+                <Button render={<a href={configHref} />} variant="outline" size="card" className="flex-1 border-line-strong" data-testid={`model-action-${model.id}`}>
+                  {model.available ? copy.home.modelConfigureCta : copy.home.modelDetailsCta} {model.available ? <SlidersHorizontal data-icon="inline-end" /> : <ArrowRight data-icon="inline-end" />}
                 </Button>
               </div>
             </div>

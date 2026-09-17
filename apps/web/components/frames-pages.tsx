@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { ArrowRight, ExternalLink, PaintBucket, Palette } from 'lucide-react';
+import { ArrowLeft, ExternalLink, PaintBucket, Palette } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ContactForm } from '@/components/contact-form';
@@ -84,7 +84,7 @@ export function FrameDetailPage({ frame: initialFrame, catalog, copy: initialCop
     return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
       <p className="eyebrow">{copy.frames.notFoundEyebrow}</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.frames.notFoundTitle}</h1>
-      <Button render={<a href="/ramy" />} variant="outline" className="mt-6 rounded-full">{copy.frames.backToAllCta} <ArrowRight data-icon="inline-end" /></Button>
+      <Button render={<a href="/ramy" />} variant="outline" className="mt-6 rounded-full">{copy.frames.backToAllCta} <ArrowLeft data-icon="inline-end" /></Button>
     </section></PageFrame>;
   }
 

@@ -49,9 +49,23 @@ function loginAdmin(PDO $pdo, array $input): array
     return ['token' => $token, 'user' => ['email' => $user['email'], 'displayName' => $user['display_name']]];
 }
 
+/** PDO może zwracać TINYINT jako tekst; JSON powinien zawierać prawdziwe booleany. */
+function normalizeAdminFlags(array $rows, array $fields): array
+{
+    foreach ($rows as &$row) {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $row)) {
+                $row[$field] = (bool) $row[$field];
+            }
+        }
+    }
+    unset($row);
+    return $rows;
+}
+
 function adminCatalog(PDO $pdo): array
 {
-    return [
+    $catalog = [
         'categories' => $pdo->query('SELECT id, slug, name, short_description, description_html, default_image_path, is_published, sort_order FROM bike_categories ORDER BY sort_order')->fetchAll(),
         'models' => $pdo->query('SELECT m.id, m.category_id, m.slug, m.name, m.short_description, m.description_html, m.computed_base_price_gross, m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.default_image_path, m.status, COUNT(mm.media_id) AS media_count FROM bike_models m LEFT JOIN model_media mm ON mm.model_id = m.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll(),
         'partGroups' => $pdo->query('SELECT id, slug, name, description, sort_order, is_required FROM part_groups ORDER BY sort_order, id')->fetchAll(),
@@ -95,6 +109,23 @@ function adminCatalog(PDO $pdo): array
         'mailRouting' => getMailRouting($pdo),
         'configurationEmailTemplate' => getConfigurationEmailTemplate($pdo),
     ];
+    $flagFields = [
+        'categories' => ['is_published'],
+        'partGroups' => ['is_required'],
+        'modelParts' => ['is_default', 'is_customer_configurable', 'customer_supplied_allowed'],
+        'modelGroupSettings' => ['customer_part_allowed'],
+        'modelSizes' => ['is_active'],
+        'batteries' => ['is_default', 'is_active'],
+        'parts' => ['is_active'],
+        'pages' => ['is_published'],
+        'frames' => ['paint_available', 'is_recommended'],
+        'projects' => ['is_published'],
+    ];
+    foreach ($flagFields as $collection => $fields) {
+        $catalog[$collection] = normalizeAdminFlags($catalog[$collection], $fields);
+    }
+    return $catalog;
+
 }
 
 function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): array

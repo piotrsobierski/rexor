@@ -112,9 +112,9 @@ function CollectionCard({ item, detailsCta }: { item: CollectionItem; detailsCta
   return (
     <article className="flex flex-col justify-between overflow-hidden rounded-[28px] border border-line bg-white transition-shadow hover:shadow-[0_10px_34px_rgba(0,0,0,0.09)] focus-within:shadow-[0_10px_34px_rgba(0,0,0,0.09)]">
       <a href={item.href} aria-label={`${item.title} — ${detailsCta}`} className="block text-inherit no-underline">
-        <div className="relative aspect-[4/3] bg-[var(--muted)] p-5">
+        <div className="relative aspect-[4/3] overflow-hidden bg-white">
           {item.image
-            ? <OptimizedImage src={item.image} alt={item.title} className="size-full object-contain mix-blend-multiply transition-transform duration-500 hover:scale-[1.03]" />
+            ? <OptimizedImage src={item.image} alt={item.title} className="size-full object-contain" />
             : <div className="size-full rounded-2xl bg-ink-wash" aria-hidden="true" />}
           {item.badge && <Badge className="absolute left-4 top-4 h-auto bg-ink px-3 py-1 text-white">{item.badge}</Badge>}
         </div>
@@ -127,7 +127,7 @@ function CollectionCard({ item, detailsCta }: { item: CollectionItem; detailsCta
       <div className="p-6 pt-2">
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-4">
           <strong className="text-sm">{item.meta}</strong>
-          <Button render={<a href={item.href} />} size="sm" className="rounded-full bg-ink px-3 text-xs text-white hover:bg-black">
+          <Button render={<a href={item.href} />} variant="outline" size="card" className="border-line-strong">
             {detailsCta} <ArrowRight data-icon="inline-end" className="size-3.5" />
           </Button>
         </div>

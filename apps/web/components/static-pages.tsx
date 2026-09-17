@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { ArrowRight, BatteryCharging, Gauge, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BatteryCharging, Gauge, MessageSquareText, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OptimizedImage } from '@/components/optimized-image';
 import { PageFrame } from '@/components/page-frame';
@@ -22,8 +22,8 @@ function BikePickCard({ model, copy }: { model: BikeModel; copy: SiteCopy }) {
     <article className="overflow-hidden rounded-[28px] border border-line bg-white transition-shadow hover:shadow-[0_10px_34px_rgba(0,0,0,0.09)] focus-within:shadow-[0_10px_34px_rgba(0,0,0,0.09)] flex flex-col justify-between">
       <div>
         <a href={productHref} aria-label={`Poznaj ${model.name}`} className="block text-inherit no-underline">
-          <div className="aspect-[4/3] bg-[var(--muted)] p-5">
-            <OptimizedImage src={model.image} alt={model.name} className="size-full object-contain mix-blend-multiply transition-transform duration-500 hover:scale-[1.03]" />
+          <div className="aspect-[4/3] overflow-hidden bg-white">
+            <OptimizedImage src={model.image} alt={model.name} className="size-full object-contain" />
           </div>
           <div className="p-6 pb-2">
             <span className="eyebrow">{model.category}</span>
@@ -33,14 +33,14 @@ function BikePickCard({ model, copy }: { model: BikeModel; copy: SiteCopy }) {
         </a>
       </div>
       <div className="p-6 pt-2">
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-line/60 pt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-4">
           <strong>{model.basePrice ? `od ${formatPrice(model.basePrice)}` : copy.bikes.priceSoon}</strong>
           <div className="flex items-center gap-2">
-            <Button render={<a href={productHref} />} variant="ghost" size="sm" className="rounded-full text-xs">
+            <Button render={<a href={productHref} />} variant="ghost" size="card">
               {copy.bikes.cardDetailsCta}
             </Button>
-            <Button render={<a href={configHref} />} size="sm" className="rounded-full bg-ink text-white hover:bg-black text-xs px-3">
-              {model.available ? copy.bikes.configureCta : copy.bikes.askCta} <ArrowRight data-icon="inline-end" className="size-3.5" />
+            <Button render={<a href={configHref} />} variant="outline" size="card" className="border-line-strong">
+              {model.available ? copy.bikes.configureCta : copy.bikes.askCta} {model.available ? <SlidersHorizontal data-icon="inline-end" /> : <MessageSquareText data-icon="inline-end" />}
             </Button>
           </div>
         </div>
@@ -117,7 +117,7 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
   // kategorii" mignęłoby przy każdym wejściu, zanim dojedzie katalog.
   if (!loaded) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><CardGridSkeleton /></section></PageFrame>;
 
-  if (!category) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.category.eyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.category.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.category.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
+  if (!category) return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.category.eyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.category.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.category.backToAllCta} <ArrowLeft data-icon="inline-end" /></Button></section></PageFrame>;
 
   if (isRestricted && !disclaimerAccepted) {
     return <PageFrame><section className="mx-auto max-w-[720px] px-4 py-16 text-center sm:px-8 lg:py-24">
@@ -174,7 +174,7 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
   }
 
   if (!model) {
-    return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.model.notFoundEyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.model.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.model.backToAllCta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
+    return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.model.notFoundEyebrow}</p><h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em]">{copy.model.notFoundTitle}</h1><Button render={<a href="/rowery" />} variant="outline" className="mt-6 rounded-full">{copy.model.backToAllCta} <ArrowLeft data-icon="inline-end" /></Button></section></PageFrame>;
   }
 
   const category = categories.find((c) => c.slug === model.categorySlug);

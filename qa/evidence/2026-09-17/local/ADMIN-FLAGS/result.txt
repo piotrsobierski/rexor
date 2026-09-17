@@ -1,0 +1,1 @@
+PASS: all admin flags preserve enabled/disabled states across frontend and API refresh; unrelated fields unchanged

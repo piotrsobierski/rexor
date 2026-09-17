@@ -680,16 +680,21 @@ test.describe('rexor visual regression (admin editor)', () => {
       ).toMatch(/<img[^>]*width:\s*75%[^>]*>/);
       await page.screenshot({ path: `${evidence}/02-editor-resized.png`, fullPage: true });
 
-      // The 1x1 test image, at 75% width with height:auto, renders as a tall
-      // square that pushes "Zapisz stronę" below the viewport -- force:true
-      // (needed to click through a lingering toast, as elsewhere in this
-      // file) does NOT auto-scroll like a plain click does, so without this
-      // the click silently lands outside the viewport and no save request is
-      // ever sent (caught by hand: this is a test-authoring gotcha, not an
-      // app bug -- see the mailbox-lib style header notes in this file).
+      // The image upload pops its own "Zapisano" toast (bottom-right), which
+      // can land exactly where the 1x1 test image -- at 75% width with
+      // height:auto, so it renders as a tall square -- pushes "Zapisz
+      // stronę" once the layout grows. Confirmed by hand with
+      // elementFromPoint() at the button's coordinates: mid-exit-animation,
+      // the toast's title <h2> was still there physically intercepting
+      // clicks even though its role="status" had already been torn down
+      // (so waiting on getByRole('status') to clear is not enough -- it
+      // under-reports how long the toast actually blocks the button for).
+      // A plain click (no force, no manual scroll) is the fix: Playwright's
+      // own actionability wait retries both "scrolled into view" and "not
+      // obscured by another element" until they're true, which force:true
+      // exists specifically to skip -- so don't use force for this one.
       const saveButton = page.getByRole('button', { name: /Zapisz stronę/ });
-      await saveButton.scrollIntoViewIfNeeded();
-      await saveButton.click({ force: true });
+      await saveButton.click();
       await expect(page.getByRole('status')).toHaveText('Zmiany zapisane.', { timeout: 10_000 });
       await page.screenshot({ path: `${evidence}/03-editor-saved.png`, fullPage: true });
 

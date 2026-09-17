@@ -31,11 +31,11 @@ export const defaultCopy = {
   },
   home: {
     eyebrow: 'Rexor bikes',
-    heroTitle: 'Zbudowany dla Twojej trasy.',
+    heroTitle: 'Zbudowany dla Twojej trasy',
     heroSubtitle: 'Wybierz konstrukcję, dobierz komponenty i zobacz cenę projektu jeszcze przed rozmową z Rexor.',
     heroCta: 'Rozpocznij konfigurację',
     modelsEyebrow: 'Modele startowe',
-    modelsTitle: 'Wybierz swoją bazę.',
+    modelsTitle: 'Wybierz swoją bazę',
     modelsAllCta: 'Wszystkie rowery',
     comingSoonBadge: 'W przygotowaniu',
     priceSoon: 'Wkrótce',
@@ -43,13 +43,13 @@ export const defaultCopy = {
     modelConfigureCta: 'Konfiguruj',
     modelDetailsCta: 'Szczegóły',
     serviceEyebrow: 'Serwis Rexor',
-    serviceTitle: 'Opieka po pierwszym kilometrze.',
+    serviceTitle: 'Opieka po pierwszym kilometrze',
     serviceText: 'Diagnostyka napędu, regulacja zawieszenia, hamulców i przeglądy okresowe. Zakres zawsze potwierdzamy przed rozpoczęciem prac.',
     serviceCta: 'Sprawdź serwis',
   },
   bikes: {
     eyebrow: 'Rowery Rexor',
-    title: 'Trzy różne punkty wyjścia.',
+    title: 'Trzy różne punkty wyjścia',
     cardDetailsCta: 'Opis',
     priceSoon: 'Cena w przygotowaniu',
     configureCta: 'Konfiguruj',
@@ -57,7 +57,7 @@ export const defaultCopy = {
   },
   category: {
     eyebrow: 'Kategoria',
-    notFoundTitle: 'Nie znaleziono tej kategorii.',
+    notFoundTitle: 'Nie znaleziono tej kategorii',
     backToAllCta: 'Zobacz wszystkie rowery',
     emptyModels: 'Ta kategoria nie ma jeszcze przypisanych modeli. Wkrótce się to zmieni.',
     electricDisclaimerTitle: 'Uwaga, zanim zobaczysz ofertę',
@@ -68,7 +68,7 @@ export const defaultCopy = {
     breadcrumbHome: 'Rexor',
     breadcrumbBikes: 'Rowery',
     notFoundEyebrow: 'Rower',
-    notFoundTitle: 'Nie znaleziono takiego modelu.',
+    notFoundTitle: 'Nie znaleziono takiego modelu',
     backToAllCta: 'Zobacz wszystkie rowery',
     configureCta: 'Konfiguruj ten model',
     askCta: 'Zapytaj o dostępność',
@@ -86,7 +86,7 @@ export const defaultCopy = {
   },
   frames: {
     eyebrow: 'Ramy',
-    title: 'Geometria decyduje o charakterze.',
+    title: 'Geometria decyduje o charakterze',
     subtitle: 'Karbonowe i aluminiowe ramy, które sprzedajemy osobno - z pełną geometrią i naszą rekomendacją.',
     empty: 'Nie ma jeszcze opublikowanych ram. Napisz do nas, a sprawdzimy dostępność u producenta.',
     cardDetailsCta: 'Sprawdź szczegóły',
@@ -96,7 +96,7 @@ export const defaultCopy = {
     frameOnlyTitle: 'Sama rama też jest w ofercie',
     frameOnlyText: 'Ramę możesz kupić osobno, bez budowy całego roweru. Możemy ją również polakierować według Twojego projektu - dowolny kolor, wzór albo odcień z palety samochodowej.',
     notFoundEyebrow: 'Rama',
-    notFoundTitle: 'Nie znaleziono takiej ramy.',
+    notFoundTitle: 'Nie znaleziono takiej ramy',
     backToAllCta: 'Zobacz wszystkie ramy',
     loading: 'Wczytuję ramę…',
     breadcrumbHome: 'Rexor',
@@ -123,13 +123,13 @@ export const defaultCopy = {
   },
   projects: {
     eyebrow: 'Realizacje',
-    title: 'Rowery, które już jeżdżą.',
+    title: 'Rowery, które już jeżdżą',
     subtitle: 'Prawdziwe realizacje zbudowane w Rexor - ze zdjęciami i pełnym spisem komponentów.',
     empty: 'Nie opublikowaliśmy jeszcze żadnej realizacji. Wkrótce się to zmieni.',
     cardDetailsCta: 'Zobacz realizację',
     completedPrefix: 'Ukończono',
     notFoundEyebrow: 'Realizacja',
-    notFoundTitle: 'Nie znaleziono takiej realizacji.',
+    notFoundTitle: 'Nie znaleziono takiej realizacji',
     backToAllCta: 'Zobacz wszystkie realizacje',
     loading: 'Wczytuję realizację…',
     breadcrumbHome: 'Rexor',
@@ -150,7 +150,7 @@ export const defaultCopy = {
   },
   parts: {
     eyebrow: 'Części',
-    title: 'Wybory, które naprawdę zmieniają jazdę.',
+    title: 'Wybory, które naprawdę zmieniają jazdę',
     cta: 'Dobierz części w konfiguratorze',
     groups: {
       drive: { name: 'Napęd elektryczny', text: 'Silniki przypisane do ramy, wyświetlacze i ładowarki.' },
@@ -163,7 +163,7 @@ export const defaultCopy = {
   },
   service: {
     eyebrow: 'Serwis Rexor',
-    title: 'Pewność przed kolejną trasą.',
+    title: 'Pewność przed kolejną trasą',
     subtitle: 'Diagnostyka, regulacja i opieka nad rowerem przed sezonem oraz po wymagających kilometrach.',
     asideTitle: 'Zgłoś rower',
     asideText: 'Opisz model i objawy. Wrócimy z proponowanym terminem oraz zakresem.',
@@ -228,7 +228,7 @@ export const defaultCopy = {
     backCta: 'Wróć do konfiguratora',
     loadingText: 'Otwieram zapisaną konfigurację…',
     savedEyebrow: 'Projekt zapisany',
-    titleSuffix: 'w Twojej wersji.',
+    titleSuffix: 'w Twojej wersji',
     copyLinkCta: 'Kopiuj link',
     copiedCta: 'Skopiowano',
     emailShareCta: 'Wyślij e-mailem',
@@ -275,6 +275,10 @@ function deepMerge<T>(base: T, override: unknown): T {
     const overrideObj = (override && typeof override === 'object' && !Array.isArray(override)) ? (override as Record<string, unknown>) : {};
     for (const key of Object.keys(result)) {
       result[key] = deepMerge(result[key], overrideObj[key]);
+      // Nagłówki bez końcowych kropek, także przy treści z panelu.
+      if ((key === 'title' || key.endsWith('Title') || key === 'titleSuffix') && typeof result[key] === 'string') {
+        result[key] = (result[key] as string).replace(/\.+\s*$/, '');
+      }
     }
     return result as T;
   }

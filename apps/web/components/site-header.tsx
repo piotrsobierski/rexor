@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Menu, Settings } from 'lucide-react';
+import { Menu, Settings, SlidersHorizontal } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { OptimizedImage } from '@/components/optimized-image';
 import { Button } from '@/components/ui/button';
@@ -47,11 +47,11 @@ export function SiteHeader() {
         </NavigationMenu>
 
         <div className="hidden items-center justify-end gap-2 sm:flex">
-          <Button render={<a href="/admin" aria-label={copy.nav.adminAria} data-testid="header-admin-button" />} variant="outline" size="icon-lg" className="h-11 rounded-none border-ink hover:bg-ink hover:text-white">
+          <Button render={<a href="/admin" aria-label={copy.nav.adminAria} data-testid="header-admin-button" />} variant="outline" size="icon-lg" className="size-11 rounded-full border-ink hover:bg-ink hover:text-white">
             <Settings aria-hidden="true" />
           </Button>
-          <Button render={<a href="/konfigurator" data-testid="header-configurator-button" />} variant="outline" size="lg" className="h-11 rounded-none border-ink px-5 font-mono text-xs font-semibold uppercase tracking-[0.12em] hover:bg-ink hover:text-white">
-            {copy.nav.cta} <ArrowRight data-icon="inline-end" aria-hidden="true" />
+          <Button render={<a href="/konfigurator" data-testid="header-configurator-button" />} variant="outline" size="lg" className="h-11 rounded-full border-ink px-5 font-mono text-xs font-semibold uppercase tracking-[0.12em] hover:bg-ink hover:text-white">
+            {copy.nav.cta} <SlidersHorizontal data-icon="inline-end" aria-hidden="true" />
           </Button>
         </div>
 
@@ -78,7 +78,7 @@ export function SiteHeader() {
             </nav>
             <div className="mt-auto p-4">
               <Button render={<a href="/konfigurator" data-testid="header-mobile-configurator-button" />} className="h-12 w-full rounded-full bg-ink text-white">
-                {copy.nav.cta} <ArrowRight data-icon="inline-end" aria-hidden="true" />
+                {copy.nav.cta} <SlidersHorizontal data-icon="inline-end" aria-hidden="true" />
               </Button>
             </div>
           </SheetContent>
