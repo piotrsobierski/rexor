@@ -13,6 +13,8 @@ vendor/
 dist/
 coverage/
 *.log
+test-results/
+qa/playwright/report/
 storage/backups/*
 !storage/backups/.gitkeep
 storage/media/*

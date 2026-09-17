@@ -34,6 +34,9 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | ADM-07 | PASS | test — `qa/evidence/2026-09-17/test/ADM-07/` | Edytor modelu zachowuje zaznaczenie przy użyciu „Pogrubienia”; zmiana pozostała niezapisana i została odrzucona odświeżeniem. |
 | ADM-10 | PARTIAL | test — `qa/evidence/2026-09-17/test/ADM-10/` | Zakładka „Zapytania” otwiera się bez błędów, ale środowisko testowe nie ma zapisanej konfiguracji do otwarcia. |
 | ADM-02–06, ADM-08–09, REL-01 | NOT RUN | — | Do wykonania według kolejności i wymaganych uprawnień. |
+| VIS-01 | PASS | test — `qa/evidence/2026-09-17/test/VIS-01/` (`npm run test:visual`) | Zdjęcie główne na `/rowery` nie odtworzyło zgłoszonego błędu; zgodne z detalem od razu po reorderze w panelu. |
+| VIS-02 | FAIL (oczekiwane) | test — `qa/evidence/2026-09-17/test/VIS-02/` (`npm run test:visual`) | Ani „Rowery”, ani „Ramy” nie mają filtra kategorii w panelu — brakująca funkcja, nie regresja jednej zakładki. |
+| VIS-03 | PASS | test — `qa/evidence/2026-09-17/test/VIS-03/` (`npm run test:visual`) | Podgląd świeżo zapisanej konfiguracji w panelu otworzył się bez błędu dla ścieżki standardowej (E82, domyślne opcje). |
 
 ## Publiczna strona i konfigurator
 
