@@ -152,12 +152,23 @@ function sanitizeRichHtml(string $html): string
             $element->setAttribute('rel', 'noopener noreferrer');
         }
         // The WYSIWYG editor's image-resize toolbar (setSelectedImageWidth in
-        // admin-panel.tsx) writes `style="width: NN%; height: auto;"` -- allow
-        // exactly that shape rather than arbitrary CSS (no url(), no
-        // expression(), no injecting unrelated properties).
+        // admin-panel.tsx) writes `style="width: NN%; height: auto;"` -- keep
+        // only that declaration (and drop anything else, e.g. a leftover
+        // outline/outline-offset from the editor's own selection-highlight
+        // styling) rather than requiring the whole attribute to match
+        // exactly, which is one stray declaration away from silently
+        // stripping the resize on every save.
         if (strtolower($element->tagName) === 'img' && $element->hasAttribute('style')) {
-            $style = trim($element->getAttribute('style'));
-            if (!preg_match('/^width:\s*\d{1,3}%;\s*height:\s*auto;?$/', $style)) {
+            $declarations = array_filter(array_map('trim', explode(';', $element->getAttribute('style'))));
+            $kept = [];
+            foreach ($declarations as $declaration) {
+                if (preg_match('/^width:\s*\d{1,3}%$/', $declaration) || preg_match('/^height:\s*auto$/', $declaration)) {
+                    $kept[] = $declaration;
+                }
+            }
+            if ($kept) {
+                $element->setAttribute('style', implode('; ', $kept) . ';');
+            } else {
                 $element->removeAttribute('style');
             }
         }

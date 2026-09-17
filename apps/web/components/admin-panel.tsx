@@ -1727,7 +1727,10 @@ function WysiwygEditor({
   /** Odczytuje HTML edytora bez podglądu zaznaczenia zdjęcia, żeby obramowanie wyboru nie trafiło do zapisu. */
   function emitChange() {
     if (!localRef.current) return;
-    if (selectedImage) selectedImage.style.outline = '';
+    if (selectedImage) {
+      selectedImage.style.outline = '';
+      selectedImage.style.outlineOffset = '';
+    }
     const html = localRef.current.innerHTML;
     if (selectedImage) {
       selectedImage.style.outline = '2px solid var(--ring)';
