@@ -106,7 +106,7 @@ function sanitizeRichHtml(string $html): string
     // $allowedTags), so bold/italic applied in the WYSIWYG editor visibly
     // vanish the moment the page is saved.
     $html = preg_replace(['/<b(\s[^>]*)?>/i', '/<\/b>/i', '/<i(\s[^>]*)?>/i', '/<\/i>/i'], ['<strong>', '</strong>', '<em>', '</em>'], $html) ?? $html;
-    $allowedTags = '<p><br><h2><h3><h4><strong><em><ul><ol><li><blockquote><a><img><table><thead><tbody><tfoot><tr><th><td><span><hr>';
+    $allowedTags = '<p><br><h1><h2><h3><h4><h5><strong><em><ul><ol><li><blockquote><a><img><table><thead><tbody><tfoot><tr><th><td><span><hr>';
     $html = strip_tags($html, $allowedTags);
     $document = new DOMDocument('1.0', 'UTF-8');
     libxml_use_internal_errors(true);
@@ -121,9 +121,11 @@ function sanitizeRichHtml(string $html): string
         'td' => ['colspan', 'rowspan', 'class'],
         'span' => ['class'],
         'p' => ['class'],
+        'h1' => ['class'],
         'h2' => ['class'],
         'h3' => ['class'],
         'h4' => ['class'],
+        'h5' => ['class'],
         'ul' => ['class'],
         'ol' => ['class'],
         'li' => ['class'],

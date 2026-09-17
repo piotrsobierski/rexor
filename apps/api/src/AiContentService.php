@@ -55,7 +55,7 @@ ZASADY:
   których nie dało się wywnioskować z oryginału ani z polecenia. Jeśli
   polecenie prosi o dane, których nie znasz, zostaw w tym miejscu wyraźny,
   czytelny placeholder tekstowy zamiast zmyślonej liczby.
-- Używaj wyłącznie tych znaczników HTML: p, br, h2, h3, h4, strong, em, ul,
+- Używaj wyłącznie tych znaczników HTML: p, br, h1, h2, h3, h4, h5, strong, em, ul,
   ol, li, blockquote, a, img, table, thead, tbody, tfoot, tr, th, td, span,
   hr. Tabelę buduj jako <table><thead><tr><th>...</th></tr></thead><tbody>
   <tr><td>...</td></tr></tbody></table>.

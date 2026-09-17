@@ -1808,28 +1808,21 @@ function WysiwygEditor({
         >
           <Italic className="size-4" />
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          type="button"
-          className="h-8 px-2 text-xs font-semibold"
-          onClick={() => format('formatBlock', '<h3>')}
-          onMouseDown={keepEditorSelection}
-          title="Nagłówek H3"
-        >
-          H3
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          type="button"
-          className="h-8 px-2 text-xs"
-          onClick={() => format('formatBlock', '<p>')}
-          onMouseDown={keepEditorSelection}
-          title="Akapit"
-        >
-          P
-        </Button>
+        {[1, 2, 3, 4, 5].map((level) => (
+          <Button
+            key={level}
+            size="sm"
+            variant="ghost"
+            type="button"
+            className="h-8 px-2 text-xs font-semibold"
+            onClick={() => format('formatBlock', `<h${level}>`)}
+            onMouseDown={keepEditorSelection}
+            aria-label={`Nagłówek H${level}`}
+            title={`Nagłówek H${level}`}
+          >
+            H{level}
+          </Button>
+        ))}
         <Button
           size="icon-sm"
           variant="ghost"

@@ -86,8 +86,11 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .choice-indicator-active { @apply border-ink bg-ink text-white; }
 
   .rich-content { @apply text-base leading-8 text-ink-muted; }
+  .rich-content h1 { @apply mb-6 mt-10 text-4xl font-semibold leading-tight tracking-[-0.04em] text-ink sm:text-5xl; }
   .rich-content h2 { @apply mb-5 text-3xl font-semibold leading-tight tracking-[-0.04em] text-ink sm:text-4xl; }
   .rich-content h3 { @apply mb-3 mt-10 text-xl font-semibold tracking-tight text-ink; }
+  .rich-content h4 { @apply mb-3 mt-8 text-lg font-semibold tracking-tight text-ink; }
+  .rich-content h5 { @apply mb-2 mt-6 text-base font-semibold text-ink; }
   .rich-content p { @apply mb-5; }
   .rich-content ul, .rich-content ol { @apply my-5 space-y-2 pl-5; }
   .rich-content li { @apply list-disc pl-2; }
