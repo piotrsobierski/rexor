@@ -2493,8 +2493,8 @@ function ModelsEditor({
                   — wyliczona z ramy, baterii, części domyślnych i składania.
                   Nie wpisuje się jej ręcznie.
                 </p>
-                <details className="rounded-xl border border-line p-3" open>
-                  <summary className="cursor-pointer text-sm font-semibold text-ink">
+                <details className="rounded-xl border border-line p-3" open data-testid={`model-description-collapsible-${row.id}`}>
+                  <summary className="cursor-pointer text-sm font-semibold text-ink" data-testid={`model-description-toggle-${row.id}`}>
                     Opis modelu (edytor WYSIWYG / strona produktu)
                   </summary>
                   <div className="mt-3">
@@ -3361,8 +3361,8 @@ function FramesEditor({
                     }
                   />
                 </div>
-                <details className="rounded-xl border border-line p-3" open>
-                  <summary className="cursor-pointer text-sm font-semibold text-ink">
+                <details className="rounded-xl border border-line p-3" open data-testid={`frame-description-collapsible-${row.id}`}>
+                  <summary className="cursor-pointer text-sm font-semibold text-ink" data-testid={`frame-description-toggle-${row.id}`}>
                     Opis ramy (edytor WYSIWYG / strona ramy)
                   </summary>
                   <div className="mt-3">
@@ -3377,8 +3377,8 @@ function FramesEditor({
                     />
                   </div>
                 </details>
-                <details className="rounded-xl border border-line p-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-ink">
+                <details className="rounded-xl border border-line p-3" data-testid={`frame-geometry-collapsible-${row.id}`}>
+                  <summary className="cursor-pointer text-sm font-semibold text-ink" data-testid={`frame-geometry-toggle-${row.id}`}>
                     Geometria ramy
                   </summary>
                   <p className="mt-2 text-xs text-ink-muted">
@@ -4055,8 +4055,8 @@ function ProjectsEditor({
                     </div>
                   ))}
                 </div>
-                <details className="rounded-xl border border-line p-3" open>
-                  <summary className="cursor-pointer text-sm font-semibold text-ink">
+                <details className="rounded-xl border border-line p-3" open data-testid={`project-content-collapsible-${row.id}`}>
+                  <summary className="cursor-pointer text-sm font-semibold text-ink" data-testid={`project-content-toggle-${row.id}`}>
                     Treść strony realizacji (edytor WYSIWYG)
                   </summary>
                   <div className="mt-3">
@@ -4665,8 +4665,9 @@ function BatteriesEditor({
               <details
                 className="mt-5 rounded-2xl border border-line bg-white p-4 sm:p-5"
                 open={rows.length === 0}
+                data-testid={`add-battery-collapsible-${modelSlug}`}
               >
-                <summary className="cursor-pointer text-sm font-semibold tracking-tight text-ink hover:text-ink/80">
+                <summary className="cursor-pointer text-sm font-semibold tracking-tight text-ink hover:text-ink/80" data-testid={`add-battery-toggle-${modelSlug}`}>
                   Dodaj pakiet do modelu {String(model.name)}
                 </summary>
 

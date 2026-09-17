@@ -437,8 +437,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               className="mt-4 rounded-[28px] border border-line bg-white p-3 sm:p-4"
               open={modelDescriptionOpen}
               onToggle={(event) => setModelDescriptionOpen(event.currentTarget.open)}
+              data-testid="model-description-collapsible"
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[20px] px-2 py-2 text-left text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[20px] px-2 py-2 text-left text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 [&::-webkit-details-marker]:hidden" data-testid="model-description-toggle">
                 <span className="min-w-0">
                   <span className="block text-base font-semibold tracking-tight">{copy.configurator.aboutModelPrefix} {model.name}</span>
                   <span className="mt-0.5 block text-xs font-normal text-ink-muted">{copy.model.descriptionEyebrow}</span>
