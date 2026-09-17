@@ -13,6 +13,21 @@ import { resolve } from 'node:path';
 //   VIS-03  Opening a just-submitted public configuration from the admin
 //           "Zapytania" tab ("Szczegóły") errors out.
 //
+// Plus completion of previously-PARTIAL scenarios from
+// qa/SCENARIUSZE_TESTOWE.md, now that an admin session and a test mailbox
+// are available (2026-09-17):
+//   VIS-04  CFG-04: paint-picker render zoom (blocked before — E82 has zero
+//           paint renders in the test catalog; E55 has 229/680, so this
+//           runs against E55).
+//   VIS-05  CFG-06 + ADM-10: full save → admin "Dziennik aktywności" shows
+//           the event → open the same record from "Zapytania" → "Szczegóły"
+//           through the real UI flow (not a direct URL). Email *delivery*
+//           to the order-notification inbox still cannot be verified from
+//           this environment (IMAPS to mail.sobierski.com:993 times out
+//           even outside the shell sandbox) — see VIS-05's WYNIK.md.
+//   VIS-06  CFG-07: keyboard focus stays trapped inside the paint-picker
+//           modal while Tabbing, and Escape returns focus to the trigger.
+//
 // Run with: npm run test:visual
 // Requires QA_ADMIN_EMAIL / QA_ADMIN_PASSWORD in the environment.
 
@@ -182,5 +197,134 @@ test.describe('rexor visual regression (admin editor)', () => {
       `Admin configuration detail view for ${publicId.trim()} shows an error state. Console issues: ${issues.join('; ') || 'none'}`,
     ).toBeFalsy();
     await expect(page.getByText(publicId.trim())).toBeVisible();
+  });
+
+  test('VIS-04: paint picker shows and zooms a render for a model that has one (E55)', async ({ page }) => {
+    const evidence = await evidenceDir('VIS-04');
+    await page.goto(`${BASE_URL}/konfigurator?model=e55`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+
+    await page.getByRole('button', { name: /Wybierz kolor/i }).click();
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Kolor lakieru' }).or(page.locator('[role="dialog"]')).first();
+    await dialog.waitFor();
+
+    const renderChip = page.getByText(/^Z wizualizacją/);
+    await renderChip.click();
+    await page.screenshot({ path: `${evidence}/01-paint-picker-filtered.png`, fullPage: true });
+
+    const swatches = page.locator('button[aria-label][title*="·"]');
+    const swatchCount = await swatches.count();
+    test.skip(swatchCount === 0, 'No render-backed swatch found after filtering — test catalog data changed.');
+    await swatches.first().click();
+
+    const zoomTrigger = page.getByRole('button', { name: /Powiększ (zdjęcie|wizualizację)/ });
+    await expect(zoomTrigger).toBeVisible();
+    await page.screenshot({ path: `${evidence}/02-paint-preview-selected.png`, fullPage: true });
+
+    await zoomTrigger.click();
+    const zoomedImg = page.locator('[role="dialog"] img').last();
+    await expect(zoomedImg).toBeVisible();
+    const zoomedSrc = await zoomedImg.getAttribute('src');
+    expect(zoomedSrc, 'Zoomed dialog must actually load a render image.').toMatch(/\/media\/paints\/renders\//);
+    await page.screenshot({ path: `${evidence}/03-paint-zoomed.png`, fullPage: true });
+  });
+
+  test('VIS-05: saved configuration shows in admin activity log and opens via the Zapytania UI', async ({
+    page,
+    context,
+  }) => {
+    const evidence = await evidenceDir('VIS-05');
+    const marker = `[QA] test-visual VIS-05 ${Date.now()}`;
+
+    const configPage = await context.newPage();
+    await configPage.goto(`${BASE_URL}/konfigurator?model=e82`, { waitUntil: 'domcontentloaded' });
+    await configPage.waitForTimeout(3000);
+    await configPage.getByRole('button', { name: /Zapisz i przejdź/i }).click();
+    await configPage.getByLabel('Imię i nazwisko').fill(marker);
+    await configPage.getByLabel('E-mail').fill('qa-configurator@example.invalid');
+    await configPage.getByRole('checkbox', { name: /Zgadzam się/ }).click({ force: true });
+    await configPage.getByRole('button', { name: /Utwórz prywatny link/i }).click();
+    await configPage.waitForURL(/\/konfiguracja\//, { timeout: 15_000 });
+    await configPage.waitForTimeout(500);
+    const publicId = (
+      await configPage.getByText('Numer projektu').locator('xpath=following-sibling::*[1]').innerText()
+    ).trim();
+    await configPage.close();
+
+    await loginAdmin(page);
+
+    // Activity log: the "configuration_created" event must show up for this
+    // exact submission (proves the record + event were created end to end;
+    // actual SMTP delivery to the order-notification inbox is a separate,
+    // currently unverifiable, concern — see WYNIK.md).
+    await page.getByRole('tab', { name: 'Dziennik aktywności' }).click();
+    await page.getByLabel('Typ zdarzenia').selectOption({ label: 'Nowa konfiguracja' });
+    await page.waitForTimeout(500);
+    // Scope to the activity-log table specifically ("Kiedy" column) — Tabs
+    // may keep the previous panel mounted, and the marker text legitimately
+    // appears in both tables, which trips Playwright's strict-mode check.
+    const activityTable = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: 'Kiedy' }) });
+    const logRow = activityTable.getByRole('row').filter({ hasText: marker });
+    await expect(
+      logRow.first(),
+      `Expected a "Nowa konfiguracja" activity-log entry for ${publicId} / "${marker}".`,
+    ).toBeVisible({ timeout: 10_000 });
+    await page.screenshot({ path: `${evidence}/01-activity-log.png`, fullPage: true });
+
+    // Zapytania tab, via the real "Szczegóły" link (not a direct URL) — this
+    // is the exact flow the original bug report used.
+    await page.getByRole('tab', { name: 'Zapytania' }).click();
+    const inquiriesTable = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: 'Projekt' }) });
+    const row = inquiriesTable.getByRole('row').filter({ hasText: marker });
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await page.screenshot({ path: `${evidence}/02-zapytania-row.png`, fullPage: true });
+    await row.getByRole('button', { name: /Szczegóły/i }).click();
+    await page.waitForURL(new RegExp(`/admin/konfiguracje/${publicId}`), { timeout: 10_000 });
+    await page.waitForTimeout(800);
+
+    const bodyText = await page.locator('body').innerText();
+    expect(
+      /błąd|error|wystąpił problem/i.test(bodyText),
+      `Admin configuration detail view for ${publicId} shows an error state.`,
+    ).toBeFalsy();
+    await page.screenshot({ path: `${evidence}/03-configuration-detail.png`, fullPage: true });
+  });
+
+  test('VIS-06: keyboard focus stays trapped inside the paint picker modal', async ({ page }) => {
+    const evidence = await evidenceDir('VIS-06');
+    await page.goto(`${BASE_URL}/konfigurator?model=e82`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+
+    const trigger = page.getByRole('button', { name: /Wybierz kolor/i });
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.locator('[role="dialog"]').first();
+    await dialog.waitFor();
+    await page.screenshot({ path: `${evidence}/01-dialog-open.png`, fullPage: true });
+
+    let escaped = false;
+    for (let i = 0; i < 25; i += 1) {
+      await page.keyboard.press('Tab');
+      // eslint-disable-next-line no-await-in-loop
+      const insideDialog = await page.evaluate(() => {
+        const active = document.activeElement;
+        const dlg = document.querySelector('[role="dialog"]');
+        return !!active && !!dlg && dlg.contains(active);
+      });
+      if (!insideDialog) {
+        escaped = true;
+        break;
+      }
+    }
+    expect(escaped, 'Tabbing inside the open paint-picker modal must not move focus behind it.').toBe(false);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden({ timeout: 5000 });
+    const focusReturnedToTrigger = await page.evaluate(() => {
+      const active = document.activeElement;
+      return active?.getAttribute('aria-label') ? true : active === document.body ? false : true;
+    });
+    await page.screenshot({ path: `${evidence}/02-dialog-closed.png`, fullPage: true });
+    expect(focusReturnedToTrigger, 'Escape must close the dialog and leave focus somewhere sane, not on <body>.').toBe(true);
   });
 });

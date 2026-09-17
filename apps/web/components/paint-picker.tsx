@@ -88,11 +88,11 @@ export function PaintSection({
   }
 
   return <>
-    {choices.length > 0 && <RadioGroup value={selectedSku ?? ''} onValueChange={onChooseSku} className="gap-2">
+    {choices.length > 0 && <RadioGroup value={selectedSku ?? ''} onValueChange={onChooseSku} className="gap-2" data-testid="paint-process-selector">
       {choices.map((choice) => {
         const active = selectedSku === choice.sku;
         const delta = choice.price === null ? null : choice.price - defaultPrice;
-        return <label key={choice.sku} className={`option-choice focus-ring ${active ? 'option-choice-active' : ''}`}>
+        return <label key={choice.sku} className={`option-choice focus-ring ${active ? 'option-choice-active' : ''}`} data-testid={`paint-process-option-${choice.sku}`}>
           <RadioGroupItem value={choice.sku} className="choice-input" />
           <span className={`choice-indicator ${active ? 'choice-indicator-active' : ''}`}>{active && <Check className="size-3.5" />}</span>
           <span className="min-w-0 flex-1">
@@ -109,8 +109,8 @@ export function PaintSection({
     {noPalettes ? <p className="mt-3 rounded-2xl border border-line bg-ink-wash/40 p-3.5 text-sm text-ink-muted">
       Dla tego modelu nie włączono jeszcze żadnej palety kolorów. Kolor ustalimy indywidualnie - napisz w uwagach, na czym Ci zależy.
     </p> : <div className="mt-3 rounded-2xl border border-line p-3.5">
-      {chosen ? <div className="flex items-center gap-3.5">
-        <ColorPreview color={chosen.color} className="size-14 shrink-0 rounded-xl" />
+      {chosen ? <div className="flex items-center gap-3.5" data-testid="paint-color-preview">
+        <ColorPreview color={chosen.color} className="size-14 shrink-0 rounded-xl" data-testid={`paint-color-swatch-${chosen.color.slug}`} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{chosen.color.name}</p>
           <p className="mt-0.5 truncate text-sm text-ink-muted">
@@ -120,9 +120,9 @@ export function PaintSection({
         </div>
         <div className="shrink-0 text-right">
           <p className="text-sm font-semibold tabular-nums">{paletteNote(chosen.palette, requirementFor(chosen.palette), formatPrice, includedLabel, chosen.color.priceGross)}</p>
-          <button type="button" onClick={openPicker} className="focus-ring mt-1 rounded text-sm font-medium text-ink underline underline-offset-4">Zmień</button>
+          <button type="button" onClick={openPicker} className="focus-ring mt-1 rounded text-sm font-medium text-ink underline underline-offset-4" data-testid="paint-color-change-button">Zmień</button>
         </div>
-      </div> : <button type="button" onClick={openPicker} className="focus-ring flex w-full items-center gap-3.5 rounded-xl text-left">
+      </div> : <button type="button" onClick={openPicker} className="focus-ring flex w-full items-center gap-3.5 rounded-xl text-left" data-testid="paint-color-select-button">
         <span className="grid size-14 shrink-0 place-items-center rounded-xl border border-dashed border-line-strong text-ink-subtle"><Palette className="size-6" /></span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Wybierz kolor</span>
@@ -334,7 +334,7 @@ export function PaintDialog({
         <DialogClose render={<Button variant="ghost" size="icon" aria-label="Zamknij" />}><X className="size-5" /></DialogClose>
       </div>
 
-      <div className="flex flex-col gap-3 border-b border-line px-4 py-3 sm:px-6">
+      <div className="flex flex-col gap-3 border-b border-line px-4 py-3 sm:px-6" data-testid="paint-filters">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-subtle" />
           <Input
@@ -343,22 +343,23 @@ export function PaintDialog({
             placeholder="Szukaj: nazwa, kod albo #hex"
             className="h-11 bg-ink-wash/50 pl-9"
             aria-label="Szukaj lakieru"
+            data-testid="paint-search-input"
           />
         </div>
-        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
-          <FilterChip active={paletteFilter === null} onClick={() => setPaletteFilter(null)}>Wszystkie</FilterChip>
-          {palettes.map((palette) => <FilterChip key={palette.slug} active={paletteFilter === palette.slug} onClick={() => setPaletteFilter(palette.slug)}>
+        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1" data-testid="paint-palette-filters">
+          <FilterChip active={paletteFilter === null} onClick={() => setPaletteFilter(null)} data-testid="filter-chip-all">Wszystkie</FilterChip>
+          {palettes.map((palette) => <FilterChip key={palette.slug} active={paletteFilter === palette.slug} onClick={() => setPaletteFilter(palette.slug)} data-testid={`filter-chip-${palette.slug}`}>
             {palette.name}
             {selecting && formatPrice
               ? <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{paletteNote(palette, requirementFor(palette), formatPrice, includedLabel)}</span>
               : <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{palette.colors.length}</span>}
           </FilterChip>)}
-          {renderCount > 0 && <FilterChip active={onlyWithRender} onClick={() => { setOnlyWithRender(!onlyWithRender); setOnlyWithPhoto(false); }}>
+          {renderCount > 0 && <FilterChip active={onlyWithRender} onClick={() => { setOnlyWithRender(!onlyWithRender); setOnlyWithPhoto(false); }} data-testid="filter-chip-render">
             <Camera className="mr-1.5 inline size-3.5 align-[-2px]" />
             Z wizualizacją
             <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{renderCount}</span>
           </FilterChip>}
-          {photoCount > 0 && <FilterChip active={onlyWithPhoto} onClick={() => { setOnlyWithPhoto(!onlyWithPhoto); setOnlyWithRender(false); }}>
+          {photoCount > 0 && <FilterChip active={onlyWithPhoto} onClick={() => { setOnlyWithPhoto(!onlyWithPhoto); setOnlyWithRender(false); }} data-testid="filter-chip-photo">
             <ImageIcon className="mr-1.5 inline size-3.5 align-[-2px]" />
             Ze zdjęciem
             <span className="ml-1.5 text-[0.7rem] font-normal opacity-70">{photoCount}</span>
@@ -379,7 +380,7 @@ export function PaintDialog({
           {paintState === 'ready' && results.length === 0 && <p className="py-10 text-center text-sm text-ink-muted">{query.trim() === '' ? 'Brak lakierów spełniających wybrane filtry.' : `Nic nie pasuje do „${query}”.`}</p>}
           {sections.map(([label, rows]) => <section key={label} className="mb-5">
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink-subtle">{label}</h4>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-2">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-2" data-testid={`paint-colors-group-${label}`}>
               {rows.map(({ palette, color }) => {
                 const active = preview?.paletteSlug === palette.slug && preview?.colorSlug === color.slug;
                 return <button
@@ -391,6 +392,7 @@ export function PaintDialog({
                   onClick={() => setPreview({ paletteSlug: palette.slug, colorSlug: color.slug })}
                   className={`focus-ring relative aspect-square rounded-xl border transition-all ${active ? 'border-ink ring-2 ring-ink ring-offset-2' : 'border-line hover:border-line-strong'}`}
                   style={{ backgroundColor: color.hex }}
+                  data-testid={`paint-color-${palette.slug}-${color.slug}`}
                 >
                   {/* Kropka = ten lakier ma policzony render ramy. Ta sama
                       konwencja co w projekcie e55, tam się sprawdziła.
@@ -412,6 +414,7 @@ export function PaintDialog({
                 onClick={() => setZoomed(true)}
                 className="focus-ring block w-full rounded-2xl"
                 title={previewImage?.variant === 'photo' ? 'Pokaż zdjęcie w powiększeniu' : 'Pokaż wizualizację w powiększeniu'}
+                data-testid="paint-preview-zoom-button"
               >
                 <span className="relative block">
                   <ColorPreview color={previewed.color} full image={previewImage} className="aspect-[4/3] w-full rounded-2xl" />
@@ -428,7 +431,7 @@ export function PaintDialog({
               </button>
               {/* Pasek miniatur tylko wtedy, gdy jest w czym przebierać:
                   przy jednym obrazie byłby drugą kopią tego samego kadru. */}
-              {previewImages.length > 1 && <div className="no-scrollbar mt-2 flex gap-2 overflow-x-auto">
+              {previewImages.length > 1 && <div className="no-scrollbar mt-2 flex gap-2 overflow-x-auto" data-testid="paint-image-thumbnails">
                 {previewImages.map((image, index) => <button
                   key={`${image.variant}-${image.image}`}
                   type="button"
@@ -437,6 +440,7 @@ export function PaintDialog({
                   aria-label={image.variant === 'photo' ? `Zdjęcie ${index + 1}` : 'Wizualizacja'}
                   title={image.variant === 'photo' ? `Zdjęcie ${index + 1}` : 'Wizualizacja'}
                   className={`focus-ring size-12 shrink-0 overflow-hidden rounded-lg border transition-colors ${image === previewImage ? 'border-ink ring-1 ring-ink' : 'border-line hover:border-line-strong'}`}
+                  data-testid={`paint-image-${image.variant}-${index}`}
                 >
                   <img src={paintImageUrl(image.thumb ?? image.image)} alt="" loading="lazy" className="size-full bg-white object-cover" />
                 </button>)}
@@ -472,6 +476,7 @@ export function PaintDialog({
                 variant="brand"
                 className="mt-4 hidden h-11 w-full rounded-full font-semibold sm:flex"
                 onClick={() => onConfirm({ paletteSlug: previewed.palette.slug, colorSlug: previewed.color.slug }, previewed.color)}
+                data-testid="paint-dialog-confirm-button-desktop"
               >
                 Wybierz ten kolor
               </Button>}
@@ -486,6 +491,7 @@ export function PaintDialog({
           variant="brand"
           className="h-12 w-full rounded-full font-semibold"
           onClick={() => onConfirm({ paletteSlug: previewed.palette.slug, colorSlug: previewed.color.slug }, previewed.color)}
+          data-testid="paint-dialog-confirm-button-mobile"
         >
           Wybierz {previewed.color.name}
         </Button>
@@ -494,7 +500,7 @@ export function PaintDialog({
       {/* Warstwa nad modalem wyboru. Radix domyka najpierw ją, więc Escape
           zamyka powiększenie, a nie cały picker. */}
       <Dialog open={zoomed && previewHasRender} onOpenChange={setZoomed}>
-        <DialogContent className="w-[min(96vw,1200px)] max-w-none bg-[#101210] p-3 sm:p-4">
+        <DialogContent className="w-[min(96vw,1200px)] max-w-none bg-[#101210] p-3 sm:p-4" data-testid="paint-zoom-dialog">
           <DialogTitle className="sr-only">
             {previewed
               ? `${previewed.color.name} - ${previewImage?.variant === 'photo' ? 'zdjęcie' : 'wizualizacja'}`
@@ -504,10 +510,11 @@ export function PaintDialog({
             src={paintImageUrl(previewImage.image ?? previewImage.thumb)}
             alt=""
             className="max-h-[78vh] w-full rounded-xl bg-white object-contain"
+            data-testid="paint-zoom-image"
           />}
           {/* Powiększenie ma własny pasek miniatur: kto tu doszedł, ten ogląda
               ujęcia, a zamykanie warstwy po każdym z nich byłoby karą. */}
-          {previewImages.length > 1 && <div className="mt-2 flex flex-wrap justify-center gap-2">
+          {previewImages.length > 1 && <div className="mt-2 flex flex-wrap justify-center gap-2" data-testid="paint-zoom-thumbnails">
             {previewImages.map((image, index) => <button
               key={`zoom-${image.variant}-${image.image}`}
               type="button"
@@ -515,6 +522,7 @@ export function PaintDialog({
               aria-pressed={image === previewImage}
               aria-label={image.variant === 'photo' ? `Zdjęcie ${index + 1}` : 'Wizualizacja'}
               className={`focus-ring size-12 overflow-hidden rounded-lg border transition-colors ${image === previewImage ? 'border-white' : 'border-white/25 hover:border-white/60'}`}
+              data-testid={`paint-zoom-thumbnail-${image.variant}-${index}`}
             >
               <img src={paintImageUrl(image.thumb ?? image.image)} alt="" loading="lazy" className="size-full bg-white object-cover" />
             </button>)}
@@ -531,12 +539,13 @@ export function PaintDialog({
   </Dialog>;
 }
 
-function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function FilterChip({ active, onClick, children, ...props }: { active: boolean; onClick: () => void; children: React.ReactNode; [key: string]: unknown }) {
   return <button
     type="button"
     onClick={onClick}
     aria-pressed={active}
     className={`focus-ring shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${active ? 'border-ink bg-ink text-white' : 'border-line bg-surface text-ink hover:border-line-strong'}`}
+    {...props}
   >
     {children}
   </button>;
