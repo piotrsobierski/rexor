@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ArrowRight, BatteryCharging, Gauge, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,11 +53,48 @@ export function BikesPage({ catalog, copy: initialCopy }: { catalog?: PublicCata
   // Ceny i zdjęcia pochodzą z katalogu API, bo cena "od" jest wyliczana z
   // cennika części, a nie wpisana w kodzie. Katalog przychodzi z serwera,
   // żeby pierwszy render nie pokazywał danych zapasowych.
-  const { models, loaded } = usePublicCatalog(catalog);
+  const { models, categories, loaded } = usePublicCatalog(catalog);
   const copy = usePublicCopy(initialCopy);
-  return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.bikes.eyebrow}</p><h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.bikes.title}</h1>{loaded
-    ? <div className="mt-10 grid gap-5 lg:grid-cols-3">{models.map((model) => <BikePickCard key={model.id} model={model} copy={copy} />)}</div>
-    : <CardGridSkeleton />}</section></PageFrame>;
+  const [activeCategorySlug, setActiveCategorySlug] = useState<string | null>(null);
+  const filters = useMemo(
+    () => categories.filter((category) => models.some((model) => model.categorySlug === category.slug)),
+    [categories, models],
+  );
+  // Jeśli z panelu zniknie ostatni model kategorii, nie zostawiamy klienta
+  // na pustej liście bez możliwości powrotu do wszystkich rowerów.
+  const effectiveCategorySlug = activeCategorySlug && filters.some((category) => category.slug === activeCategorySlug)
+    ? activeCategorySlug
+    : null;
+  const visibleModels = effectiveCategorySlug
+    ? models.filter((model) => model.categorySlug === effectiveCategorySlug)
+    : models;
+
+  return (
+    <PageFrame>
+      <section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
+        <p className="eyebrow">{copy.bikes.eyebrow}</p>
+        <h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.bikes.title}</h1>
+        {loaded ? (
+          <>
+            <fieldset className="-mx-4 mt-8 flex min-w-0 gap-2 overflow-x-auto border-0 px-4 pb-2 sm:mx-0 sm:flex-wrap sm:px-0">
+              <legend className="sr-only">{copy.collection.filtersAria}</legend>
+              <BikeFilterButton label={copy.collection.allFilter} active={effectiveCategorySlug === null} onClick={() => setActiveCategorySlug(null)} />
+              {filters.map((category) => (
+                <BikeFilterButton key={category.slug} label={category.name} active={effectiveCategorySlug === category.slug} onClick={() => setActiveCategorySlug(category.slug)} />
+              ))}
+            </fieldset>
+            <div className="mt-6 grid gap-5 lg:grid-cols-3">
+              {visibleModels.map((model) => <BikePickCard key={model.id} model={model} copy={copy} />)}
+            </div>
+          </>
+        ) : <CardGridSkeleton />}
+      </section>
+    </PageFrame>
+  );
+}
+
+function BikeFilterButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return <Button type="button" onClick={onClick} aria-pressed={active} variant={active ? 'default' : 'outline'} size="sm" className={`shrink-0 rounded-full px-4 ${active ? 'bg-ink text-white hover:bg-black' : 'border-line text-ink-muted hover:text-ink'}`}>{label}</Button>;
 }
 
 /** Kategorie, które przekraczają moc/prędkość roweru elektrycznego - klient musi potwierdzić ostrzeżenie raz na przeglądarkę zanim zobaczy ofertę. */
