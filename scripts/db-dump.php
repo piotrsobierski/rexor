@@ -59,14 +59,17 @@ function dumpDatabase(PDO $pdo, string $outputPath): array
             $write("DROP TABLE IF EXISTS {$quotedTable};\n");
             $write($createSql . ";\n\n");
 
-            // Kursor bez buforowania - wiersze schodzą po jednym, więc duża
-            // tabela nie trafia w całości do pamięci PHP.
-            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
-            $statement = $pdo->query("SELECT * FROM {$quotedTable}");
+            // Zwykły buforowany fetchAll(): ten katalog (rowery, części,
+            // dziennik aktywności) liczy tysiące wierszy, nie miliony, więc
+            // pamięć nie jest problemem - a jeden round-trip na tabelę jest
+            // dużo szybszy niż kursor bez buforowania, który na tym hostingu
+            // płacił pełny round-trip PHP<->MySQL za KAŻDY pojedynczy wiersz
+            // (mała baza i tak trafiała w limit czasu serwera WWW).
+            $rows = $pdo->query("SELECT * FROM {$quotedTable}")->fetchAll(PDO::FETCH_ASSOC);
             $batch = [];
             $batchSize = 200;
 
-            while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            foreach ($rows as $row) {
                 $rowCount++;
                 $values = array_map(static function ($value) use ($pdo): string {
                     if ($value === null) {
@@ -85,8 +88,6 @@ function dumpDatabase(PDO $pdo, string $outputPath): array
                 $write("INSERT INTO {$quotedTable} VALUES\n" . implode(",\n", $batch) . ";\n");
             }
             $write("\n");
-            $statement->closeCursor();
-            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
         }
 
         $write("SET FOREIGN_KEY_CHECKS=1;\n");
