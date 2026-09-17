@@ -88,6 +88,12 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [pickerCategory, setPickerCategory] = useState('all');
+  const pickerCategories = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const item of models) if (!seen.has(item.categorySlug)) seen.set(item.categorySlug, item.category);
+    return [{ slug: 'all', label: 'Wszystkie' }, ...Array.from(seen, ([slug, label]) => ({ slug, label }))];
+  }, [models]);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'error'>('idle');
   const [submitError, setSubmitError] = useState('');
@@ -402,26 +408,33 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
         </div>
       </section>
 
-      <Dialog open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:max-w-2xl sm:p-8">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-semibold tracking-tight text-ink">{copy.configurator.changeModelCta}</DialogTitle>
+      <Dialog open={modelPickerOpen} onOpenChange={(open) => { setModelPickerOpen(open); if (open) setPickerCategory('all'); }}>
+        <DialogContent className="flex max-h-[85vh] w-full flex-col gap-0 overflow-hidden rounded-3xl bg-white p-0 shadow-2xl sm:max-w-2xl">
+          <DialogHeader className="shrink-0 gap-3 border-b border-line px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
+            <DialogTitle className="pr-8 text-xl font-semibold tracking-tight text-ink sm:text-2xl">{copy.configurator.changeModelCta}</DialogTitle>
+            {pickerCategories.length > 1 && (
+              <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
+                {pickerCategories.map((cat) => <button key={cat.slug} type="button" onClick={() => setPickerCategory(cat.slug)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${pickerCategory === cat.slug ? 'bg-ink text-white' : 'bg-ink-wash text-ink-muted hover:bg-line-strong/40'}`}>{cat.label}</button>)}
+              </div>
+            )}
           </DialogHeader>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => { selectModel(item.id); setModelPickerOpen(false); }} className={`pick-card focus-ring overflow-hidden p-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}>
-              <span className="block aspect-[4/3] w-full overflow-hidden bg-ink-wash">
-                {item.image && <OptimizedImage src={item.image} alt={item.name} className="size-full object-contain mix-blend-multiply" />}
-              </span>
-              <span className="block p-4">
-                <span className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span>
-                  <span className={`grid size-6 shrink-0 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span>
+          <div className="overflow-y-auto p-5 sm:p-8">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {models.filter((item) => pickerCategory === 'all' || item.categorySlug === pickerCategory).map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => { selectModel(item.id); setModelPickerOpen(false); }} className={`pick-card focus-ring overflow-hidden p-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}>
+                <span className="block aspect-[4/3] w-full overflow-hidden bg-ink-wash">
+                  {item.image && <OptimizedImage src={item.image} alt={item.name} className="size-full object-contain mix-blend-multiply" />}
                 </span>
-                <span className="mt-1 block text-xl font-semibold tracking-tight">{item.name}</span>
-                {item.eyebrow && <span className="mt-1 block text-sm text-ink-muted">{item.eyebrow}</span>}
-                <span className="mt-2 block text-sm font-medium text-ink">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span>
-              </span>
-            </button>; })}
+                <span className="block p-4">
+                  <span className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span>
+                    <span className={`grid size-6 shrink-0 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span>
+                  </span>
+                  <span className="mt-1 block text-xl font-semibold tracking-tight">{item.name}</span>
+                  {item.eyebrow && <span className="mt-1 block text-sm text-ink-muted">{item.eyebrow}</span>}
+                  <span className="mt-2 block text-sm font-medium text-ink">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span>
+                </span>
+              </button>; })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
