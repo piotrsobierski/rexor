@@ -433,7 +433,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
         >
           <TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1" data-testid="admin-tabs">
             <TabsTrigger value="models" className="rounded-full px-4 py-2" data-testid="tab-models">
-              Modele i zdjęcia
+              Modele
             </TabsTrigger>
             <TabsTrigger value="frames" className="rounded-full px-4 py-2" data-testid="tab-frames">
               Ramy
@@ -486,6 +486,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
             <ModelsEditor
               rows={catalog.models}
               media={catalog.modelMedia}
+              sizes={catalog.modelSizes}
               categories={catalog.categories}
               specifications={catalog.modelSpecifications}
               patch={patch}
@@ -2133,6 +2134,7 @@ function WysiwygEditor({
 function ModelsEditor({
   rows,
   media,
+  sizes,
   categories,
   specifications,
   patch,
@@ -2142,6 +2144,7 @@ function ModelsEditor({
 }: {
   rows: Row[];
   media: MediaRow[];
+  sizes: Row[];
   categories: Row[];
   specifications: Record<number, { facts?: string[]; [key: string]: unknown }>;
   patch: (
@@ -2661,6 +2664,15 @@ function ModelsEditor({
                     />
                   </div>
                 </details>
+                <ModelSizesPanel
+                  modelId={row.id}
+                  disabled={!isSavedRecordId(row.id)}
+                  sizes={sizes.filter((size) => Number(size.model_id) === Number(row.id))}
+                  patch={patch}
+                  request={request}
+                  reload={reload}
+                  setMessage={setMessage}
+                />
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
@@ -6227,43 +6239,6 @@ function ModelEquipmentEditor({
       .map((row) => [Number(row.group_id), row]),
   );
 
-  const [newSize, setNewSize] = useState({
-    code: '',
-    label: '',
-    price_delta_gross: '0',
-  });
-
-  async function addSize() {
-    if (!newSize.code.trim() || !newSize.label.trim()) {
-      setMessage('Podaj kod i nazwę rozmiaru.');
-      return;
-    }
-    setMessage('Dodaję rozmiar…');
-    try {
-      await request('/admin/sizes', {
-        method: 'POST',
-        body: JSON.stringify({
-          model_id: modelId,
-          code: newSize.code.trim(),
-          label: newSize.label.trim(),
-          price_delta_gross: Number(newSize.price_delta_gross || 0),
-          sort_order:
-            catalog.modelSizes.filter((row) => Number(row.model_id) === modelId)
-              .length * 10 + 10,
-        }),
-      });
-      setNewSize({ code: '', label: '', price_delta_gross: '0' });
-      await reload();
-      setMessage('Rozmiar dodany.');
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : 'Nie udało się dodać rozmiaru.',
-      );
-    }
-  }
-
   async function saveModelPart(body: Record<string, unknown>) {
     setMessage('Zapisuję osprzęt…');
     try {
@@ -6492,7 +6467,7 @@ function ModelEquipmentEditor({
             <div className="flex flex-col justify-between rounded-2xl border border-line/70 bg-[#fafbfa] p-4 text-sm">
               <div className="flex items-center justify-between text-ink-muted">
                 <span>Rama</span>
-                <InfoTooltip text="Cena surowej ramy zdefiniowana dla tego modelu w zakładce 'Modele i zdjęcia'." />
+                <InfoTooltip text="Cena surowej ramy zdefiniowana dla tego modelu w zakładce 'Modele'." />
               </div>
               <div className="mt-2 text-lg font-semibold tabular-nums text-ink">
                 {pricing.framePriceGross.toFixed(2)} zł
@@ -6522,7 +6497,7 @@ function ModelEquipmentEditor({
             <div className="flex flex-col justify-between rounded-2xl border border-line/70 bg-[#fafbfa] p-4 text-sm">
               <div className="flex items-center justify-between text-ink-muted">
                 <span>Składanie</span>
-                <InfoTooltip text="Koszt montażu roweru zdefiniowany dla tego modelu w zakładce 'Modele i zdjęcia'." />
+                <InfoTooltip text="Koszt montażu roweru zdefiniowany dla tego modelu w zakładce 'Modele'." />
               </div>
               <div className="mt-2 text-lg font-semibold tabular-nums text-ink">
                 {pricing.assemblyPriceGross.toFixed(2)} zł
@@ -6848,82 +6823,15 @@ function ModelEquipmentEditor({
         );
       })}
 
-      {/* 4. SIZES & DISCOUNTS */}
-      <Panel
-        title="Rozmiary i dopłaty"
-        description="Rozmiar może mieć własną dopłatę, jeśli rama w danym rozmiarze kosztuje więcej."
-      >
-        <div className="mb-5 rounded-2xl border border-line bg-white p-4 sm:p-5">
-          <h3 className="text-sm font-semibold tracking-tight text-ink">
-            Dodaj rozmiar
-          </h3>
-          <p className="mt-1 text-xs text-ink-subtle">
-            Geometrię uzupełnia się w danych modelu - nowy rozmiar pojawi się
-            w konfiguratorze od razu, a w tabeli geometrii dopiero z wymiarami.
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[110px_1fr_160px_auto]">
-            <Input
-              placeholder="Kod (M)"
-              value={newSize.code}
-              onChange={(event) =>
-                setNewSize({ ...newSize, code: event.target.value })
-              }
-              className="h-9 text-sm"
-            />
-            <Input
-              placeholder="Nazwa dla klienta (M / 17 cali)"
-              value={newSize.label}
-              onChange={(event) =>
-                setNewSize({ ...newSize, label: event.target.value })
-              }
-              className="h-9 text-sm"
-            />
-            <Input
-              type="number"
-              step="0.01"
-              placeholder="Dopłata brutto"
-              value={newSize.price_delta_gross}
-              onChange={(event) =>
-                setNewSize({
-                  ...newSize,
-                  price_delta_gross: event.target.value,
-                })
-              }
-              className="h-9 text-sm"
-            />
-            <Button size="sm" onClick={() => void addSize()}>
-              <Save /> Dodaj
-            </Button>
-          </div>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Rozmiar</TableHead>
-              <TableHead className="w-40">Dopłata brutto (zł)</TableHead>
-              <TableHead className="w-40">Akcja</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {catalog.modelSizes
-              .filter((row) => Number(row.model_id) === modelId)
-              .map((row) => (
-                <SizeRow
-                  key={row.id}
-                  row={row}
-                  patch={patch}
-                  request={request}
-                  reload={reload}
-                  setMessage={setMessage}
-                />
-              ))}
-          </TableBody>
-        </Table>
-      </Panel>
     </div>
   );
 }
 
+/**
+ * Rozmiary modelu żyją w zakładce "Modele" (per model, obok galerii i opisu),
+ * nie tutaj - "Osprzęt i cena modelu" to osprzęt i grupy części, a rozmiar to
+ * własność samego modelu, tak samo jak w Ramach (patrz ModelSizesPanel).
+ */
 function SizeRow({
   row,
   patch,
@@ -6996,5 +6904,125 @@ function SizeRow({
         </div>
       </TableCell>
     </TableRow>
+  );
+}
+
+/**
+ * Rozmiary modelu, obok galerii i opisu w zakładce "Modele" - obowiązkowe
+ * przed publikacją (patrz guard w updateAdminRecord() w AdminService.php).
+ * Rozmiar może mieć dopłatę: rama w innym rozmiarze bywa droższa, czego
+ * ramy sprzedawane osobno (zakładka "Ramy") nie potrzebują.
+ */
+function ModelSizesPanel({
+  modelId,
+  disabled,
+  sizes,
+  patch,
+  request,
+  reload,
+  setMessage,
+}: {
+  modelId: unknown;
+  disabled: boolean;
+  sizes: Row[];
+  patch: (
+    resource: string,
+    id: number,
+    fields: Record<string, unknown>,
+  ) => Promise<void>;
+  request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
+}) {
+  const [newSize, setNewSize] = useState({ code: '', label: '', price_delta_gross: '0' });
+
+  async function addSize() {
+    if (!newSize.code.trim() || !newSize.label.trim()) {
+      setMessage('Podaj kod i nazwę rozmiaru.');
+      return;
+    }
+    setMessage('Dodaję rozmiar…');
+    try {
+      await request('/admin/sizes', {
+        method: 'POST',
+        body: JSON.stringify({
+          model_id: modelId,
+          code: newSize.code.trim(),
+          label: newSize.label.trim(),
+          price_delta_gross: Number(newSize.price_delta_gross || 0),
+          sort_order: sizes.length * 10 + 10,
+        }),
+      });
+      setNewSize({ code: '', label: '', price_delta_gross: '0' });
+      await reload();
+      setMessage('Rozmiar dodany.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Nie udało się dodać rozmiaru.',
+      );
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-line bg-white p-4 sm:p-5">
+      <h3 className="text-sm font-semibold tracking-tight text-ink">Rozmiary i dopłaty</h3>
+      <p className="mt-1 text-xs text-ink-subtle">
+        Model musi mieć co najmniej jeden aktywny rozmiar, zanim będzie można go opublikować. Dopłata dolicza się do ceny „od”, gdy rama w danym rozmiarze kosztuje więcej.
+      </p>
+      {sizes.length > 0 && (
+        <Table className="mt-3">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Rozmiar</TableHead>
+              <TableHead className="w-40">Dopłata brutto (zł)</TableHead>
+              <TableHead className="w-40">Akcja</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sizes.map((row) => (
+              <SizeRow
+                key={row.id}
+                row={row}
+                patch={patch}
+                request={request}
+                reload={reload}
+                setMessage={setMessage}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
+      <div className="mt-3 grid gap-2 sm:grid-cols-[110px_1fr_160px_auto]">
+        <Input
+          placeholder="Kod (M)"
+          value={newSize.code}
+          disabled={disabled}
+          onChange={(event) => setNewSize({ ...newSize, code: event.target.value })}
+          className="h-9 text-sm"
+        />
+        <Input
+          placeholder="Nazwa dla klienta (M / 17 cali)"
+          value={newSize.label}
+          disabled={disabled}
+          onChange={(event) => setNewSize({ ...newSize, label: event.target.value })}
+          className="h-9 text-sm"
+        />
+        <Input
+          type="number"
+          step="0.01"
+          placeholder="Dopłata brutto"
+          value={newSize.price_delta_gross}
+          disabled={disabled}
+          onChange={(event) => setNewSize({ ...newSize, price_delta_gross: event.target.value })}
+          className="h-9 text-sm"
+        />
+        <Button size="sm" disabled={disabled} onClick={() => void addSize()}>
+          <Save /> Dodaj
+        </Button>
+      </div>
+      {disabled && (
+        <p className="mt-2 text-xs text-ink-subtle">Najpierw zapisz model, aby móc dodać rozmiar.</p>
+      )}
+    </div>
   );
 }
