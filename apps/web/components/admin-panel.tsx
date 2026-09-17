@@ -1686,6 +1686,12 @@ function WysiwygEditor({
     onChange?.(localRef.current?.innerHTML ?? '');
   }
 
+  // Kliknięcie paska narzędzi przenosiło fokus z edytora na przycisk, więc
+  // Chromium gubił zaznaczenie i formatował pusty fragment.
+  function keepEditorSelection(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+  }
+
   async function handleImage(file?: File) {
     if (!file || !onUploadImage) return;
     const url = await onUploadImage(file);
@@ -1778,6 +1784,7 @@ function WysiwygEditor({
           variant="ghost"
           type="button"
           onClick={() => format('bold')}
+          onMouseDown={keepEditorSelection}
           aria-label="Pogrubienie"
           title="Pogrubienie"
         >
@@ -1788,6 +1795,7 @@ function WysiwygEditor({
           variant="ghost"
           type="button"
           onClick={() => format('italic')}
+          onMouseDown={keepEditorSelection}
           aria-label="Kursywa"
           title="Kursywa"
         >
@@ -1799,6 +1807,7 @@ function WysiwygEditor({
           type="button"
           className="h-8 px-2 text-xs font-semibold"
           onClick={() => format('formatBlock', '<h3>')}
+          onMouseDown={keepEditorSelection}
           title="Nagłówek H3"
         >
           H3
@@ -1809,6 +1818,7 @@ function WysiwygEditor({
           type="button"
           className="h-8 px-2 text-xs"
           onClick={() => format('formatBlock', '<p>')}
+          onMouseDown={keepEditorSelection}
           title="Akapit"
         >
           P
@@ -1818,6 +1828,7 @@ function WysiwygEditor({
           variant="ghost"
           type="button"
           onClick={() => format('insertUnorderedList')}
+          onMouseDown={keepEditorSelection}
           aria-label="Lista punktowana"
           title="Lista"
         >
@@ -5668,8 +5679,6 @@ function InquiriesTable({ rows }: { rows: Row[] }) {
                   render={
                     <a
                       href={`/admin/konfiguracje/${row.public_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
                     />
                   }
                 >
