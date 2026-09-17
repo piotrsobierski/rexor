@@ -7,17 +7,17 @@ uznawać za automatycznie zweryfikowany.
 | Scenariusz | Wynik ręczny | Skrypt | Stan automatyzacji |
 | --- | --- | --- | --- |
 | API-01/02 | PASS | `run-api-smoke.cjs` | POTWIERDZONE (200/200/401/422) |
-| PUB-01/02 | PASS | `run-public-navigation.cjs` | POTWIERDZONE częściowo: menu; filtr wymaga dopisania asercji modeli |
+| PUB-01/02 | PASS | `run-public-navigation.cjs`, `qa/playwright/test-visual.spec.ts` (`VIS-11`) | POTWIERDZONE (menu + filtr obie części, `VIS-11` sprawdza dokładny zestaw modeli per kategoria) |
 | PUB-03 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-01`) | POTWIERDZONE |
 | PUB-04 | PASS | `run-public-pages.cjs` | DO PONOWNEGO URUCHOMIENIA |
 | PUB-05/06 | PASS | — | DO DOROBIENIA |
 | CFG-01–03 | PASS/PARTIAL | — | DO DOROBIENIA |
 | CFG-04 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-04`) | POTWIERDZONE (na E55; E82 bez danych renderów) |
-| CFG-05 | PASS lokalnie | — | DO DOROBIENIA po wdrożeniu |
+| CFG-05 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-12`) | POTWIERDZONE na środowisku testowym (mobile zwinięty / desktop rozwinięty) |
 | CFG-06 | PASS (zapis + dziennik + e-mail) | `run-configuration-save.cjs`, `qa/playwright/test-visual.spec.ts` (`VIS-05`, `VIS-07`) | Wszystko POTWIERDZONE. E-mail pierwotnie nie docierał (`.env` testowy: `MAIL_TRANSPORT=log`) — naprawione wdrożeniem poprawnego `SMTP_HOST` (patrz `VIS-07/WYNIK.md`) |
-| CFG-07 | PARTIAL (modal OK, karuzela/akordeon do zrobienia) | `qa/playwright/test-visual.spec.ts` (`VIS-06`) | POTWIERDZONE częściowo: pułapka fokusu modalu lakieru |
+| CFG-07 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-06`, `VIS-13`) | POTWIERDZONE: modal lakieru (`VIS-06`), karuzela zdjęć i akordeon opisu poza modalem (`VIS-13`) |
 | ADM-01 | PASS | `run-admin-session.cjs` | DO PONOWNEGO URUCHOMIENIA po poprawce |
-| ADM-07 | PASS | — | DO DOROBIENIA |
+| ADM-07 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-08`, `VIS-09`, `VIS-10`) | POTWIERDZONE: formatowanie zaznaczenia (`VIS-08`), pełny zapis widoczny publicznie (`VIS-09`), zmiana rozmiaru zdjęcia respektowana publicznie po naprawie sanitizera (`VIS-10`) |
 | ADM-10 | PASS | `qa/playwright/test-visual.spec.ts` (`VIS-05`) | POTWIERDZONE |
 
 Kolejność pracy: najpierw skrypty oznaczone `DO DOROBIENIA` dla już wykonanych
@@ -46,3 +46,9 @@ jest pomijany) — logika połączenia IMAP jest w reużywalnym helperze
 | VIS-05 | Dopełnienie CFG-06 + ADM-10: pełny zapis → Dziennik aktywności → „Zapytania” → „Szczegóły” | PASS — cały przepływ działa przez prawdziwe UI, bez ponownego logowania i bez błędu | POTWIERDZONE dla zapisu/podglądu; dostarczenie e-maila NIE potwierdzone (IMAPS `mail.sobierski.com:993` → `CONNECT_TIMEOUT`, także poza sandboxem) |
 | VIS-06 | Dopełnienie CFG-07: pułapka fokusu w modalu lakieru | PASS — 25× Tab nie wyprowadza fokusu poza `[role="dialog"]`; Escape oddaje fokus | POTWIERDZONE dla modalu lakieru; karuzela i akordeon opisu poza zakresem tego testu |
 | VIS-07 | Dopełnienie CFG-06: rzeczywiste dostarczenie e-maila zamówienia | Pierwszy przebieg **FAIL** (`.env` testowy: `MAIL_TRANSPORT=log`, `SMTP_HOST` pusty). Naprawione: `.env.remote` → `MAIL_TRANSPORT=smtp`, `SMTP_HOST=de1.sohost.pl` (realny host, nie Cloudflare-proxowany `mail.sobierski.com`), wdrożone tylko dla `.env` przez FTP. Drugi przebieg **PASS** (~8 s); zobacz `qa/evidence/2026-09-17/test/VIS-07/WYNIK.md` | NAPRAWIONE i POTWIERDZONE na teście. Produkcja (`rexorbikes.com`, osobne `.env.production`) miała już poprawny, nieproxowany `SMTP_HOST` — prawdopodobnie nie dotyczył jej ten problem, ale nie zweryfikowano z tej sesji |
+| VIS-08 | Dopełnienie ADM-07: przycisk „Akapit” faktycznie zamienia nagłówek z powrotem na `<p>` | PASS | POTWIERDZONE |
+| VIS-09 | Dopełnienie ADM-07: prawdziwa edycja z klawiatury zapisana w „Strony” trafia na stronę publiczną | PASS | POTWIERDZONE (pełny round-trip zapis → odczyt publiczny) |
+| VIS-10 | Dopełnienie ADM-07: zmiana rozmiaru zdjęcia w edytorze WYSIWYG jest respektowana na stronie publicznej po zapisie | Pierwszy przebieg **FAIL** — sanitizer HTML (`bootstrap.php`) usuwał atrybut `style` z `<img>`, więc rozmiar nigdy nie przetrwał zapisu; dodatkowo `outline-offset` z podświetlenia zaznaczenia w edytorze zostawał w zapisanym stylu. Naprawione: dopuszczono `width`/`height` w stylu `<img>` (parsowanie per-deklaracja, nie dopasowanie całego atrybutu) + poprawiono `emitChange()`, by czyścił też `outlineOffset`. Drugi przebieg **PASS** | NAPRAWIONE i POTWIERDZONE na teście |
+| VIS-11 | Dopełnienie PUB-01/02: dokładny zestaw modeli per kategoria na `/rowery` (nie tylko stan aktywnego filtra) | PASS | POTWIERDZONE |
+| VIS-12 | Dopełnienie CFG-05 na środowisku testowym: opis modelu zwinięty na telefonie / rozwinięty na desktopie | PASS | POTWIERDZONE |
+| VIS-13 | Dopełnienie CFG-07 poza modalem lakieru: fokus klawiatury w karuzeli zdjęć i akordeonie opisu | PASS | POTWIERDZONE |

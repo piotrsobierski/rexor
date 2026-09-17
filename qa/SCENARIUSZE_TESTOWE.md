@@ -16,8 +16,8 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | ID | Stan | Środowisko / dowód | Dlaczego |
 | --- | --- | --- | --- |
 | API-01 | PASS | test — `qa/evidence/2026-09-16/test/API-01/` | Health i katalog publiczny odpowiadają poprawnie. |
-| PUB-01 | PASS | test — `qa/evidence/2026-09-16/test/PUB-01/`, `qa/evidence/2026-09-17/test/PUB-01/` | Menu na desktopie i telefonie nie zawiera „Części”; aktualny test potwierdza też otwieranie oraz przejście z menu mobilnego. |
-| PUB-02 | PASS | test — `qa/evidence/2026-09-16/test/PUB-02/` | Filtry kategorii zawężają listę modeli. |
+| PUB-01 | PASS | test — `qa/evidence/2026-09-16/test/PUB-01/`, `qa/evidence/2026-09-17/test/PUB-01/`, `VIS-11/` | Menu na desktopie i telefonie nie zawiera „Części”; aktualny test potwierdza też otwieranie oraz przejście z menu mobilnego. `VIS-11` dopełnia dokładną asercją modeli na filtrze kategorii. |
+| PUB-02 | PASS | test — `qa/evidence/2026-09-16/test/PUB-02/`, `VIS-11/` | Filtry kategorii zawężają listę modeli; `VIS-11` sprawdza dokładny zestaw modeli per kategoria względem `GET /api/catalog`, nie tylko stan aktywnego filtra. |
 | PUB-03 | PASS | test — `qa/evidence/2026-09-17/test/PUB-03/`, `VIS-01/` | Reorder zdjęć E82 w panelu i zdjęcie główne na `/rowery`/detalu zgodne od razu po zmianie (dopełnione przez `VIS-01`). |
 | PUB-04 | PASS | test — `qa/evidence/2026-09-17/test/PUB-04/` | Wszystkie zbadane strony i dwa detale odpowiadają bez błędów konsoli. |
 | PUB-05 | PASS | test — `qa/evidence/2026-09-17/test/PUB-05/` | Komunikat prawny poprzedza ofertę elektryczną i po potwierdzeniu filtruje modele. |
@@ -26,9 +26,9 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | CFG-02 | PASS | test — `qa/evidence/2026-09-16/test/CFG-02/` | Cztery kontrolne ceny zmieniły się o oczekiwane kwoty. |
 | CFG-03 | PASS | test — `qa/evidence/2026-09-16/test/CFG-03/` | Bateria zmienia wspólnie pojemność, cenę i zasięg. |
 | CFG-04 | PASS | test — `qa/evidence/2026-09-16/test/CFG-04/`, `qa/evidence/2026-09-17/test/VIS-04/` | Picker, wyszukiwanie, dopłata i powiększenie renderu działają (E82 ma 0 kolorów z renderem w danych testowych — powiększenie dopełniono na E55, który ma 229/680). |
-| CFG-05 | PASS (local) | lokalnie — `qa/evidence/2026-09-16/local/CFG-05/` | „Rozwiń/Zwiń” działa; czeka na wdrożenie do testu. |
+| CFG-05 | PASS | test — `qa/evidence/2026-09-16/local/CFG-05/`, `qa/evidence/2026-09-17/test/VIS-12/` | „Rozwiń/Zwiń” działa; `VIS-12` potwierdza na środowisku testowym: domyślnie zwinięte na telefonie (390×844), rozwinięte na desktopie (1440×1000), etykieta i stan `<details>` przełączają się poprawnie w obie strony. |
 | CFG-06 | PASS (po naprawie) | test — `qa/evidence/2026-09-17/test/CFG-06/`, `VIS-05/`, `VIS-07/` | Walidacja i zapis działają (`VIS-05`). `VIS-07` wykrył, że e-mail „Nowe zapytanie ofertowe” nie docierał (`.env` środowiska testowego miał `MAIL_TRANSPORT=log`) — naprawiono wdrożeniem `SMTP_HOST=de1.sohost.pl` (nie Cloudflare-proxowany `mail.sobierski.com`) do `.env.remote`; po naprawie e-mail dociera (~8 s). |
-| CFG-07 | PARTIAL | test — `qa/evidence/2026-09-17/test/CFG-07/`, `VIS-06/` | Enter i Escape działają; `VIS-06` potwierdza, że 25× Tab w otwartym modalu lakieru nie wyprowadza fokusu poza modal. Pozostaje do zrobienia: audyt fokusu karuzeli zdjęć i akordeonu opisu poza modalem. |
+| CFG-07 | PASS | test — `qa/evidence/2026-09-17/test/CFG-07/`, `VIS-06/`, `VIS-13/` | Enter i Escape działają; `VIS-06` potwierdza pułapkę fokusu w modalu lakieru (25× Tab); `VIS-13` dopełnia audytem karuzeli zdjęć (Next + Enter) i akordeonu opisu (Enter/Spacja na `<summary>`) poza modalem — fokus nigdy nie znika ani nie trafia na `<body>`. |
 | API-02 | PASS | test — `qa/evidence/2026-09-17/test/API-02/` | API odrzuca brak/zły token oraz niepełny payload zapisu. |
 | ADM-01 | PASS | test — `qa/evidence/2026-09-17/test/ADM-01/` | Logowanie na podane konto działa; panel modeli i galerie są widoczne bez błędów konsoli. |
 | ADM-07 | PASS | test — `qa/evidence/2026-09-17/test/ADM-07/` | Edytor modelu zachowuje zaznaczenie przy użyciu „Pogrubienia”; zmiana pozostała niezapisana i została odrzucona odświeżeniem. |
@@ -41,6 +41,9 @@ zgadywanie danych ani pomijanie zapisu w raporcie.
 | VIS-05 | PASS | test — `qa/evidence/2026-09-17/test/VIS-05/` (`npm run test:visual`) | Dopełnia CFG-06 (zapis) + ADM-10: pełny zapis konfiguracji, wpis w Dzienniku aktywności, otwarcie przez „Zapytania” → „Szczegóły”. |
 | VIS-06 | PASS | test — `qa/evidence/2026-09-17/test/VIS-06/` (`npm run test:visual`) | Dopełnia CFG-07 (część modalu lakieru): 25× Tab w otwartym modalu nie wyprowadza fokusu poza niego; Escape wraca fokus w sensowne miejsce. |
 | VIS-07 | PASS (po naprawie) | test — `qa/evidence/2026-09-17/test/VIS-07/` (`npm run test:visual -- -g VIS-07`, wymaga `QA_MAILBOX_EMAIL`/`QA_MAILBOX_PASSWORD`) | Dopełnia CFG-06 (e-mail). Pierwszy przebieg: FAIL — `.env` środowiska testowego miał `MAIL_TRANSPORT=log`. Naprawiono (`.env.remote` → `MAIL_TRANSPORT=smtp`, `SMTP_HOST=de1.sohost.pl`, wdrożone przez FTP tylko dla `.env`). Drugi przebieg: PASS, e-mail dociera w ~8 s. |
+| VIS-11 | PASS | test — `qa/evidence/2026-09-17/test/VIS-11/` (`npm run test:visual`) | Dopełnia PUB-01/02: dokładny zestaw modeli per kategoria na `/rowery` (nie tylko stan aktywnego filtra), porównany z `GET /api/catalog`; powrót do „Wszystkie” przywraca pełną listę. |
+| VIS-12 | PASS | test — `qa/evidence/2026-09-17/test/VIS-12/` (`npm run test:visual`) | Dopełnia CFG-05 na środowisku testowym: opis modelu domyślnie zwinięty na telefonie (390×844), rozwinięty na desktopie; przełączanie „Rozwiń”/„Zwiń” działa w obie strony. |
+| VIS-13 | PASS | test — `qa/evidence/2026-09-17/test/VIS-13/` (`npm run test:visual`) | Dopełnia CFG-07 poza modalem lakieru: audyt fokusu klawiatury karuzeli zdjęć i akordeonu opisu — fokus pozostaje widoczny, nigdy nie znika ani nie trafia na `<body>`. |
 
 ## Publiczna strona i konfigurator
 
