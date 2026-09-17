@@ -83,8 +83,8 @@ function ProjectDetail({ project, copy }: { project: PublicProject; copy: SiteCo
         <span className="text-ink">{project.title}</span>
       </nav>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start lg:gap-14">
-        <div className="space-y-4">
+      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-14">
+        <div className="min-w-0 space-y-4">
           {/* Zdjęcia realizacji są prawdziwymi fotografiami, nie renderami na
               jednolitym tle - dlatego object-cover, bez mix-blend-multiply. */}
           <div className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)]">
@@ -93,7 +93,7 @@ function ProjectDetail({ project, copy }: { project: PublicProject; copy: SiteCo
               : <div className="size-full bg-ink-wash" aria-hidden="true" />}
           </div>
           {project.gallery.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-2">
+            <div className="flex gap-3 overflow-x-auto overscroll-x-contain pb-2">
               {project.gallery.map((img, index) => (
                 <button
                   key={img}
@@ -108,7 +108,7 @@ function ProjectDetail({ project, copy }: { project: PublicProject; copy: SiteCo
           )}
         </div>
 
-        <div>
+        <div className="min-w-0">
           <span className="eyebrow">{project.categoryName ?? copy.projects.eyebrow}</span>
           <h1 className="mt-2 text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">{project.title}</h1>
           {completed && (
