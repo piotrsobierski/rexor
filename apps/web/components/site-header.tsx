@@ -16,7 +16,6 @@ export function SiteHeader() {
     { href: '/rowery', label: copy.nav.rowery },
     { href: '/ramy', label: copy.nav.ramy },
     { href: '/realizacje', label: copy.nav.realizacje },
-    { href: '/czesci', label: copy.nav.czesci },
     { href: '/serwis', label: copy.nav.serwis },
   ];
   return (
