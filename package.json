@@ -6,6 +6,8 @@
     "deploy:package": "scripts/package-release.sh",
     "deploy:dry-run": "scripts/deploy-ftp.sh --dry-run",
     "deploy": "scripts/deploy-ftp.sh --apply",
+    "backup:qa": "scripts/download-db-backup.sh",
+    "backup:prod": "scripts/download-db-backup.sh --prod",
     "test:visual": "playwright test --config qa/playwright/playwright.config.ts",
     "prepare": "husky"
   },

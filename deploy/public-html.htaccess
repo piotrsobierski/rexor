@@ -17,8 +17,11 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 RewriteRule ^api(?:/.*)?$ apps/api/public/index.php [QSA,L]
 
 # Kod aplikacji, SQL, sekrety i backupy nie mogą być pobierane przez WWW.
+# remote-backup.php tylko WYZWALA zrzut (zapisuje go pod storage/backups/),
+# nie serwuje go - storage/backups zostaje zablokowany jak wyżej, pobranie
+# idzie przez FTP w scripts/download-db-backup.sh.
 RewriteCond %{THE_REQUEST} \s/+(.*/)?(?:apps|database|scripts|storage/backups)(?:[/\s?]) [NC]
-RewriteCond %{REQUEST_URI} !^/scripts/remote-migrate\.php$ [NC]
+RewriteCond %{REQUEST_URI} !^/scripts/remote-(migrate|backup)\.php$ [NC]
 RewriteRule ^ - [F,L]
 
 <FilesMatch "(^\.|\.env|\.(sql|log|ini|sh)$)">

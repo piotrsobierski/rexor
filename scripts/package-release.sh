@@ -46,7 +46,7 @@ rsync -a public/media/ "$release_dir/public/media/"
 # Nie są w Git, więc paczka jest jedyną drogą, żeby trafiły na serwer - bez nich
 # `paint_colors.reference_image_path` wskazywałby na nieistniejące pliki.
 rsync -a storage/paint-reference/ "$release_dir/storage/paint-reference/"
-install -m 0644 scripts/migrate.php scripts/remote-migrate.php "$release_dir/scripts/"
+install -m 0644 scripts/migrate.php scripts/remote-migrate.php scripts/db-dump.php scripts/remote-backup.php "$release_dir/scripts/"
 install -m 0600 "$remote_env" "$release_dir/.env"
 install -m 0644 deploy/public-html.htaccess "$release_dir/.htaccess"
 
