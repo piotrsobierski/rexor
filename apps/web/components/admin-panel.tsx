@@ -3236,11 +3236,42 @@ function FramesEditor({
           const galleryIds = gallery.map((item) => item.media_id);
           const draft = drafts[row.id] ?? row;
           const frameSizes = sizes.filter((size) => Number(size.frame_id) === Number(row.id));
+          const categoryName = categories.find((c) => Number(c.id) === Number(row.category_id))?.name;
+          const statusLabel = row.status === 'published' ? 'Opublikowana' : row.status === 'archived' ? 'Zarchiwizowana' : 'Szkic';
+          const thumbnail = gallery[0]
+            ? mediaSrc(gallery[0].storage_path)
+            : row.default_image_path
+              ? mediaSrc(String(row.default_image_path))
+              : null;
           return (
-            <article
+            <details
               key={row.id}
-              className="min-w-0 rounded-2xl border border-line p-5 sm:p-6"
+              className="group min-w-0 rounded-2xl border border-line"
+              data-testid={`frame-card-${row.id}`}
             >
+              <summary className="flex cursor-pointer list-none items-center gap-3 p-4 sm:p-5 [&::-webkit-details-marker]:hidden">
+                {thumbnail ? (
+                  <img src={thumbnail} alt="" className="h-14 w-20 shrink-0 rounded-lg bg-[var(--muted)] object-contain" />
+                ) : (
+                  <div className="grid h-14 w-20 shrink-0 place-items-center rounded-lg bg-[var(--muted)] text-[10px] text-ink-subtle">Brak zdjęć</div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-semibold tracking-tight">{String(row.name || 'Nowa rama')}</span>
+                    {frameSizes.length === 0 && (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                        <Info className="size-3" /> 1
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-ink-muted">
+                    {categoryName ?? 'Bez kategorii'} · {statusLabel}
+                    {row.price_gross ? ` · ${String(row.price_gross)} zł` : ''}
+                  </div>
+                </div>
+                <ChevronDown className="size-4 shrink-0 text-ink-muted transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-line p-4 sm:p-6">
               {frameSizes.length === 0 && (
                 <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4">
                   <h3 className="flex items-center gap-2 text-sm font-semibold text-red-800">
@@ -3707,7 +3738,8 @@ function FramesEditor({
                   </Button>
                 </div>
               </div>
-            </article>
+              </div>
+            </details>
           );
         })}
       </div>
