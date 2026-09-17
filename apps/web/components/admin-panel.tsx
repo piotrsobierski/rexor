@@ -47,6 +47,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { adminFlagEnabled } from '@/lib/admin-flags';
+import { isSavedRecordId } from '@/lib/saved-record';
 import { Toaster, toast } from '@/components/ui/toast';
 import {
   NativeSelect,
@@ -842,6 +843,10 @@ function PartsEditor({
   }
 
   async function uploadPartImage(part: Row, file?: File) {
+    if (!isSavedRecordId(part.id)) {
+      setMessage('Najpierw zapisz element, aby móc dodać zdjęcie.');
+      return;
+    }
     if (!file) return;
     const form = new FormData();
     form.append('file', await compressUploadImage(file));
@@ -986,6 +991,7 @@ function PartsEditor({
             <Save /> Dodaj
           </Button>
         </div>
+        <p className="mt-3 text-xs text-ink-muted">Najpierw zapisz element. Zdjęcia dodasz w jego edytorze poniżej.</p>
       </div>
 
       {/* 2. CATEGORY SWITCHER BAR */}
@@ -1158,6 +1164,7 @@ function PartsEditor({
                           <Upload className="size-4" />
                           <input
                             type="file"
+                            disabled={!isSavedRecordId(row.id)}
                             accept="image/jpeg,image/png,image/webp,image/avif"
                             className="sr-only"
                             onChange={(event) =>
@@ -1385,6 +1392,10 @@ function CategoriesEditor({
 
 
   async function uploadImage(row: Row, file?: File) {
+    if (!isSavedRecordId(row.id)) {
+      setMessage('Najpierw zapisz element, aby móc dodać zdjęcie.');
+      return;
+    }
     if (!file) return;
     const form = new FormData();
     form.append('file', await compressUploadImage(file));
@@ -1444,6 +1455,7 @@ function CategoriesEditor({
                   <Upload className="size-3.5" /> Zmień
                   <input
                     type="file"
+                    disabled={!isSavedRecordId(row.id)}
                     accept="image/jpeg,image/png,image/webp,image/avif"
                     className="sr-only"
                     onChange={(event) =>
@@ -1642,6 +1654,7 @@ function WysiwygEditor({
   initialHtml,
   onChange,
   onUploadImage,
+  uploadRecordId,
   onAiEdit,
   onRef,
   minHeight = 'min-h-48',
@@ -1650,6 +1663,7 @@ function WysiwygEditor({
   initialHtml?: string;
   onChange?: (html: string) => void;
   onUploadImage?: (file: File) => Promise<string | null>;
+  uploadRecordId?: number | null;
   /** Wysyła (instrukcja, aktualny HTML) do backendu AI i zwraca zaproponowany HTML całego pola. */
   onAiEdit?: (instruction: string, currentHtml: string) => Promise<string>;
   onRef?: (el: HTMLDivElement | null) => void;
@@ -1657,6 +1671,7 @@ function WysiwygEditor({
 }) {
   const localRef = useRef<HTMLDivElement | null>(null);
   const content = value ?? initialHtml ?? '';
+  const canUploadImage = uploadRecordId === undefined || isSavedRecordId(uploadRecordId);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiInstruction, setAiInstruction] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -1697,7 +1712,7 @@ function WysiwygEditor({
   }
 
   async function handleImage(file?: File) {
-    if (!file || !onUploadImage) return;
+    if (!file || !onUploadImage || !canUploadImage) return;
     const url = await onUploadImage(file);
     if (url) {
       localRef.current?.focus();
@@ -1836,13 +1851,14 @@ function WysiwygEditor({
         </Button>
         {onUploadImage && (
           <Label
-            className="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg hover:bg-white"
+            className={cn("inline-flex size-8 items-center justify-center rounded-lg", canUploadImage ? "cursor-pointer hover:bg-white" : "cursor-not-allowed opacity-40")}
             aria-label="Wstaw zdjęcia"
-            title="Wstaw jedno lub wiele zdjęć"
+            title={canUploadImage ? "Wstaw jedno lub wiele zdjęć" : "Najpierw zapisz element"}
           >
             <ImagePlus className="size-4" />
             <input
               type="file"
+              disabled={!canUploadImage}
               accept="image/*"
               multiple
               className="sr-only"
@@ -2048,6 +2064,10 @@ function ModelsEditor({
   }, [rows, specifications]);
 
   async function upload(model: Row, files?: FileList | null) {
+    if (!isSavedRecordId(model.id)) {
+      setMessage('Najpierw zapisz element, aby móc dodać zdjęcie.');
+      return;
+    }
     const selected = Array.from(files ?? []);
     if (selected.length === 0) return;
     let defaultImagePath = String(model.default_image_path ?? '');
@@ -2232,6 +2252,7 @@ function ModelsEditor({
         <Button size="sm" className="mt-3" onClick={addModel}>
           <Save /> Dodaj model
         </Button>
+        <p className="mt-3 text-xs text-ink-muted">Najpierw zapisz element. Zdjęcia dodasz w jego edytorze poniżej.</p>
       </div>
       <LongListSearch
         list={list}
@@ -2494,6 +2515,7 @@ function ModelsEditor({
                   </summary>
                   <div className="mt-3">
                     <WysiwygEditor
+                      uploadRecordId={row.id ?? null}
                       value={String(drafts[row.id]?.description_html ?? '')}
                       onRef={(el) => {
                         editorRefs.current[row.id] = el;
@@ -2557,6 +2579,7 @@ function ModelsEditor({
                     <Upload className="size-4" /> Dodaj zdjęcia do galerii
                     <input
                       type="file"
+                      disabled={!isSavedRecordId(row.id)}
                       accept="image/jpeg,image/png,image/webp,image/avif"
                       multiple
                       className="sr-only"
@@ -2763,6 +2786,10 @@ function FramesEditor({
     files: File | FileList | null | undefined,
     role: 'gallery' | 'geometry',
   ) {
+    if (!isSavedRecordId(frame.id)) {
+      setMessage('Najpierw zapisz element, aby móc dodać zdjęcie.');
+      return;
+    }
     const selected = files instanceof File ? [files] : Array.from(files ?? []);
     if (selected.length === 0) return;
     let defaultImagePath = String(frame.default_image_path ?? '');
@@ -2940,6 +2967,7 @@ function FramesEditor({
   }
 
   async function uploadInlineImage(frame: Row, file: File) {
+    if (!isSavedRecordId(frame.id)) return null;
     const form = new FormData();
     form.append('file', await compressUploadImage(file));
     form.append('altText', `Zdjęcie w opisie ramy ${String(frame.name)}`);
@@ -2999,6 +3027,7 @@ function FramesEditor({
         <Button size="sm" className="mt-3" onClick={addFrame}>
           <Plus /> Dodaj ramę
         </Button>
+        <p className="mt-3 text-xs text-ink-muted">Najpierw zapisz element. Zdjęcia dodasz w jego edytorze poniżej.</p>
       </div>
       {rows.length === 0 && (
         <p className="text-sm text-ink-muted">
@@ -3362,6 +3391,7 @@ function FramesEditor({
                   </summary>
                   <div className="mt-3">
                     <WysiwygEditor
+                      uploadRecordId={row.id ?? null}
                       value={String(draft.description_html ?? '')}
                       onRef={(el) => {
                         descriptionRefs.current[row.id] = el;
@@ -3423,6 +3453,7 @@ function FramesEditor({
                       <Upload className="size-4" /> Wgraj tabelę geometrii
                       <input
                         type="file"
+                        disabled={!isSavedRecordId(row.id)}
                         accept="image/jpeg,image/png,image/webp,image/avif"
                         className="sr-only"
                         multiple
@@ -3437,6 +3468,7 @@ function FramesEditor({
                       Geometria opisana tekstem
                     </Label>
                     <WysiwygEditor
+                      uploadRecordId={row.id ?? null}
                       value={String(draft.geometry_html ?? '')}
                       onRef={(el) => {
                         geometryRefs.current[row.id] = el;
@@ -3455,6 +3487,7 @@ function FramesEditor({
                     <Upload className="size-4" /> Dodaj zdjęcia do galerii
                     <input
                       type="file"
+                      disabled={!isSavedRecordId(row.id)}
                       accept="image/jpeg,image/png,image/webp,image/avif"
                       multiple
                       className="sr-only"
@@ -3547,6 +3580,10 @@ function ProjectsEditor({
     files: File | FileList | null | undefined,
     role: 'cover' | 'gallery',
   ) {
+    if (!isSavedRecordId(project.id)) {
+      setMessage('Najpierw zapisz element, aby móc dodać zdjęcie.');
+      return;
+    }
     const selected = files instanceof File ? [files] : Array.from(files ?? []);
     if (selected.length === 0) return;
     setMessage(`Wysyłam zdjęcia (0/${selected.length})…`);
@@ -3749,6 +3786,7 @@ function ProjectsEditor({
         <Button size="sm" className="mt-3" onClick={addProject}>
           <Plus /> Dodaj realizację
         </Button>
+        <p className="mt-3 text-xs text-ink-muted">Najpierw zapisz element. Zdjęcia dodasz w jego edytorze poniżej.</p>
       </div>
       {rows.length === 0 && (
         <p className="text-sm text-ink-muted">
@@ -3805,6 +3843,7 @@ function ProjectsEditor({
                       <Upload className="size-3.5" /> Zmień
                       <input
                         type="file"
+                        disabled={!isSavedRecordId(row.id)}
                         accept="image/jpeg,image/png,image/webp,image/avif"
                         className="sr-only"
                         onChange={(event) =>
@@ -4056,6 +4095,7 @@ function ProjectsEditor({
                   </summary>
                   <div className="mt-3">
                     <WysiwygEditor
+                      uploadRecordId={row.id ?? null}
                       value={String(draft.content_html ?? '')}
                       onRef={(el) => {
                         contentRefs.current[row.id] = el;
@@ -4195,6 +4235,7 @@ function ProjectsEditor({
                     <Upload className="size-4" /> Dodaj zdjęcia do galerii
                     <input
                       type="file"
+                      disabled={!isSavedRecordId(row.id)}
                       accept="image/jpeg,image/png,image/webp,image/avif"
                       multiple
                       className="sr-only"
@@ -4871,6 +4912,7 @@ function PageEditor({
         <div className="grid gap-1.5">
           <Label>Treść</Label>
           <WysiwygEditor
+            uploadRecordId={page.id ?? null}
             value={contentHtml}
             onChange={setContentHtml}
             minHeight="min-h-80"

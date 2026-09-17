@@ -1,5 +1,7 @@
 'use client';
 
+import { isSavedRecordId } from '@/lib/saved-record';
+
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Upload } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -632,6 +634,7 @@ function NewColorForm({
     >
       <Plus /> Dodaj kolor
     </Button>
+    <p className="w-full text-xs text-ink-muted">Najpierw zapisz kolor. Zdjęcia dodasz w jego edytorze.</p>
   </div>;
 }
 
@@ -770,12 +773,13 @@ const renderTarget = (render: Render) => (render.modelSlug !== null ? `model:${r
  * wizualizacji przez nieuwagę przy liście wyboru.
  */
 function RenderSlot({
-  slot, items, isWinner, uploading, onUpload, onPreview, onDelete,
+  slot, items, isWinner, uploading, canUpload, onUpload, onPreview, onDelete,
 }: {
   slot: (typeof SLOTS)[number];
   items: Render[];
   isWinner: boolean;
   uploading: boolean;
+  canUpload: boolean;
   onUpload: (files: File[]) => void;
   onPreview: (render: Render) => void;
   onDelete: (render: Render) => void;
@@ -783,6 +787,7 @@ function RenderSlot({
   const [dragging, setDragging] = useState(false);
 
   function accept(list: FileList | null) {
+    if (!canUpload || uploading) return;
     const files = [...(list ?? [])].filter((file) => file.type.startsWith('image/'));
     if (files.length === 0) return;
     onUpload(slot.multiple ? files : files.slice(0, 1));
@@ -826,7 +831,7 @@ function RenderSlot({
           accept="image/*"
           multiple={slot.multiple}
           className="sr-only"
-          disabled={uploading}
+          disabled={uploading || !canUpload}
           onChange={(event) => { accept(event.target.files); event.target.value = ''; }}
         />
       </label>
@@ -864,7 +869,8 @@ function RendersEditor({
   const winner = SLOTS.find((slot) => bySlot(slot.variant).length > 0)?.variant ?? null;
 
   async function upload(variant: Render['variant'], files: File[]) {
-    if (!current) { setMessage('Wskaż model albo ramę dla obrazu.'); return; }
+    if (!isSavedRecordId(color.id)) { setMessage('Najpierw zapisz kolor, aby móc dodać zdjęcie.'); return; }
+    if (!current) { setMessage('Wskaż zapisany model albo ramę dla obrazu.'); return; }
     setUploadingVariant(variant);
     try {
       // Sekwencyjnie, nie równolegle: `sort_order` kolejnego zdjęcia liczy się
@@ -951,6 +957,7 @@ function RendersEditor({
         items={bySlot(slot.variant)}
         isWinner={winner === slot.variant}
         uploading={uploadingVariant === slot.variant}
+        canUpload={isSavedRecordId(color.id) && current !== undefined}
         onUpload={(files) => void upload(slot.variant, files)}
         onPreview={setPreview}
         onDelete={(render) => void remove(render)}
