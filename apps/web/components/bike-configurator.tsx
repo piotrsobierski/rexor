@@ -391,7 +391,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
       <section className="mx-auto max-w-[1480px] px-4 pb-3 pt-7 sm:px-8 sm:pt-10 lg:px-12">
         <div className="mb-5 flex items-end justify-between gap-4"><div><p className="eyebrow">{copy.configurator.heroEyebrow}</p><h1 className="mt-2 text-[clamp(2rem,5vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em]">{copy.configurator.heroTitleLine1}<br className="hidden sm:block" /> {copy.configurator.heroTitleLine2}</h1></div><p className="hidden max-w-sm text-right text-base leading-relaxed text-ink-muted xl:block">{copy.configurator.heroSubtitle}</p></div>
         <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0">
-          {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => selectModel(item.id)} className={`pick-card focus-ring min-w-[78vw] snap-center sm:min-w-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active}><span className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span><span className={`grid size-6 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span></span><span className="mt-1 text-xl font-semibold tracking-tight">{item.name}</span><span className="mt-1 text-sm text-ink-muted">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span></button>; })}
+          {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => selectModel(item.id)} className={`pick-card focus-ring min-w-[78vw] snap-center sm:min-w-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}><span className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span><span className={`grid size-6 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span></span><span className="mt-1 text-xl font-semibold tracking-tight">{item.name}</span><span className="mt-1 text-sm text-ink-muted">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span></button>; })}
         </div>
       </section>
 
@@ -410,9 +410,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               </span>}
               <span className={`rounded-full bg-ink-wash px-3 py-1.5 text-xs font-semibold tabular-nums text-ink-muted ${paintSlide ? '' : 'ml-auto'}`}>{galleryIndex + 1} / {gallery.length}</span>
             </div>
-            <Carousel key={`${model.id}-${gallery[0] ?? ''}`} setApi={setCarouselApi} opts={{ loop: gallery.length > 1 }} aria-label={`Zdjęcia modelu ${model.name}`}>
+            <Carousel key={`${model.id}-${gallery[0] ?? ''}`} setApi={setCarouselApi} opts={{ loop: gallery.length > 1 }} aria-label={`Zdjęcia modelu ${model.name}`} data-testid="model-gallery">
               <CarouselContent className="ml-0">
-                {gallery.map((image, index) => <CarouselItem key={image} className="pl-0">
+                {gallery.map((image, index) => <CarouselItem key={image} className="pl-0" data-testid={`gallery-slide-${index}`}>
                   <div className="stage-media p-4 sm:p-8">
                     <OptimizedImage
                       src={image}
@@ -420,6 +420,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                         ? `${model.name} — ${paintSlides[index].variant === 'photo' ? 'zdjęcie' : 'wizualizacja'} w kolorze ${chosenPaint.color.name}`
                         : `${model.name} — zdjęcie ${index - paintSlides.length + 1}`}
                       priority={index === 0}
+                      data-testid={`gallery-image-${index}`}
                     />
                   </div>
                 </CarouselItem>)}
@@ -456,11 +457,11 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           <div className="flex items-start justify-between gap-5"><div><p className="eyebrow">{copy.configurator.projectEyebrow}</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">{copy.configurator.configTitlePrefix} {model.name.replace('Rexor ', '')}</h2></div><span className="rounded-full bg-[var(--accent-brand)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em]">{copy.configurator.grossBadge}</span></div>
           <Progress value={model.available ? 72 : 12} className="mt-5 h-1.5 bg-ink-wash [&>div]:bg-ink" />
           {!model.available ? <div className="mt-8 rounded-3xl bg-ink p-6 text-white"><Bike className="size-8 text-[var(--accent-brand)]" /><h3 className="mt-8 text-2xl font-semibold">{copy.configurator.unavailableTitle}</h3><p className="mt-3 leading-relaxed text-white/64">{copy.configurator.unavailableText}</p><Button render={<a href="/serwis" />} className="mt-6 w-full rounded-full bg-white text-ink hover:bg-white/90">{copy.configurator.unavailableCta} <ArrowRight data-icon="inline-end" /></Button></div> : <>
-            <section className="config-section"><div className="section-heading"><div><span>01</span><h3>{copy.configurator.sizeSectionTitle}</h3></div><p>{copy.configurator.sizeSectionSubtitle}</p></div><RadioGroup value={size} onValueChange={changeSize} className="grid grid-cols-3 gap-2">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>
-            {model.batteries.length > 0 && <section className="config-section">
+            <section className="config-section" data-testid="size-section"><div className="section-heading"><div><span>01</span><h3>{copy.configurator.sizeSectionTitle}</h3></div><p>{copy.configurator.sizeSectionSubtitle}</p></div><RadioGroup value={size} onValueChange={changeSize} className="grid grid-cols-3 gap-2" data-testid="size-selector">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`} data-testid={`size-option-${item.code}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>
+            {model.batteries.length > 0 && <section className="config-section" data-testid="battery-section">
               <div className="section-heading"><div><span>02</span><h3>{copy.configurator.batterySectionTitle}</h3></div><p>{copy.configurator.batterySectionSubtitle}</p></div>
-              <RadioGroup value={battery?.code ?? ''} onValueChange={changeBattery} className="gap-2">
-                {model.batteries.map((item) => { const selected = battery?.code === item.code; const delta = item.grossPrice - (defaultBattery?.grossPrice ?? item.grossPrice); return <label key={item.code} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}>
+              <RadioGroup value={battery?.code ?? ''} onValueChange={changeBattery} className="gap-2" data-testid="battery-selector">
+                {model.batteries.map((item) => { const selected = battery?.code === item.code; const delta = item.grossPrice - (defaultBattery?.grossPrice ?? item.grossPrice); return <label key={item.code} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`} data-testid={`battery-option-${item.code}`}>
                   <RadioGroupItem value={item.code} className="choice-input" />
                   <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>
                   <span className="min-w-0 flex-1">
@@ -533,7 +534,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               // Lakierowanie ma własną sekcję: obok zakresu robót stoi wybór
               // koloru, który nie jest częścią z cennika, tylko osobnym bytem.
               if (group.slug === PAINT_GROUP_SLUG) {
-                return <section className="config-section" key={group.slug}>
+                return <section className="config-section" key={group.slug} data-testid={`group-section-${group.slug}`}>
                   {heading}
                   <PaintSection
                     choices={choices.map(({ sku, name, detail, price }) => ({ sku, name, detail, price }))}
@@ -551,13 +552,13 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                   />
                 </section>;
               }
-              return <section className="config-section" key={group.slug}>
+              return <section className="config-section" key={group.slug} data-testid={`group-section-${group.slug}`}>
                 {heading}
-                <RadioGroup value={selections[group.slug] ?? ''} onValueChange={(value) => choose(group.slug, value)} className="gap-2">
-                  {choices.map((choice) => { const selected = selections[group.slug] === choice.sku; const delta = choice.price === null ? null : choice.price - defaultPrice; return <label key={choice.sku} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`}>
+                <RadioGroup value={selections[group.slug] ?? ''} onValueChange={(value) => choose(group.slug, value)} className="gap-2" data-testid={`group-selector-${group.slug}`}>
+                  {choices.map((choice) => { const selected = selections[group.slug] === choice.sku; const delta = choice.price === null ? null : choice.price - defaultPrice; return <label key={choice.sku} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`} data-testid={`option-${group.slug}-${choice.sku}`}>
                     <RadioGroupItem value={choice.sku} className="choice-input" />
                     <span className={`choice-indicator ${selected ? 'choice-indicator-active' : ''}`}>{selected && <Check className="size-3.5" />}</span>
-                    {choice.imagePath && <img src={choice.imagePath} alt="" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setZoomedImage(choice.imagePath); }} className="size-10 shrink-0 cursor-zoom-in rounded-lg border border-line bg-white object-contain transition-transform hover:scale-110" />}
+                    {choice.imagePath && <img src={choice.imagePath} alt="" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setZoomedImage(choice.imagePath); }} className="size-10 shrink-0 cursor-zoom-in rounded-lg border border-line bg-white object-contain transition-transform hover:scale-110" data-testid={`option-image-${group.slug}-${choice.sku}`} />}
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2 font-semibold">{choice.name}{choice.customerSupplied && <span className="rounded bg-ink-wash px-1.5 py-0.5 text-[0.68rem] uppercase tracking-wide text-ink-muted">{copy.configurator.customerPartBadge}</span>}</span>
                       <span className="mt-0.5 block text-sm text-ink-muted">{choice.detail}</span>
@@ -567,7 +568,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                 </RadioGroup>
               </section>;
             })}
-            <div className="mt-7 rounded-3xl bg-ink p-5 text-white sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-white/54">{copy.configurator.priceLabel}</p><p className="mt-1 text-3xl font-semibold tracking-[-0.04em] tabular-nums">{pricing.total === null ? copy.configurator.priceIndividual : formatPrice(pricing.total)}</p></div>{pricing.delta !== 0 && <span className="rounded-full bg-white/10 px-3 py-1.5 text-sm tabular-nums">{pricing.delta > 0 ? '+' : '−'}{formatPrice(Math.abs(pricing.delta))}</span>}</div><Button onClick={() => setDialogOpen(true)} variant="brand" className="mt-6 h-12 w-full rounded-full font-semibold transition-all hover:brightness-95">{copy.configurator.saveCta} <ArrowRight data-icon="inline-end" className="shrink-0" /></Button><p className="mt-3 flex items-center justify-center gap-2 text-center text-xs text-white/48"><ShieldCheck className="size-3.5" /> {copy.configurator.grossPriceNote}</p></div>
+            <div className="mt-7 rounded-3xl bg-ink p-5 text-white sm:p-6" data-testid="price-summary"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-white/54">{copy.configurator.priceLabel}</p><p className="mt-1 text-3xl font-semibold tracking-[-0.04em] tabular-nums" data-testid="total-price">{pricing.total === null ? copy.configurator.priceIndividual : formatPrice(pricing.total)}</p></div>{pricing.delta !== 0 && <span className="rounded-full bg-white/10 px-3 py-1.5 text-sm tabular-nums" data-testid="price-delta">{pricing.delta > 0 ? '+' : '−'}{formatPrice(Math.abs(pricing.delta))}</span>}</div><Button onClick={() => setDialogOpen(true)} variant="brand" className="mt-6 h-12 w-full rounded-full font-semibold transition-all hover:brightness-95" data-testid="open-contact-form-button">{copy.configurator.saveCta} <ArrowRight data-icon="inline-end" className="shrink-0" /></Button><p className="mt-3 flex items-center justify-center gap-2 text-center text-xs text-white/48"><ShieldCheck className="size-3.5" /> {copy.configurator.grossPriceNote}</p></div>
           </>}
         </aside>
       </section>
@@ -580,14 +581,14 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           <DialogTitle className="text-2xl font-semibold tracking-tight text-ink">{copy.configurator.saveDialogTitlePrefix} {model.name}</DialogTitle>
           <DialogDescription className="text-sm text-ink-muted">{copy.configurator.saveDialogDescription}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submitConfiguration} className="mt-2 grid gap-4">
-          <div className="grid gap-1.5"><Label htmlFor="customerName" className="font-medium text-ink">{copy.configurator.nameLabel}</Label><Input id="customerName" required autoComplete="name" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerName} onChange={(e) => setContact({ ...contact, customerName: e.target.value })} /></div>
-          <div className="grid gap-1.5"><Label htmlFor="customerEmail" className="font-medium text-ink">{copy.configurator.emailLabel}</Label><Input id="customerEmail" required type="email" autoComplete="email" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerEmail} onChange={(e) => setContact({ ...contact, customerEmail: e.target.value })} /></div>
-          <div className="grid gap-1.5"><Label htmlFor="customerPhone" className="font-medium text-ink">{copy.configurator.phoneLabel} <span className="text-ink-subtle font-normal">{copy.configurator.optionalHint}</span></Label><Input id="customerPhone" type="tel" autoComplete="tel" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerPhone} onChange={(e) => setContact({ ...contact, customerPhone: e.target.value })} /></div>
-          <div className="grid gap-1.5"><Label htmlFor="notes" className="font-medium text-ink">{copy.configurator.notesLabel} <span className="text-ink-subtle font-normal">{copy.configurator.optionalHint}</span></Label><Textarea id="notes" rows={3} className="bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.notes} onChange={(e) => setContact({ ...contact, notes: e.target.value })} placeholder={copy.configurator.notesPlaceholder} /></div>
-          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-ink-wash p-4 text-sm leading-relaxed text-ink"><Checkbox checked={contact.privacyAccepted} onCheckedChange={(checked) => setContact({ ...contact, privacyAccepted: checked === true })} className="mt-0.5" /><span>{copy.configurator.privacyConsentLabel}</span></label>
-          {submitError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>}
-          <Button type="submit" disabled={submitState === 'saving'} className="h-12 rounded-full bg-ink text-white font-semibold transition-colors hover:bg-black">{submitState === 'saving' ? copy.configurator.submittingCta : copy.configurator.submitCta} <ArrowRight data-icon="inline-end" /></Button>
+        <form onSubmit={submitConfiguration} className="mt-2 grid gap-4" data-testid="contact-form">
+          <div className="grid gap-1.5"><Label htmlFor="customerName" className="font-medium text-ink">{copy.configurator.nameLabel}</Label><Input id="customerName" data-testid="contact-name-input" required autoComplete="name" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerName} onChange={(e) => setContact({ ...contact, customerName: e.target.value })} /></div>
+          <div className="grid gap-1.5"><Label htmlFor="customerEmail" className="font-medium text-ink">{copy.configurator.emailLabel}</Label><Input id="customerEmail" data-testid="contact-email-input" required type="email" autoComplete="email" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerEmail} onChange={(e) => setContact({ ...contact, customerEmail: e.target.value })} /></div>
+          <div className="grid gap-1.5"><Label htmlFor="customerPhone" className="font-medium text-ink">{copy.configurator.phoneLabel} <span className="text-ink-subtle font-normal">{copy.configurator.optionalHint}</span></Label><Input id="customerPhone" data-testid="contact-phone-input" type="tel" autoComplete="tel" className="h-11 bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.customerPhone} onChange={(e) => setContact({ ...contact, customerPhone: e.target.value })} /></div>
+          <div className="grid gap-1.5"><Label htmlFor="notes" className="font-medium text-ink">{copy.configurator.notesLabel} <span className="text-ink-subtle font-normal">{copy.configurator.optionalHint}</span></Label><Textarea id="notes" data-testid="contact-notes-input" rows={3} className="bg-ink-wash/50 border-line text-ink focus:bg-white" value={contact.notes} onChange={(e) => setContact({ ...contact, notes: e.target.value })} placeholder={copy.configurator.notesPlaceholder} /></div>
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-ink-wash p-4 text-sm leading-relaxed text-ink"><Checkbox checked={contact.privacyAccepted} onCheckedChange={(checked) => setContact({ ...contact, privacyAccepted: checked === true })} className="mt-0.5" data-testid="contact-privacy-checkbox" /><span>{copy.configurator.privacyConsentLabel}</span></label>
+          {submitError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="contact-error-message">{submitError}</p>}
+          <Button type="submit" disabled={submitState === 'saving'} className="h-12 rounded-full bg-ink text-white font-semibold transition-colors hover:bg-black" data-testid="contact-submit-button">{submitState === 'saving' ? copy.configurator.submittingCta : copy.configurator.submitCta} <ArrowRight data-icon="inline-end" /></Button>
         </form>
       </DialogContent>
     </Dialog>

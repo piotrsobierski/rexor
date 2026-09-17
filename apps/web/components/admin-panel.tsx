@@ -340,8 +340,9 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
         <form
           onSubmit={login}
           className="w-full max-w-sm rounded-3xl bg-white p-7"
+          data-testid="admin-login-form"
         >
-          <img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" />
+          <img src="/brand/rexor-logo.png" alt="Rexor" className="w-32" data-testid="admin-logo" />
           <p className="eyebrow mt-10">Panel administracyjny</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             Zaloguj się
@@ -354,6 +355,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
                 type="email"
                 required
                 className="h-11"
+                data-testid="admin-email-input"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
@@ -365,6 +367,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
                 type="password"
                 required
                 className="h-11"
+                data-testid="admin-password-input"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -372,11 +375,12 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
             <Button
               type="submit"
               className="h-11 rounded-full bg-ink text-white"
+              data-testid="admin-login-button"
             >
               Zaloguj
             </Button>
             {message && (
-              <p className="text-center text-sm text-ink-muted">{message}</p>
+              <p className="text-center text-sm text-ink-muted" data-testid="admin-login-message">{message}</p>
             )}
           </div>
         </form>
@@ -389,11 +393,11 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex h-18 max-w-[1500px] items-center justify-between px-4 sm:px-8">
           <a href="/">
-            <img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" />
+            <img src="/brand/rexor-logo.png" alt="Rexor" className="w-28" data-testid="admin-logo" />
           </a>
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={refreshCatalog} />
-            <Button variant="ghost" size="sm" onClick={logout}>
+            <Button variant="ghost" size="sm" onClick={logout} data-testid="admin-logout-button">
               <LogOut /> Wyloguj
             </Button>
           </div>
@@ -421,52 +425,53 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
             }
           }}
         >
-          <TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1">
-            <TabsTrigger value="models" className="rounded-full px-4 py-2">
+          <TabsList className="no-scrollbar mb-6 h-auto max-w-full justify-start overflow-x-auto rounded-full bg-white p-1" data-testid="admin-tabs">
+            <TabsTrigger value="models" className="rounded-full px-4 py-2" data-testid="tab-models">
               Modele i zdjęcia
             </TabsTrigger>
-            <TabsTrigger value="frames" className="rounded-full px-4 py-2">
+            <TabsTrigger value="frames" className="rounded-full px-4 py-2" data-testid="tab-frames">
               Ramy
             </TabsTrigger>
-            <TabsTrigger value="categories" className="rounded-full px-4 py-2">
+            <TabsTrigger value="categories" className="rounded-full px-4 py-2" data-testid="tab-categories">
               Kategorie
             </TabsTrigger>
-            <TabsTrigger value="equipment" className="rounded-full px-4 py-2">
+            <TabsTrigger value="equipment" className="rounded-full px-4 py-2" data-testid="tab-equipment">
               Osprzęt i cena modelu
             </TabsTrigger>
-            <TabsTrigger value="parts" className="rounded-full px-4 py-2">
+            <TabsTrigger value="parts" className="rounded-full px-4 py-2" data-testid="tab-parts">
               Części i ceny
             </TabsTrigger>
-            <TabsTrigger value="paints" className="rounded-full px-4 py-2">
+            <TabsTrigger value="paints" className="rounded-full px-4 py-2" data-testid="tab-paints">
               Lakiery
             </TabsTrigger>
-            <TabsTrigger value="batteries" className="rounded-full px-4 py-2">
+            <TabsTrigger value="batteries" className="rounded-full px-4 py-2" data-testid="tab-batteries">
               Baterie
             </TabsTrigger>
-            <TabsTrigger value="service" className="rounded-full px-4 py-2">
+            <TabsTrigger value="service" className="rounded-full px-4 py-2" data-testid="tab-service">
               Strony
             </TabsTrigger>
-            <TabsTrigger value="projects" className="rounded-full px-4 py-2">
+            <TabsTrigger value="projects" className="rounded-full px-4 py-2" data-testid="tab-projects">
               Realizacje
             </TabsTrigger>
-            <TabsTrigger value="texts" className="rounded-full px-4 py-2">
+            <TabsTrigger value="texts" className="rounded-full px-4 py-2" data-testid="tab-texts">
               Teksty
             </TabsTrigger>
-            <TabsTrigger value="theme" className="rounded-full px-4 py-2">
+            <TabsTrigger value="theme" className="rounded-full px-4 py-2" data-testid="tab-theme">
               Kolory
             </TabsTrigger>
-            <TabsTrigger value="chatbot" className="rounded-full px-4 py-2">
+            <TabsTrigger value="chatbot" className="rounded-full px-4 py-2" data-testid="tab-chatbot">
               Chatbot AI
             </TabsTrigger>
-            <TabsTrigger value="mail" className="rounded-full px-4 py-2">
+            <TabsTrigger value="mail" className="rounded-full px-4 py-2" data-testid="tab-mail">
               Poczta
             </TabsTrigger>
-            <TabsTrigger value="inquiries" className="rounded-full px-4 py-2">
+            <TabsTrigger value="inquiries" className="rounded-full px-4 py-2" data-testid="tab-inquiries">
               Zapytania
             </TabsTrigger>
             <TabsTrigger
               value="activity-log"
               className="rounded-full px-4 py-2"
+              data-testid="tab-activity-log"
             >
               Dziennik aktywności
             </TabsTrigger>
