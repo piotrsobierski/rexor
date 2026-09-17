@@ -524,12 +524,13 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               </RadioGroup>
 
               {battery && battery.energyWh > 0 && (
-                <div className="mt-3.5 rounded-2xl border border-line bg-[#fafbfa] p-4 text-ink">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line/70 pb-2.5">
+                <details className="group mt-3.5 rounded-2xl border border-line bg-[#fafbfa] text-ink" data-testid="range-estimate-collapsible">
+                  <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-2 p-4 [&::-webkit-details-marker]:hidden" data-testid="range-estimate-toggle">
                     <div>
                       <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink">
                         <Zap className="size-3.5 text-amber-600" />
                         {copy.configurator.rangeEstimateTitle} ({formatEnergy(battery.energyWh)})
+                        <ChevronDown className="size-3.5 shrink-0 text-ink-muted transition-transform group-open:rotate-180" />
                       </h4>
                       <p className="mt-0.5 text-[11px] text-ink-muted">
                         {copy.configurator.rangeEstimateSubtitle}
@@ -538,9 +539,9 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                     <span className="rounded-md bg-white border border-line px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-ink">
                       {battery.energyWh} Wh
                     </span>
-                  </div>
+                  </summary>
 
-                  <div className="mt-2.5 overflow-x-auto">
+                  <div className="overflow-x-auto border-t border-line/70 px-4 pb-4 pt-2.5">
                     <table className="w-full text-left text-xs">
                       <thead>
                         <tr className="text-[11px] text-ink-subtle">
@@ -569,7 +570,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </details>
               )}
             </section>}
             {model.groups.filter((group) => group.selectionMode !== 'fixed').map((group, groupIndex) => {
