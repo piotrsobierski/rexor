@@ -103,6 +103,7 @@ function adminCatalog(PDO $pdo): array
         })(),
         'frames' => adminFrames($pdo),
         'frameMedia' => adminFrameMedia($pdo),
+        'frameSizes' => adminFrameSizes($pdo),
         'projects' => adminProjects($pdo),
         'projectMedia' => adminProjectMedia($pdo),
         'branding' => getBranding($pdo),
@@ -115,6 +116,7 @@ function adminCatalog(PDO $pdo): array
         'modelParts' => ['is_default', 'is_customer_configurable', 'customer_supplied_allowed'],
         'modelGroupSettings' => ['customer_part_allowed'],
         'modelSizes' => ['is_active'],
+        'frameSizes' => ['is_active'],
         'batteries' => ['is_default', 'is_active'],
         'parts' => ['is_active'],
         'pages' => ['is_published'],
@@ -135,6 +137,7 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
         'models' => ['table' => 'bike_models', 'fields' => ['category_id', 'name', 'short_description', 'description_html', 'frame_price_gross', 'assembly_price_gross', 'margin_percent', 'default_image_path', 'status', 'sort_order', 'specifications']],
         'parts' => ['table' => 'parts', 'fields' => ['name', 'group_id', 'description', 'gross_price', 'price_status', 'image_path', 'is_active']],
         'sizes' => ['table' => 'model_sizes', 'fields' => ['label', 'price_delta_gross', 'sort_order', 'is_active']],
+        'frame-sizes' => ['table' => 'frame_sizes', 'fields' => ['label', 'sort_order', 'is_active']],
         'pages' => ['table' => 'site_pages', 'fields' => ['title', 'navigation_label', 'excerpt', 'content_html', 'hero_image_path', 'is_published']],
         'frames' => [
             'table' => 'frames',
@@ -182,6 +185,23 @@ function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): a
     }
     if ($updates === []) {
         throw new InvalidArgumentException('Brak pól do zapisania.');
+    }
+    // Model/rama bez aktywnego rozmiaru przechodzi przez konfigurator/formularz
+    // zapytania, ale nie da się jej sensownie zamówić - `sizeCode` wysłany do
+    // /configurations (albo puste pole rozmiaru w zapytaniu o ramę) trafia w
+    // pustkę. Łapiemy to tutaj, zanim model/rama w ogóle trafi na stronę
+    // publiczną, zamiast dopiero przy pierwszym zamówieniu klienta.
+    $publishSizeGuards = [
+        'models' => ['table' => 'model_sizes', 'column' => 'model_id', 'label' => 'modelu', 'section' => 'Rozmiary i dopłaty'],
+        'frames' => ['table' => 'frame_sizes', 'column' => 'frame_id', 'label' => 'ramy', 'section' => 'Rozmiary'],
+    ];
+    if (isset($publishSizeGuards[$resource]) && ($parameters['status'] ?? null) === 'published') {
+        $guard = $publishSizeGuards[$resource];
+        $sizeCount = $pdo->prepare("SELECT COUNT(*) FROM {$guard['table']} WHERE {$guard['column']} = :parent AND is_active = TRUE");
+        $sizeCount->execute(['parent' => $id]);
+        if ((int) $sizeCount->fetchColumn() === 0) {
+            throw new InvalidArgumentException("Nie można opublikować {$guard['label']} bez rozmiaru. Dodaj co najmniej jeden aktywny rozmiar w sekcji „{$guard['section']}”.");
+        }
     }
     $statement = $pdo->prepare('UPDATE ' . $definition['table'] . ' SET ' . implode(', ', $updates) . ' WHERE id = :id');
     $statement->execute($parameters);

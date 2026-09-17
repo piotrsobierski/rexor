@@ -33,8 +33,23 @@ function hydrateFrameRow(PDO $pdo, array $row): array
     $row['paint_available'] = (bool) $row['paint_available'];
     $row['is_recommended'] = (bool) $row['is_recommended'];
     $row['media'] = entityMediaRows($pdo, 'frames', $frameId);
+    $row['sizes'] = frameSizes($pdo, $frameId);
 
     return $row;
+}
+
+/** Aktywne rozmiary ramy, w kolejności prezentacji. */
+function frameSizes(PDO $pdo, int $frameId): array
+{
+    $statement = $pdo->prepare(
+        'SELECT code, label FROM frame_sizes WHERE frame_id = :frame AND is_active = TRUE ORDER BY sort_order, id'
+    );
+    $statement->execute(['frame' => $frameId]);
+
+    return array_map(static fn (array $size): array => [
+        'code' => $size['code'],
+        'label' => $size['label'],
+    ], $statement->fetchAll());
 }
 
 /** Publiczna lista: tylko opublikowane, kolejność jak w panelu, potem alfabetycznie. */
@@ -169,4 +184,103 @@ function adminFrameMedia(PDO $pdo): array
         'SELECT fm.frame_id, fm.media_id, fm.role, fm.sort_order, me.storage_path, me.alt_text ' .
         'FROM frame_media fm JOIN media me ON me.id = fm.media_id ORDER BY fm.frame_id, fm.sort_order, fm.media_id'
     )->fetchAll();
+}
+
+/** Płaskie wiersze dla panelu - odpowiednik `modelSizes` w adminCatalog(). */
+function adminFrameSizes(PDO $pdo): array
+{
+    return $pdo->query(
+        'SELECT id, frame_id, code, label, sort_order, is_active FROM frame_sizes ORDER BY frame_id, sort_order, id'
+    )->fetchAll();
+}
+
+function createAdminFrameSize(PDO $pdo, array $input): array
+{
+    $frameId = (int) ($input['frame_id'] ?? 0);
+    $code = trim((string) ($input['code'] ?? ''));
+    $label = trim((string) ($input['label'] ?? ''));
+
+    if ($frameId <= 0) {
+        throw new InvalidArgumentException('Wskaż ramę.');
+    }
+    if ($code === '' || mb_strlen($code) > 40) {
+        throw new InvalidArgumentException('Podaj oznaczenie rozmiaru (np. M), maksymalnie 40 znaków.');
+    }
+    if ($label === '' || mb_strlen($label) > 120) {
+        throw new InvalidArgumentException('Podaj nazwę rozmiaru widoczną dla klienta, maksymalnie 120 znaków.');
+    }
+
+    $frame = $pdo->prepare('SELECT name FROM frames WHERE id = :id');
+    $frame->execute(['id' => $frameId]);
+    $frameName = $frame->fetchColumn();
+    if ($frameName === false) {
+        throw new InvalidArgumentException('Nie znaleziono ramy.');
+    }
+
+    $duplicate = $pdo->prepare('SELECT 1 FROM frame_sizes WHERE frame_id = :frame AND code = :code');
+    $duplicate->execute(['frame' => $frameId, 'code' => $code]);
+    if ($duplicate->fetchColumn() !== false) {
+        throw new InvalidArgumentException("Rama ma już rozmiar o oznaczeniu „{$code}”.");
+    }
+
+    $statement = $pdo->prepare(
+        'INSERT INTO frame_sizes (frame_id, code, label, sort_order, is_active) ' .
+        'VALUES (:frame, :code, :label, :sort_order, :is_active)'
+    );
+    $statement->execute([
+        'frame' => $frameId,
+        'code' => $code,
+        'label' => $label,
+        'sort_order' => (int) ($input['sort_order'] ?? 0),
+        'is_active' => ($input['is_active'] ?? true) ? 1 : 0,
+    ]);
+    $id = (int) $pdo->lastInsertId();
+
+    logActivity(
+        $pdo,
+        'frame_size_created',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Dodano rozmiar \"{$label}\" (#{$id}) do ramy \"{$frameName}\" (#{$frameId}).",
+        ['id' => $id, 'frameId' => $frameId, 'code' => $code]
+    );
+
+    $row = $pdo->prepare('SELECT id, frame_id, code, label, sort_order, is_active FROM frame_sizes WHERE id = :id');
+    $row->execute(['id' => $id]);
+
+    return ['size' => $row->fetch()];
+}
+
+/**
+ * Usuwanie rozmiaru ramy. Ostatniego aktywnego rozmiaru nie usuwamy: rama
+ * opublikowana bez rozmiaru wraca do tego samego problemu, któremu zapobiega
+ * blokada publikacji w updateAdminRecord().
+ */
+function deleteAdminFrameSize(PDO $pdo, int $id): array
+{
+    $size = $pdo->prepare('SELECT frame_id, code, label FROM frame_sizes WHERE id = :id');
+    $size->execute(['id' => $id]);
+    $row = $size->fetch();
+    if (!$row) {
+        throw new InvalidArgumentException('Nie znaleziono rozmiaru.');
+    }
+
+    $siblings = $pdo->prepare('SELECT COUNT(*) FROM frame_sizes WHERE frame_id = :frame');
+    $siblings->execute(['frame' => $row['frame_id']]);
+    if ((int) $siblings->fetchColumn() <= 1) {
+        throw new InvalidArgumentException('To jedyny rozmiar tej ramy. Dodaj inny, zanim usuniesz ten - opublikowana rama musi mieć co najmniej jeden rozmiar.');
+    }
+
+    $pdo->prepare('DELETE FROM frame_sizes WHERE id = :id')->execute(['id' => $id]);
+
+    logActivity(
+        $pdo,
+        'frame_size_deleted',
+        'admin',
+        currentAdmin()['email'] ?? null,
+        "Usunięto rozmiar \"{$row['label']}\" ({$row['code']}) z ramy #{$row['frame_id']}.",
+        ['id' => $id, 'frameId' => $row['frame_id'], 'code' => $row['code']]
+    );
+
+    return ['id' => $id, 'deleted' => true];
 }

@@ -6,11 +6,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
-/** Dodatkowe, opcjonalne pole tekstowe dopisywane do `context` wysyłki (np. rozmiar ramy). */
-export type ContactExtraField = { name: string; label: string; placeholder?: string };
+/**
+ * Dodatkowe pole dopisywane do `context` wysyłki (np. rozmiar ramy). Bez
+ * `options` to zwykły tekst; z `options` (kod + etykieta) to lista wyboru -
+ * np. rozmiary ramy zdefiniowane w panelu zamiast wpisywania ich ręcznie.
+ */
+export type ContactExtraField = {
+  name: string;
+  label: string;
+  placeholder?: string;
+  options?: Array<{ value: string; label: string }>;
+};
 
 /**
  * Wspólny formularz dla /kontakt, CTA na /serwis i zapytania o ramę - jedno API
@@ -91,7 +101,20 @@ export function ContactForm({ type, title, description, context, extraFields = [
     {extraFields.length > 0 && <div className="grid gap-3 sm:grid-cols-2">
       {extraFields.map((field) => <div key={field.name} className="grid gap-1.5">
         <Label htmlFor={`${type}-${field.name}`}>{field.label}</Label>
-        <Input id={`${type}-${field.name}`} placeholder={field.placeholder} value={extras[field.name] ?? ''} onChange={(event) => setExtras((current) => ({ ...current, [field.name]: event.target.value }))} />
+        {field.options ? (
+          <NativeSelect
+            id={`${type}-${field.name}`}
+            required
+            className="w-full"
+            value={extras[field.name] ?? ''}
+            onChange={(event) => setExtras((current) => ({ ...current, [field.name]: event.target.value }))}
+          >
+            <NativeSelectOption value="" disabled>Wybierz…</NativeSelectOption>
+            {field.options.map((option) => <NativeSelectOption key={option.value} value={option.value}>{option.label}</NativeSelectOption>)}
+          </NativeSelect>
+        ) : (
+          <Input id={`${type}-${field.name}`} placeholder={field.placeholder} value={extras[field.name] ?? ''} onChange={(event) => setExtras((current) => ({ ...current, [field.name]: event.target.value }))} />
+        )}
       </div>)}
     </div>}
     <div className="grid gap-1.5"><Label htmlFor={`${type}-message`}>Wiadomość</Label><Textarea id={`${type}-message`} required className="min-h-32" value={message} onChange={(event) => setMessage(event.target.value)} /></div>

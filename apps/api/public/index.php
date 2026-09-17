@@ -158,7 +158,7 @@ if ($method === 'GET' && $path === '/admin/activity-log') {
     jsonResponse(activityLog($pdo, $limit, $beforeId, $eventType));
 }
 
-if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts|sizes|frames|projects)/(\d+)$~', $path, $matches)) {
+if ($method === 'PATCH' && preg_match('~^/admin/(categories|models|parts|sizes|frame-sizes|frames|projects)/(\d+)$~', $path, $matches)) {
     requireAdmin($pdo);
     jsonResponse(updateAdminRecord($pdo, $matches[1], (int) $matches[2], requestJson()));
 }
@@ -203,6 +203,16 @@ if ($method === 'POST' && $path === '/admin/sizes') {
 if ($method === 'DELETE' && preg_match('~^/admin/sizes/(\d+)$~', $path, $matches)) {
     requireAdmin($pdo);
     jsonResponse(deleteAdminSize($pdo, (int) $matches[1]));
+}
+
+if ($method === 'POST' && $path === '/admin/frame-sizes') {
+    requireAdmin($pdo);
+    jsonResponse(createAdminFrameSize($pdo, requestJson()), 201);
+}
+
+if ($method === 'DELETE' && preg_match('~^/admin/frame-sizes/(\d+)$~', $path, $matches)) {
+    requireAdmin($pdo);
+    jsonResponse(deleteAdminFrameSize($pdo, (int) $matches[1]));
 }
 
 if ($method === 'POST' && $path === '/admin/model-parts') {

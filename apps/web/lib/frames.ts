@@ -35,6 +35,8 @@ export type ApiFrame = {
   source_url: string | null;
   default_image_path: string | null;
   media: Array<{ storage_path: string; role: FrameMediaRole; alt_text: string | null }>;
+  /** Rozmiary zdefiniowane w panelu - bez dopłaty, rama ma jedną cenę niezależnie od rozmiaru. */
+  sizes: Array<{ code: string; label: string }>;
 };
 
 /**

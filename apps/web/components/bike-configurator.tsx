@@ -87,6 +87,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   const [modelDescriptionOpen, setModelDescriptionOpen] = useState(false);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'error'>('idle');
   const [submitError, setSubmitError] = useState('');
@@ -390,10 +391,27 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     <main className="flex-1">
       <section className="mx-auto max-w-[1480px] px-4 pb-3 pt-7 sm:px-8 sm:pt-10 lg:px-12">
         <div className="mb-5 flex items-end justify-between gap-4"><div><p className="eyebrow">{copy.configurator.heroEyebrow}</p><h1 className="mt-2 text-[clamp(2rem,5vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em]">{copy.configurator.heroTitleLine1}<br className="hidden sm:block" /> {copy.configurator.heroTitleLine2}</h1></div><p className="hidden max-w-sm text-right text-base leading-relaxed text-ink-muted xl:block">{copy.configurator.heroSubtitle}</p></div>
-        <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0">
-          {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => selectModel(item.id)} className={`pick-card focus-ring min-w-[78vw] snap-center sm:min-w-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}><span className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span><span className={`grid size-6 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span></span><span className="mt-1 text-xl font-semibold tracking-tight">{item.name}</span><span className="mt-1 text-sm text-ink-muted">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span></button>; })}
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{copy.configurator.currentModelEyebrow}</p>
+            <p className="mt-0.5 truncate text-lg font-semibold tracking-tight">{model.name}</p>
+          </div>
+          <Button type="button" variant="outline" className="shrink-0 rounded-full" onClick={() => setModelPickerOpen(true)} data-testid="model-switcher-trigger">
+            {copy.configurator.changeModelCta} <ChevronDown className="size-4" />
+          </Button>
         </div>
       </section>
+
+      <Dialog open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
+        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:max-w-2xl sm:p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold tracking-tight text-ink">{copy.configurator.changeModelCta}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            {models.map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => { selectModel(item.id); setModelPickerOpen(false); }} className={`pick-card focus-ring ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}><span className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{item.category}</span><span className={`grid size-6 place-items-center rounded-full border ${active ? 'border-ink bg-ink text-white' : 'border-line-strong'}`}>{active && <Check className="size-3.5" />}</span></span><span className="mt-1 text-xl font-semibold tracking-tight">{item.name}</span><span className="mt-1 text-sm text-ink-muted">{item.basePrice ? `od ${formatPrice(item.basePrice)}` : copy.configurator.priceComingSoon}</span></button>; })}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <section className="mx-auto grid max-w-[1480px] gap-4 px-4 pb-20 sm:px-8 lg:grid-cols-[minmax(0,1.32fr)_minmax(380px,0.68fr)] lg:px-12">
         <div className="lg:sticky lg:top-[88px] lg:self-start">

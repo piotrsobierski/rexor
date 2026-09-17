@@ -42,7 +42,7 @@ import {
   formatWeightKg,
   formatWh,
 } from '@/lib/battery';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -161,6 +161,7 @@ type Catalog = {
   modelMedia: MediaRow[];
   frames: Row[];
   frameMedia: FrameMediaRow[];
+  frameSizes: Row[];
   projects: Row[];
   projectMedia: ProjectMediaRow[];
   theme: Record<string, string>;
@@ -497,6 +498,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
             <FramesEditor
               rows={catalog.frames ?? []}
               media={catalog.frameMedia ?? []}
+              sizes={catalog.frameSizes ?? []}
               categories={catalog.categories}
               patch={patch}
               request={request}
@@ -2691,9 +2693,15 @@ function ModelsEditor({
                       });
                     }}
                   >
-                    <Save /> Zapisz model
+                    <Save className="size-4" /> Zapisz model
                   </Button>
-                  <Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium">
+                  <Label
+                    className={buttonVariants({
+                      variant: 'outline',
+                      size: 'sm',
+                      className: 'cursor-pointer',
+                    })}
+                  >
                     <Upload className="size-4" /> Dodaj zdjęcia do galerii
                     <input
                       type="file"
@@ -2855,6 +2863,7 @@ function frameDrafts(rows: Row[]): Record<number, Row> {
 function FramesEditor({
   rows,
   media,
+  sizes,
   categories,
   patch,
   request,
@@ -2863,6 +2872,7 @@ function FramesEditor({
 }: {
   rows: Row[];
   media: FrameMediaRow[];
+  sizes: Row[];
   categories: Row[];
   patch: (
     resource: string,
@@ -3597,6 +3607,14 @@ function FramesEditor({
                     />
                   </div>
                 </details>
+                <FrameSizesPanel
+                  frameId={row.id}
+                  disabled={!isSavedRecordId(row.id)}
+                  sizes={sizes.filter((size) => Number(size.frame_id) === Number(row.id))}
+                  request={request}
+                  reload={reload}
+                  setMessage={setMessage}
+                />
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={() => void saveFrame(row)}>
                     <Save /> Zapisz ramę
@@ -3630,6 +3648,125 @@ function FramesEditor({
       </div>
       <LongListMore list={list} noun="ram" />
     </Panel>
+  );
+}
+
+/**
+ * Rozmiary ramy: bez dopłaty i bez geometrii per rozmiar (patrz komentarz w
+ * migracji 037_frame_sizes.sql) - tylko oznaczenia, które klient wybiera w
+ * formularzu zapytania zamiast wpisywać rozmiar ręcznie.
+ */
+function FrameSizesPanel({
+  frameId,
+  disabled,
+  sizes,
+  request,
+  reload,
+  setMessage,
+}: {
+  frameId: unknown;
+  disabled: boolean;
+  sizes: Row[];
+  request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
+}) {
+  const [newSize, setNewSize] = useState({ code: '', label: '' });
+
+  async function addSize() {
+    if (!newSize.code.trim() || !newSize.label.trim()) {
+      setMessage('Podaj kod i nazwę rozmiaru.');
+      return;
+    }
+    setMessage('Dodaję rozmiar…');
+    try {
+      await request('/admin/frame-sizes', {
+        method: 'POST',
+        body: JSON.stringify({
+          frame_id: frameId,
+          code: newSize.code.trim(),
+          label: newSize.label.trim(),
+          sort_order: sizes.length * 10 + 10,
+        }),
+      });
+      setNewSize({ code: '', label: '' });
+      await reload();
+      setMessage('Rozmiar dodany.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Nie udało się dodać rozmiaru.',
+      );
+    }
+  }
+
+  async function removeSize(row: Row) {
+    if (
+      !window.confirm(
+        `Usunąć rozmiar „${String(row.label ?? row.code)}"?`,
+      )
+    )
+      return;
+    setMessage('Usuwam rozmiar…');
+    try {
+      await request(`/admin/frame-sizes/${row.id}`, { method: 'DELETE' });
+      await reload();
+      setMessage('Rozmiar usunięty.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Nie udało się usunąć rozmiaru.',
+      );
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-line bg-white p-4 sm:p-5">
+      <h3 className="text-sm font-semibold tracking-tight text-ink">Rozmiary</h3>
+      <p className="mt-1 text-xs text-ink-subtle">
+        Lista rozmiarów do wyboru w formularzu zapytania o ramę - bez dopłaty, rama ma jedną cenę niezależnie od rozmiaru.
+      </p>
+      {sizes.length > 0 && (
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {sizes.map((row) => (
+            <li
+              key={row.id}
+              className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface px-3 py-1.5 text-sm"
+            >
+              {String(row.label ?? row.code)}
+              <button
+                type="button"
+                aria-label={`Usuń rozmiar ${String(row.label ?? row.code)}`}
+                className="text-ink-subtle hover:text-red-600"
+                onClick={() => void removeSize(row)}
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-3 grid gap-2 sm:grid-cols-[110px_1fr_auto]">
+        <Input
+          placeholder="Kod (M)"
+          value={newSize.code}
+          disabled={disabled}
+          onChange={(event) => setNewSize({ ...newSize, code: event.target.value })}
+          className="h-9 text-sm"
+        />
+        <Input
+          placeholder="Nazwa dla klienta (M / 17 cali)"
+          value={newSize.label}
+          disabled={disabled}
+          onChange={(event) => setNewSize({ ...newSize, label: event.target.value })}
+          className="h-9 text-sm"
+        />
+        <Button size="sm" disabled={disabled} onClick={() => void addSize()}>
+          <Save /> Dodaj
+        </Button>
+      </div>
+      {disabled && (
+        <p className="mt-2 text-xs text-ink-subtle">Najpierw zapisz ramę, aby móc dodać rozmiar.</p>
+      )}
+    </div>
   );
 }
 

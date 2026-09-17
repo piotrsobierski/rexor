@@ -179,6 +179,8 @@ export const defaultCopy = {
     heroTitleLine1: 'Rower skrojony',
     heroTitleLine2: 'pod Twój teren.',
     heroSubtitle: 'Dobieraj komponenty, obserwuj cenę i wróć do swojego projektu przez prywatny link.',
+    currentModelEyebrow: 'Konfigurujesz',
+    changeModelCta: 'Zmień model',
     priceComingSoon: 'cena w przygotowaniu',
     aboutModelPrefix: 'O modelu',
     projectEyebrow: 'Twój projekt',

@@ -197,7 +197,13 @@ function FrameDetail({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
             description={copy.frames.formDescription}
             context={{ frameSlug: frame.slug, frameName: frame.name }}
             extraFields={[
-              { name: 'size', label: copy.frames.formSizeLabel },
+              {
+                name: 'size',
+                label: copy.frames.formSizeLabel,
+                options: frame.sizes.length > 0
+                  ? frame.sizes.map((size) => ({ value: size.label, label: size.label }))
+                  : undefined,
+              },
               { name: 'paint', label: copy.frames.formPaintLabel },
             ]}
           />
