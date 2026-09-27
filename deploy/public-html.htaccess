@@ -21,7 +21,7 @@ RewriteRule ^api(?:/.*)?$ apps/api/public/index.php [QSA,L]
 # nie serwuje go - storage/backups zostaje zablokowany jak wyżej, pobranie
 # idzie przez FTP w scripts/download-db-backup.sh.
 RewriteCond %{THE_REQUEST} \s/+(.*/)?(?:apps|database|scripts|storage/backups)(?:[/\s?]) [NC]
-RewriteCond %{REQUEST_URI} !^/scripts/remote-(migrate|backup)\.php$ [NC]
+RewriteCond %{REQUEST_URI} !^/scripts/remote-(migrate|backup|catalog-sync)\.php$ [NC]
 RewriteRule ^ - [F,L]
 
 <FilesMatch "(^\.|\.env|\.(sql|log|ini|sh)$)">
