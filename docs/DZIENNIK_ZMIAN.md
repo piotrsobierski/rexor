@@ -1,14 +1,5 @@
 # Dziennik zmian
 
-## 2026-09-17 — Domyślny silnik E82
-
-Automatyczny przebieg CFG-06 wykazał, że E82 nie miał domyślnej pozycji w
-stałej grupie „Silnik”, więc API prawidłowo odrzucało zapis jako konfigurację
-wymagającą wyceny indywidualnej. W panelu administratora przypisano i ustawiono
-jako domyślny „Silnik Bafang M510 250 W / 95 Nm” (`motor-m510-250w`, 3 700 zł).
-Katalog po zmianie zwraca cenę bazową E82 20 680 zł; ponowiony CFG-06 utworzył
-rekord (HTTP 201), a ADM-10 otworzył jego szczegóły w tej samej sesji.
-
 Zapis prac: co zostało zrobione, dlaczego i jakie pliki objęła zmiana.
 Nowe wpisy dopisujemy na górze.
 
@@ -21,6 +12,178 @@ oraz świadomie nierozwiązane ryzyka. Dzięki temu następny agent może odró�
 fakty sprawdzone od założeń i nie powtarza diagnostyki.
 
 ---
+
+## 2026-09-21 — Teksty z panelu nie wgrywały się na wyeksportowanej stronie; szkielety zamiast mignięć
+
+### Objaw
+
+Na produkcji (eksport statyczny) teksty nadpisane w panelu („Teksty") nie
+pojawiały się w treści stron — HTML miał wartości domyślne z builda, a API
+zwracało nadpisania (potwierdzone: hero z builda „Zbudowany dla Twojej trasy"
+vs `Spersonalizowane dla Ciebie11` z API). Nagłówek i stopka pobierały copy
+każde z osobna po stronie klienta i migały: najpierw „Rowery", po sekundie
+„Rowery111".
+
+### Przyczyna
+
+Przy `STATIC_EXPORT=1` `fetchJson()` z `server-catalog.ts` celowo zwraca null,
+więc strony przekazywały `copy={null}`. `usePublicCopy()` traktował `null`
+jak dane startowe (`initial !== undefined`), więc nie pobierał nic z API i
+teksty zostawały zamrożone z builda. Komponenty bez `initial` (nagłówek,
+stopka) pobierały copy niezależnie — stąd mignięcie. Dodatkowo każda strona
+i każdy komponent robił własne pobranie `/settings/copy`.
+
+### Zmiana
+
+- Nowy `apps/web/components/copy-provider.tsx`: `CopyProvider` w
+  `app/layout.tsx` pobiera copy raz dla całej strony. Z realnym `initial`
+  (SSR) teksty są gotowe od razu; bez niego (eksport statyczny) jedno
+  pobranie `/api/settings/copy` po stronie klienta, a do czasu odpowiedzi
+  `usePublicCopyReady()` zwraca false.
+- `apps/web/lib/use-public-copy.ts`: hook czyta z kontekstu providera;
+  naprawione rozróżnienie null/undefined (null = „dociągnij sam");
+  dodany `usePublicCopyReady()`.
+- Szkielety (`Skeleton`) zamiast tekstów z builda, dopóki copy nie jest
+  potwierdzone: nagłówek (menu, CTA), stopka, hero strony głównej i jej
+  sekcje, nagłówki /rowery, kategorii, modelu, części, ram, realizacji,
+  serwisu i konfiguratora, breadcrumby. Tekst renderuje się raz — żadnego
+  mignięcia „default -> nadpisanie".
+- Strony (`app/**/page.tsx`) i komponenty stron przestały przekazywać
+  `copy` propem — jedno źródło: layout. Wyjątkiem pozostaje przekazywanie
+  już scalonego obiektu copy do małych komponentów prezentacyjnych
+  (BikePickCard, FilteredCollection, FrameDetail, ProjectDetail).
+
+### Testy
+
+- `tsc --noEmit` czysto; build `STATIC_EXPORT=1` przechodzi.
+- Wyeksportowany `index.html` nie zawiera domyślnych tekstów hero ani
+  „Rowery" w menu — jest markup szkieletów i chunk `copy-provider`.
+- Cross-check 202 użyć `copy.*` w komponentach: wszystkie mają klucz w
+  `defaultCopy`; brak martwych kluczy w `site_settings.copy`.
+- QA (`rexor.sobierski.com`): przed deploy wpisano nadpisania z produkcji
+  przez `PATCH /api/admin/settings/copy` (login `admin@rexor.local`, dane
+  w `docs/CREDS.md`), po deploy do weryfikacji: szkielety bez mignięcia,
+  teksty z API widać po odświeżeniu bez rebuildu.
+
+### Drugi przebieg: audyt „wszystkie teksty z copy" (2026-09-21, wieczór)
+
+Pytanie właściciela „na pewno WSZYSTKIE teksty lecą z copy?" ujawniło dwie
+grupy problemów, poprawione tym samym deployem na QA:
+
+- **Martwe klucze** (edytowalne w panelu, nigdzie nie renderowane):
+  usunięto z `copy.ts` `frames.loading`, `frames.factsTitle`,
+  `projects.loading` i `collection.loading` (zastąpiły je szkielety).
+  W bazach QA/produkcji stare wartości jeszcze leżą, ale są obojętne
+  (deepMerge bierze klucze z bazowej struktury) i znikną przy najbliższym
+  zapisie z zakładki „Teksty".
+- **Teksty na sztywno przeniesione do copy**: cały wspólny formularz
+  kontaktowy (nowa sekcja `contact` — etykiety, CTA, komunikaty), cała
+  obudowa czatu AI (nowa sekcja `chat` — dymek, nagłówek, placeholder,
+  hinty, powitanie; prompt asystenta pozostaje osobnym ustawieniem panelu)
+  oraz arie nawigacji w nagłówku (`nav.homeAria`, `nav.navigationAria`).
+
+Świadomie pozostały poza copy (do decyzji właściciela):
+- `nav.czesci` — martwe pole w panelu; ZASADY nr 22 mówią, że menu ma
+  zawierać „Części", a dziennik z 2026-09-16 odnotował celowe usunięcie
+  tego linku z nawigacji. Rozbieżność do rozstrzygnięcia (podpiąć link
+  albo usunąć klucz).
+- mikroteksty przeglądarki lakierów (`paint-picker.tsx`) — ~25 napisów
+  silnie sprzężonych z interpolacją; kandydat na osobny wpis, jeśli mają
+  być edytowalne.
+- zapasowa treść serwisu (`serviceFallbackContent`) — celowo w kodzie,
+  używana tylko przy braku odpowiedzi API.
+- `title="Napisz do nas"` na ikonie kontaktu (tooltip).
+
+### Wdrożenie
+
+2026-09-21: QA (`rexor.sobierski.com`) — dwa przebiegi (fix szkieletów,
+potem audyt tekstów). Produkcja (`rexorbikes.com`): wdrożono pełny fix
+(`REMOTE_ENV_FILE=.env.production DEPLOY_ENV_FILE=.deploy.env.production
+scripts/deploy-ftp.sh --apply`), wcześniej zdjęto zrzut bazy
+(`scripts/download-db-backup.sh --prod`, `storage/backups/prod/20260921T131719Z`).
+Klucz `nav.czesci` usunięty z `copy.ts` po decyzji właściciela (link „Części"
+pozostaje poza menu — aktualna praktyka wygrywa z ZASADAMI nr 22, które
+warto zaktualizować przy najbliższej rewizji). Po wdrożeniu: HTML produkcji
+nie ma zapieczonych tekstów (szkielety), `/api/health` OK, dane w
+`site_settings.copy` nietknięte.
+
+### Trzeci przebieg: tytuł panelu „Strony" vs treść strony (2026-09-21, wieczór)
+
+Pytanie właściciela: czy tytuł strony zdefiniowany w panelu („Strony") jest
+faktycznie używany na każdej stronie? Audyt: NIE.
+
+- `/serwis`: tytuł „Serwis rowerów Rexor" z panelu był ignorowany — hero brał
+  `copy.service.title` z zakładki „Teksty". Naprawione: tytuł i lead hero
+  biorą teraz `site_pages.title` i `site_pages.excerpt`, a gdy są puste
+  (albo API nie odpowiada) — `copy.service.title`/`subtitle`; do czasu
+  rozstrzygnięcia szkielet. `excerpt` przestał być martwym polem.
+- `/kontakt`, `/regulamin`, `/polityka-prywatnosci`: tytuł z panelu był
+  używany, ale na wyeksportowanej stronie mignął hardcoded fallbackiem z
+  builda („Kontakt", „Regulamin") — teraz szkielet do czasu odpowiedzi API.
+- `hero_image_path` w site_pages pozostaje bez renderu w interfejsie publicznym
+  (pole w panelu obecnie martwe) — do decyzji projektowej.
+- `navigation_label` to etykieta panelowa, nie publiczna — bez zmian.
+
+Wdrożono na QA i zweryfikowano: HTML `/serwis` bez zapieczonych tytułów,
+tytuł z panelu (wraz z testowym „!x") dojdzie z API. Produkcja: ten sam fix
+wdrożony 2026-09-21 bez zmian w bazie (potwierdzone: `/api/pages/serwis`
+zwraca „Serwis rowerów Rexor" bez testowego „!x", `/api/health` OK).
+
+Czwarta poprawka (ten sam dzień): nagłówek i opis formularza na /kontakt
+(„Napisz do nas" / „Odpowiemy najszybciej…") były wpisane na sztywno w
+`kontakt-page.tsx` i nie reagowały na zakładkę „Teksty". Przeniesione do
+`copy.contact.asideTitle`/`asideDescription`; cały wspólny formularz
+(etykiety, CTA, tytuł/lead obok formularza) dostaje szkielet do czasu
+potwierdzenia tekstów z API, więc nadpisania z panelu pojawiają się bez
+mignięcia. Wdrożone na QA; produkcja czeka na decyzję właściciela.
+
+Piąta poprawka (ten sam dzień): powitanie czatu było zamrożone w stanie
+komponentu (`useState` inicjalizowany raz), więc przy eksporcie statycznym
+nie podążało za tekstami z panelu — nagłówek okna tak, a pierwsza wiadomość
+nie. Powitanie jest teraz pochodną copy i odświeża się, dopóki rozmowa nie
+zaczęła się (flaga `conversationStarted`; reset czatu wraca do trybu
+podążania). Przy okazji odkryto i naprawiono ryzyko w API:
+`updateSiteCopy` zapisywał payload bez scalania, więc częściowy zapis
+(zawierający tylko jedną sekcję) wyzerowałby pozostałe sekcje w
+`site_settings.copy`. Teraz `array_replace_recursive` z obecną wartością
+(pełny draft z panelu daje identyczny wynik). Podczas testów częściowy
+zapis faktycznie skrócił copy na QA — odtworzono pełny dokument z żywego
+stanu produkcji + sekcje chat/contact z `defaultCopy` (19 sekcji;
+weryfikacja: partial PATCH zachowuje pozostałe sekcje).
+
+Szósta poprawka (ten sam dzień): czat nie miał szkieletów — dymek
+powitalny i otwarte okno mogły pokazać teksty z builda i podmienić je na
+panelowe. Dymek pokazuje się dopiero po potwierdzeniu tekstów (`copyReady`),
+a w oknie szkielety obejmują tytuł, plakietkę Online, podtytuł, powitanie,
+hint i stopkę; placeholder pola jest pusty do czasu. Wdrożone na QA, a po
+zatwierdzeniu właściciela także na produkcję (2026-09-21: pakiet piąta +
+szósta poprawka; baza nietknięta, copy prod = 17 sekcji, `nav.rowery`
+już oczyszczone przez właściciela w panelu, homepage: 44 szkielety,
+0 defaultów w HTML).
+
+### Nierozwiązane ryzyka
+
+
+- Silnik SEO czyta treść po JS: w wyeksportowanym HTML hero ma szkielet
+  zamiast tekstu (jak już wcześniej listy katalogu). `<title>`/`description`
+  pozostają w meta z builda.
+- Ten sam wzorzec „null z eksportu statycznego" dotyczy motywu i favicony
+  (`ThemeClientRuntime`, `FaviconRuntime`) — kolory mogą mignąć; do
+  rozważenia analogiczny provider w osobnym kroku.
+- Nadpisania testowe w bazie („Rowery111", „Ramy!!!", „Realizacje!!!!!"
+  itd.) celowo pozostały na QA i produkcji do ręcznej weryfikacji ładowania;
+  decyzja o przywróceniu defaultów należy do właściciela.
+
+---
+
+## 2026-09-17 — Domyślny silnik E82
+
+Automatyczny przebieg CFG-06 wykazał, że E82 nie miał domyślnej pozycji w
+stałej grupie „Silnik”, więc API prawidłowo odrzucało zapis jako konfigurację
+wymagającą wyceny indywidualnej. W panelu administratora przypisano i ustawiono
+jako domyślny „Silnik Bafang M510 250 W / 95 Nm” (`motor-m510-250w`, 3 700 zł).
+Katalog po zmianie zwraca cenę bazową E82 20 680 zł; ponowiony CFG-06 utworzył
+rekord (HTTP 201), a ADM-10 otworzył jego szczegóły w tej samej sesji.
 
 ## 2026-09-17 — Dalsze testy publiczne: menu i kontakt
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeStyle } from '@/components/theme-runtime';
+import { CopyProvider } from '@/components/copy-provider';
 import { fetchBranding, fetchCopy, fetchTheme } from '@/lib/server-catalog';
 import { mergeCopy } from '@/lib/copy';
 import { publicMediaUrl } from '@/lib/catalog-merge';
@@ -34,12 +35,17 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [theme, branding] = await Promise.all([fetchTheme(), fetchBranding()]);
+  const [theme, branding, copy] = await Promise.all([fetchTheme(), fetchBranding(), fetchCopy()]);
   return (
     <html lang="pl">
       <head><ThemeStyle theme={theme} /></head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
+        {/* `copy ?? undefined`: null z eksportu statycznego znaczy "brak danych
+            na serwerze", a nie "pusty nadpisania" - provider ma wtedy pobrać
+            teksty z /api po stronie klienta (patrz copy-provider.tsx). */}
+        <CopyProvider initial={copy ?? undefined}>
+          {children}
+        </CopyProvider>
         <ThemeClientRuntime applied={theme !== null} />
         <FaviconRuntime applied={branding !== null} />
         <ChatWidget />

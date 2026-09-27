@@ -1,7 +1,7 @@
 import { BikesPage } from '@/components/static-pages';
-import { fetchCatalog, fetchCopy } from '@/lib/server-catalog';
+import { fetchCatalog } from '@/lib/server-catalog';
 
 export default async function Page() {
-  const [catalog, copy] = await Promise.all([fetchCatalog(), fetchCopy()]);
-  return <BikesPage catalog={catalog ?? undefined} copy={copy} />;
+  const catalog = await fetchCatalog();
+  return <BikesPage catalog={catalog ?? undefined} />;
 }

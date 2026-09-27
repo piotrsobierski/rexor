@@ -5,12 +5,14 @@ import { usePathname } from 'next/navigation';
 import { ArrowLeft, ArrowRight, BatteryCharging, Gauge, MessageSquareText, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OptimizedImage } from '@/components/optimized-image';
+import { GalleryImageButton } from '@/components/gallery-lightbox';
 import { PageFrame } from '@/components/page-frame';
 import { CardGridSkeleton, ProductDetailSkeleton } from '@/components/page-loading';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice, type BikeModel } from '@/lib/catalog';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
-import { usePublicCopy } from '@/lib/use-public-copy';
+import { usePublicCopy, usePublicCopyReady } from '@/lib/use-public-copy';
 import type { SiteCopy } from '@/lib/copy';
 
 
@@ -49,12 +51,13 @@ function BikePickCard({ model, copy }: { model: BikeModel; copy: SiteCopy }) {
   );
 }
 
-export function BikesPage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
+export function BikesPage({ catalog }: { catalog?: PublicCatalogData }) {
   // Ceny i zdjęcia pochodzą z katalogu API, bo cena "od" jest wyliczana z
   // cennika części, a nie wpisana w kodzie. Katalog przychodzi z serwera,
   // żeby pierwszy render nie pokazywał danych zapasowych.
   const { models, categories, loaded } = usePublicCatalog(catalog);
-  const copy = usePublicCopy(initialCopy);
+  const copy = usePublicCopy();
+  const copyReady = usePublicCopyReady();
   const [activeCategorySlug, setActiveCategorySlug] = useState<string | null>(null);
   const filters = useMemo(
     () => categories.filter((category) => models.some((model) => model.categorySlug === category.slug)),
@@ -72,8 +75,8 @@ export function BikesPage({ catalog, copy: initialCopy }: { catalog?: PublicCata
   return (
     <PageFrame>
       <section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
-        <p className="eyebrow">{copy.bikes.eyebrow}</p>
-        <h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.bikes.title}</h1>
+        <p className="eyebrow">{copyReady ? copy.bikes.eyebrow : <Skeleton aria-hidden="true" className="h-3 w-24" />}</p>
+        <h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copyReady ? copy.bikes.title : <Skeleton aria-hidden="true" className="h-12 w-2/3 sm:h-16" />}</h1>
         {loaded ? (
           <>
             <fieldset className="-mx-4 mt-8 flex min-w-0 gap-2 overflow-x-auto border-0 px-4 pb-2 sm:mx-0 sm:flex-wrap sm:px-0">
@@ -100,9 +103,10 @@ function BikeFilterButton({ label, active, onClick }: { label: string; active: b
 /** Kategorie, które przekraczają moc/prędkość roweru elektrycznego - klient musi potwierdzić ostrzeżenie raz na przeglądarkę zanim zobaczy ofertę. */
 const restrictedCategorySlugs = ['elektryczne'];
 
-export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { catalog?: PublicCatalogData; categorySlug: string; copy?: unknown }) {
+export function CategoryPage({ catalog, categorySlug }: { catalog?: PublicCatalogData; categorySlug: string }) {
   const { models, categories, loaded } = usePublicCatalog(catalog);
-  const copy = usePublicCopy(initialCopy);
+  const copy = usePublicCopy();
+  const copyReady = usePublicCopyReady();
   const category = categories.find((item) => item.slug === categorySlug);
   const categoryModels = models.filter((model) => model.categorySlug === categorySlug);
   const isRestricted = restrictedCategorySlugs.includes(categorySlug);
@@ -128,10 +132,10 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
     </section></PageFrame>;
   }
 
-  const categoryImage = publicMediaUrl(category.default_image_path);
+  const categoryImage = publicMediaUrl(category.hero_image_path || category.default_image_path);
   return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
     {categoryImage && <div className="mb-8 aspect-[21/9] w-full overflow-hidden rounded-[28px] bg-[var(--muted)]"><OptimizedImage src={categoryImage} alt="" priority className="size-full object-cover" /></div>}
-    <p className="eyebrow">{copy.category.eyebrow}</p>
+    <p className="eyebrow">{copyReady ? copy.category.eyebrow : <Skeleton aria-hidden="true" className="h-3 w-20" />}</p>
     <h1 className="mt-3 text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{category.name}</h1>
     {category.short_description && <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-muted">{category.short_description}</p>}
     {category.description_html && <div className="rich-content mt-4 max-w-2xl text-sm leading-relaxed text-ink-muted" dangerouslySetInnerHTML={{ __html: category.description_html }} />}
@@ -142,9 +146,10 @@ export function CategoryPage({ catalog, categorySlug, copy: initialCopy }: { cat
   </section></PageFrame>;
 }
 
-export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initialCopy }: { catalog?: PublicCatalogData; modelSlug?: string; copy?: unknown }) {
+export function BikeModelPage({ catalog, modelSlug: modelSlugProp }: { catalog?: PublicCatalogData; modelSlug?: string }) {
   const { models, categories, loaded } = usePublicCatalog(catalog);
-  const copy = usePublicCopy(initialCopy);
+  const copy = usePublicCopy();
+  const copyReady = usePublicCopyReady();
   // Statyczny eksport nie może z góry wypisać wszystkich par kategoria/model
   // (nowe modele/ramy dochodzą wyłącznie z bazy, przez panel) - trasa
   // /rowery/[category]/[model] renderuje więc jedną powłokę dla dowolnego
@@ -187,9 +192,9 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
       <section className="mx-auto max-w-[1480px] px-4 py-8 sm:px-8 lg:px-12 lg:py-12">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-          <a href="/" className="hover:text-ink transition-colors">{copy.model.breadcrumbHome}</a>
+          <a href="/" className="hover:text-ink transition-colors">{copyReady ? copy.model.breadcrumbHome : <Skeleton aria-hidden="true" className="inline-block h-3 w-10" />}</a>
           <span>/</span>
-          <a href="/rowery" className="hover:text-ink transition-colors">{copy.model.breadcrumbBikes}</a>
+          <a href="/rowery" className="hover:text-ink transition-colors">{copyReady ? copy.model.breadcrumbBikes : <Skeleton aria-hidden="true" className="inline-block h-3 w-14" />}</a>
           <span>/</span>
           <a href={`/rowery/${model.categorySlug}`} className="hover:text-ink transition-colors">{category?.name ?? model.category}</a>
           <span>/</span>
@@ -197,17 +202,17 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
         </nav>
 
         {/* Hero Section */}
-        <div className="mt-8 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start lg:gap-14">
+        <div className="mt-8 grid min-w-0 grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-14">
           {/* Gallery showcase */}
-          <div className="space-y-4">
-            <div className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)] p-6 sm:p-10">
+          <div className="min-w-0 space-y-4">
+            <GalleryImageButton images={model.gallery.length ? model.gallery : [model.image]} index={selectedPhoto} title={model.name} labels={copy.gallery} className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)] p-6 sm:p-10">
               <OptimizedImage
                 src={activeImage}
                 alt={model.name}
                 priority
                 className="size-full object-contain mix-blend-multiply transition-all duration-300"
               />
-            </div>
+            </GalleryImageButton>
             {model.gallery.length > 1 && (
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {model.gallery.map((img, idx) => (
@@ -310,10 +315,11 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp, copy: initial
   );
 }
 
-export function PartsPage({ copy: initialCopy }: { copy?: unknown } = {}) {
-  const copy = usePublicCopy(initialCopy);
+export function PartsPage() {
+  const copy = usePublicCopy();
+  const copyReady = usePublicCopyReady();
   const groups = Object.values(copy.parts.groups);
-  return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copy.parts.eyebrow}</p><h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.parts.title}</h1><div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{groups.map(({ name, text }, index) => <article key={name} className="flex min-h-56 flex-col rounded-[24px] border border-line bg-white p-6"><span className="font-mono text-xs text-ink-subtle">{String(index + 1).padStart(2, '0')}</span><h2 className="mt-auto text-2xl font-semibold tracking-tight">{name}</h2><p className="mt-3 text-sm leading-relaxed text-ink-muted">{text}</p></article>)}</div><Button render={<a href="/konfigurator" />} className="mt-8 h-12 rounded-full bg-ink px-6 text-white">{copy.parts.cta} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
+  return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20"><p className="eyebrow">{copyReady ? copy.parts.eyebrow : <Skeleton aria-hidden="true" className="h-3 w-16" />}</p><h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copyReady ? copy.parts.title : <Skeleton aria-hidden="true" className="h-12 w-2/3 sm:h-16" />}</h1><div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{groups.map(({ name, text }, index) => <article key={name} className="flex min-h-56 flex-col rounded-[24px] border border-line bg-white p-6"><span className="font-mono text-xs text-ink-subtle">{String(index + 1).padStart(2, '0')}</span><h2 className="mt-auto text-2xl font-semibold tracking-tight">{name}</h2><p className="mt-3 text-sm leading-relaxed text-ink-muted">{text}</p></article>)}</div><Button render={<a href="/konfigurator" />} className="mt-8 h-12 rounded-full bg-ink px-6 text-white">{copyReady ? copy.parts.cta : <Skeleton aria-hidden="true" className="h-4 w-52" />} <ArrowRight data-icon="inline-end" /></Button></section></PageFrame>;
 }
 
 /**
@@ -328,9 +334,8 @@ export function PartsPage({ copy: initialCopy }: { copy?: unknown } = {}) {
  * Katalog pobieramy raz i przekazujemy niżej jako `catalog`, żeby CategoryPage
  * ani BikeModelPage nie odpytywały API po raz drugi.
  */
-export function CategoryOrModelPage({ catalog, copy: initialCopy }: { catalog?: PublicCatalogData; copy?: unknown }) {
+export function CategoryOrModelPage({ catalog }: { catalog?: PublicCatalogData }) {
   const { models, categories, loaded } = usePublicCatalog(catalog);
-  const copy = usePublicCopy(initialCopy);
   const pathname = usePathname();
   const slug = (pathname.split('/').filter(Boolean).pop() ?? '').toLowerCase();
 
@@ -339,6 +344,6 @@ export function CategoryOrModelPage({ catalog, copy: initialCopy }: { catalog?: 
 
   const resolved: PublicCatalogData = { models, categories };
   return models.some((model) => model.id === slug)
-    ? <BikeModelPage catalog={resolved} modelSlug={slug} copy={initialCopy} />
-    : <CategoryPage catalog={resolved} categorySlug={slug} copy={initialCopy} />;
+    ? <BikeModelPage catalog={resolved} modelSlug={slug} />
+    : <CategoryPage catalog={resolved} categorySlug={slug} />;
 }

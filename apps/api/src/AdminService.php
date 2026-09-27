@@ -66,8 +66,8 @@ function normalizeAdminFlags(array $rows, array $fields): array
 function adminCatalog(PDO $pdo): array
 {
     $catalog = [
-        'categories' => $pdo->query('SELECT id, slug, name, short_description, description_html, default_image_path, icon_key, is_published, sort_order FROM bike_categories ORDER BY sort_order')->fetchAll(),
-        'models' => $pdo->query('SELECT m.id, m.category_id, m.slug, m.name, m.short_description, m.description_html, m.computed_base_price_gross, m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.default_image_path, m.status, COUNT(mm.media_id) AS media_count FROM bike_models m LEFT JOIN model_media mm ON mm.model_id = m.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll(),
+        'categories' => $pdo->query('SELECT id, slug, name, short_description, description_html, default_image_path, hero_image_path, icon_key, is_published, sort_order FROM bike_categories ORDER BY sort_order')->fetchAll(),
+        'models' => $pdo->query('SELECT m.id, m.category_id, m.slug, m.name, m.short_description, m.description_html, m.computed_base_price_gross, m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.default_image_path, m.status, m.is_recommended, COUNT(mm.media_id) AS media_count FROM bike_models m LEFT JOIN model_media mm ON mm.model_id = m.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll(),
         'partGroups' => $pdo->query('SELECT id, slug, name, description, sort_order, is_required FROM part_groups ORDER BY sort_order, id')->fetchAll(),
         'modelParts' => $pdo->query('SELECT mp.model_id, mp.part_id, pg.slug AS group_slug, p.group_id, mp.is_default, mp.is_customer_configurable, mp.customer_supplied_allowed, mp.customer_supplied_gross_price, mp.gross_price_override, mp.sort_order, mp.notes FROM model_parts mp JOIN parts p ON p.id = mp.part_id JOIN part_groups pg ON pg.id = p.group_id ORDER BY mp.model_id, pg.sort_order, mp.sort_order')->fetchAll(),
         'modelGroupSettings' => $pdo->query('SELECT mpgs.model_id, mpgs.group_id, pg.slug AS group_slug, mpgs.selection_mode, mpgs.customer_part_allowed, mpgs.customer_part_gross_price, mpgs.customer_part_label, mpgs.helper_text FROM model_part_group_settings mpgs JOIN part_groups pg ON pg.id = mpgs.group_id ORDER BY mpgs.model_id, pg.sort_order')->fetchAll(),
@@ -112,6 +112,7 @@ function adminCatalog(PDO $pdo): array
     ];
     $flagFields = [
         'categories' => ['is_published'],
+        'models' => ['is_recommended'],
         'partGroups' => ['is_required'],
         'modelParts' => ['is_default', 'is_customer_configurable', 'customer_supplied_allowed'],
         'modelGroupSettings' => ['customer_part_allowed'],
@@ -133,8 +134,8 @@ function adminCatalog(PDO $pdo): array
 function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): array
 {
     $definitions = [
-        'categories' => ['table' => 'bike_categories', 'fields' => ['name', 'short_description', 'description_html', 'default_image_path', 'icon_key', 'is_published', 'sort_order']],
-        'models' => ['table' => 'bike_models', 'fields' => ['category_id', 'name', 'short_description', 'description_html', 'frame_price_gross', 'assembly_price_gross', 'margin_percent', 'default_image_path', 'status', 'sort_order', 'specifications']],
+        'categories' => ['table' => 'bike_categories', 'fields' => ['name', 'short_description', 'description_html', 'default_image_path', 'hero_image_path', 'icon_key', 'is_published', 'sort_order']],
+        'models' => ['table' => 'bike_models', 'fields' => ['category_id', 'name', 'short_description', 'description_html', 'frame_price_gross', 'assembly_price_gross', 'margin_percent', 'default_image_path', 'status', 'is_recommended', 'sort_order', 'specifications']],
         'parts' => ['table' => 'parts', 'fields' => ['name', 'group_id', 'description', 'gross_price', 'price_status', 'image_path', 'is_active']],
         'sizes' => ['table' => 'model_sizes', 'fields' => ['label', 'price_delta_gross', 'sort_order', 'is_active']],
         'frame-sizes' => ['table' => 'frame_sizes', 'fields' => ['label', 'sort_order', 'is_active']],
@@ -987,18 +988,28 @@ function updateBranding(PDO $pdo, array $input): array
 /**
  * Teksty statyczne stron publicznych. W przeciwieństwie do motywu (stały
  * zestaw 7 kolorów) kształt tego dokumentu jest zdefiniowany po stronie
- * frontendu (apps/web/lib/copy.ts) i może się rozrastać, więc tu tylko
- * pilnujemy, że to niepusty obiekt, i zapisujemy go jak przyszedł.
+ * frontendu (apps/web/lib/copy.ts) i może się rozrastać. Zapis scalany jest
+ * w głąb z obecną wartością, więc częściowy zapis (np. sama sekcja Chat z
+ * przyszłego klienta albo starszej wersji panelu) nie wyzeroje pozostałych
+ * sekcji; pełny draft z zakładki „Teksty" daje ten sam wynik.
  */
 function updateSiteCopy(PDO $pdo, array $input): array
 {
     if ($input === [] || array_is_list($input)) {
         throw new RuntimeException('Nieprawidłowa treść tekstów strony.', 422);
     }
+    $current = $pdo->query("SELECT value FROM site_settings WHERE setting_key = 'copy'")->fetchColumn();
+    $decoded = $current === false || $current === null || $current === ''
+        ? []
+        : json_decode((string) $current, true);
+    if (!is_array($decoded)) {
+        $decoded = [];
+    }
+    $merged = array_replace_recursive($decoded, $input);
     $statement = $pdo->prepare("INSERT INTO site_settings (setting_key, value) VALUES ('copy', :value) ON DUPLICATE KEY UPDATE value = VALUES(value)");
-    $statement->execute(['value' => json_encode($input, JSON_THROW_ON_ERROR)]);
+    $statement->execute(['value' => json_encode($merged, JSON_THROW_ON_ERROR)]);
     logActivity($pdo, 'copy_updated', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono teksty strony.', []);
-    return $input;
+    return $merged;
 }
 
 /**
@@ -1117,9 +1128,9 @@ function uploadAdminMedia(PDO $pdo): array
 
     $ownerType = (string) ($_POST['ownerType'] ?? '');
     $ownerId = (int) ($_POST['ownerId'] ?? 0);
-    $role = in_array($_POST['role'] ?? '', ['default', 'gallery', 'description', 'geometry'], true) ? $_POST['role'] : 'gallery';
+    $role = in_array($_POST['role'] ?? '', ['default', 'hero', 'gallery', 'description', 'geometry'], true) ? $_POST['role'] : 'gallery';
     $maps = [
-        'category' => ['table' => 'category_media', 'column' => 'category_id', 'allowedRoles' => ['default', 'gallery', 'description']],
+        'category' => ['table' => 'category_media', 'column' => 'category_id', 'allowedRoles' => ['default', 'hero', 'gallery', 'description']],
         'model' => ['table' => 'model_media', 'column' => 'model_id', 'allowedRoles' => ['default', 'gallery', 'description', 'geometry']],
         'part' => ['table' => 'part_media', 'column' => 'part_id', 'allowedRoles' => ['default', 'gallery', 'description']],
     ];

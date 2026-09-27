@@ -14,7 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ConfiguratorSkeleton } from '@/components/page-loading';
+import { Skeleton } from '@/components/ui/skeleton';
 import { OptimizedImage } from '@/components/optimized-image';
+import { GalleryImageButton } from '@/components/gallery-lightbox';
 import { CUSTOMER_SUPPLIED_SKU, NONE_SKU, bikeModels, formatPrice, type BikeModel, type OptionGroup } from '@/lib/catalog';
 import { publicMediaUrl } from '@/lib/catalog-merge';
 import { computeBatteryEstimates, computeRangeEstimates } from '@/lib/battery';
@@ -22,7 +24,7 @@ import { configurationPricing, groupDefaultPrice, type Selections } from '@/lib/
 import { PAINT_GROUP_SLUG, findColor, paintImageUrl, paintImages, usePaints, type PaintColor, type PaintSelection } from '@/lib/paints';
 import { PaintSection } from '@/components/paint-picker';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
-import { usePublicCopy } from '@/lib/use-public-copy';
+import { usePublicCopy, usePublicCopyReady } from '@/lib/use-public-copy';
 import type { SiteCopy } from '@/lib/copy';
 type ContactForm = { customerName: string; customerEmail: string; customerPhone: string; notes: string; privacyAccepted: boolean };
 
@@ -79,6 +81,7 @@ function groupChoices(group: OptionGroup, t: SiteCopy['configurator']) {
 export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
   const { models, loaded: catalogLoaded } = usePublicCatalog(catalog);
   const copy = usePublicCopy();
+  const copyReady = usePublicCopyReady();
   const [modelId, setModelId] = useState<BikeModel['id']>(models[0]?.id ?? 'e82');
   const [size, setSize] = useState('M');
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -396,7 +399,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     <SiteHeader />
     <main className="flex-1">
       <section className="mx-auto max-w-[1480px] px-4 pb-3 pt-7 sm:px-8 sm:pt-10 lg:px-12">
-        <div className="mb-5 flex items-end justify-between gap-4"><div><p className="eyebrow">{copy.configurator.heroEyebrow}</p><h1 className="mt-2 text-[clamp(2rem,5vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em]">{copy.configurator.heroTitleLine1}<br className="hidden sm:block" /> {copy.configurator.heroTitleLine2}</h1></div><p className="hidden max-w-sm text-right text-base leading-relaxed text-ink-muted xl:block">{copy.configurator.heroSubtitle}</p></div>
+        <div className="mb-5 flex items-end justify-between gap-4"><div><p className="eyebrow">{copyReady ? copy.configurator.heroEyebrow : <Skeleton aria-hidden="true" className="h-3 w-24" />}</p><h1 className="mt-2 text-[clamp(2rem,5vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em]">{copyReady ? <>{copy.configurator.heroTitleLine1}<br className="hidden sm:block" /> {copy.configurator.heroTitleLine2}</> : <Skeleton aria-hidden="true" className="h-12 w-2/3 sm:h-16" />}</h1></div><p className="hidden max-w-sm text-right text-base leading-relaxed text-ink-muted xl:block">{copyReady ? copy.configurator.heroSubtitle : <Skeleton aria-hidden="true" className="h-5 w-full max-w-sm" />}</p></div>
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">{copy.configurator.currentModelEyebrow}</p>
@@ -409,18 +412,18 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
       </section>
 
       <Dialog open={modelPickerOpen} onOpenChange={(open) => { setModelPickerOpen(open); if (open) setPickerCategory('all'); }}>
-        <DialogContent className="flex max-h-[85vh] w-full flex-col gap-0 overflow-hidden rounded-3xl bg-white p-0 shadow-2xl sm:max-w-2xl">
-          <DialogHeader className="shrink-0 gap-3 border-b border-line px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
+        <DialogContent className="flex min-w-0 max-h-[85dvh] w-[calc(100%-2rem)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-3xl bg-white p-0 shadow-2xl sm:max-w-2xl">
+          <DialogHeader className="min-w-0 shrink-0 gap-3 border-b border-line px-5 pt-5 pb-4 sm:px-8 sm:pt-6">
             <DialogTitle className="pr-8 text-xl font-semibold tracking-tight text-ink sm:text-2xl">{copy.configurator.changeModelCta}</DialogTitle>
             {pickerCategories.length > 1 && (
-              <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
+              <div className="no-scrollbar min-w-0 max-w-full flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5">
                 {pickerCategories.map((cat) => <button key={cat.slug} type="button" onClick={() => setPickerCategory(cat.slug)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${pickerCategory === cat.slug ? 'bg-ink text-white' : 'bg-ink-wash text-ink-muted hover:bg-line-strong/40'}`}>{cat.label}</button>)}
               </div>
             )}
           </DialogHeader>
-          <div className="overflow-y-auto p-5 sm:p-8">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {models.filter((item) => pickerCategory === 'all' || item.categorySlug === pickerCategory).map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => { selectModel(item.id); setModelPickerOpen(false); }} className={`pick-card focus-ring overflow-hidden p-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}>
+          <div className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto p-5 sm:p-8">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              {models.filter((item) => pickerCategory === 'all' || item.categorySlug === pickerCategory).map((item) => { const active = item.id === model.id; return <button key={item.id} type="button" onClick={() => { selectModel(item.id); setModelPickerOpen(false); }} className={`pick-card focus-ring min-w-0 w-full whitespace-normal break-words overflow-hidden p-0 ${active ? 'pick-card-active' : ''}`} aria-pressed={active} data-testid={`model-select-${item.id}`}>
                 <span className="block aspect-[4/3] w-full overflow-hidden bg-ink-wash">
                   {item.image && <OptimizedImage src={item.image} alt={item.name} className="size-full object-contain mix-blend-multiply" />}
                 </span>
@@ -439,8 +442,8 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
         </DialogContent>
       </Dialog>
 
-      <section className="mx-auto grid max-w-[1480px] gap-4 px-4 pb-20 sm:px-8 lg:grid-cols-[minmax(0,1.32fr)_minmax(380px,0.68fr)] lg:px-12">
-        <div className="lg:sticky lg:top-[88px] lg:self-start">
+      <section className="mx-auto grid w-full min-w-0 max-w-[1480px] grid-cols-1 gap-4 px-4 pb-20 sm:px-8 lg:grid-cols-[minmax(0,1.32fr)_minmax(380px,0.68fr)] lg:px-12">
+        <div className="min-w-0 lg:sticky lg:top-[88px] lg:self-start">
           <div className="stage-card">
             <div className="stage-bar justify-between border-b border-line">
               <div>
@@ -457,16 +460,17 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
             <Carousel key={`${model.id}-${gallery[0] ?? ''}`} setApi={setCarouselApi} opts={{ loop: gallery.length > 1 }} aria-label={`Zdjęcia modelu ${model.name}`} data-testid="model-gallery">
               <CarouselContent className="ml-0">
                 {gallery.map((image, index) => <CarouselItem key={image} className="pl-0" data-testid={`gallery-slide-${index}`}>
-                  <div className="stage-media p-4 sm:p-8">
+                  <GalleryImageButton images={gallery} index={index} title={model.name} labels={copy.gallery} className="stage-media p-4 sm:p-8">
                     <OptimizedImage
                       src={image}
                       alt={index < paintSlides.length && chosenPaint
                         ? `${model.name} — ${paintSlides[index].variant === 'photo' ? 'zdjęcie' : 'wizualizacja'} w kolorze ${chosenPaint.color.name}`
                         : `${model.name} — zdjęcie ${index - paintSlides.length + 1}`}
                       priority={index === 0}
+                      className="size-full object-contain"
                       data-testid={`gallery-image-${index}`}
                     />
-                  </div>
+                  </GalleryImageButton>
                 </CarouselItem>)}
               </CarouselContent>
               {gallery.length > 1 && <><CarouselPrevious size="icon-lg" className="left-3 z-20 border-line bg-surface/90 shadow-md hover:bg-surface sm:left-5" /><CarouselNext size="icon-lg" className="right-3 z-20 border-line bg-surface/90 shadow-md hover:bg-surface sm:right-5" /></>}
@@ -498,7 +502,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           )}
         </div>
 
-        <aside className="rounded-[28px] border border-line bg-white p-5 sm:p-7 lg:p-8">
+        <aside className="min-w-0 rounded-[28px] border border-line bg-white p-5 sm:p-7 lg:p-8">
           <div className="flex items-start justify-between gap-5"><div><p className="eyebrow">{copy.configurator.projectEyebrow}</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">{copy.configurator.configTitlePrefix} {model.name.replace('Rexor ', '')}</h2></div><span className="rounded-full bg-[var(--accent-brand)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em]">{copy.configurator.grossBadge}</span></div>
           <Progress value={model.available ? 72 : 12} className="mt-5 h-1.5 bg-ink-wash [&>div]:bg-ink" />
           {!model.available ? <div className="mt-8 rounded-3xl bg-ink p-6 text-white"><Bike className="size-8 text-[var(--accent-brand)]" /><h3 className="mt-8 text-2xl font-semibold">{copy.configurator.unavailableTitle}</h3><p className="mt-3 leading-relaxed text-white/64">{copy.configurator.unavailableText}</p><Button render={<a href="/serwis" />} className="mt-6 w-full rounded-full bg-white text-ink hover:bg-white/90">{copy.configurator.unavailableCta} <ArrowRight data-icon="inline-end" /></Button></div> : <>

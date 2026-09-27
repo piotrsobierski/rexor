@@ -7,17 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FilteredCollection, type CollectionItem } from '@/components/filtered-collection';
 import { OptimizedImage } from '@/components/optimized-image';
+import { GalleryImageButton } from '@/components/gallery-lightbox';
 import { PageFrame } from '@/components/page-frame';
 import { ProductDetailSkeleton } from '@/components/page-loading';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatCompletedAt, projectHref, type ApiProject, type PublicProject } from '@/lib/projects';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
-import { usePublicCopy } from '@/lib/use-public-copy';
+import { usePublicCopy, usePublicCopyReady } from '@/lib/use-public-copy';
 import { usePublicProject, usePublicProjects } from '@/lib/use-public-projects';
 import type { SiteCopy } from '@/lib/copy';
 
 /** Lista realizacji z tym samym filtrem kategorii co /ramy. */
-export function ProjectsPage({ projects: initialProjects, catalog, copy: initialCopy }: { projects?: ApiProject[]; catalog?: PublicCatalogData; copy?: unknown }) {
-  const copy = usePublicCopy(initialCopy);
+export function ProjectsPage({ projects: initialProjects, catalog }: { projects?: ApiProject[]; catalog?: PublicCatalogData }) {
+  const copy = usePublicCopy();
+  const copyReady = usePublicCopyReady();
   const { categories } = usePublicCatalog(catalog);
   const { projects, loaded } = usePublicProjects(initialProjects, categories);
 
@@ -38,17 +41,17 @@ export function ProjectsPage({ projects: initialProjects, catalog, copy: initial
   });
 
   return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
-    <p className="eyebrow">{copy.projects.eyebrow}</p>
-    <h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.projects.title}</h1>
-    <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-muted">{copy.projects.subtitle}</p>
+    <p className="eyebrow">{copyReady ? copy.projects.eyebrow : <Skeleton aria-hidden="true" className="h-3 w-20" />}</p>
+    <h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copyReady ? copy.projects.title : <Skeleton aria-hidden="true" className="h-12 w-2/3 sm:h-16" />}</h1>
+    <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-muted">{copyReady ? copy.projects.subtitle : <Skeleton aria-hidden="true" className="h-5 w-full max-w-2xl" />}</p>
 
     <FilteredCollection items={items} categories={categories} copy={copy} detailsCta={copy.projects.cardDetailsCta} emptyText={copy.projects.empty} loaded={loaded} />
   </section></PageFrame>;
 }
 
 /** Powłoka "_" jak przy ramach - slug czytamy z realnego adresu po stronie klienta. */
-export function ProjectDetailPage({ project: initialProject, catalog, copy: initialCopy }: { project?: ApiProject | null; catalog?: PublicCatalogData; copy?: unknown }) {
-  const copy = usePublicCopy(initialCopy);
+export function ProjectDetailPage({ project: initialProject, catalog }: { project?: ApiProject | null; catalog?: PublicCatalogData }) {
+  const copy = usePublicCopy();
   const { categories } = usePublicCatalog(catalog);
   const pathname = usePathname();
   const slug = (pathname.split('/').filter(Boolean).pop() ?? '').toLowerCase();
@@ -68,6 +71,7 @@ export function ProjectDetailPage({ project: initialProject, catalog, copy: init
 }
 
 function ProjectDetail({ project, copy }: { project: PublicProject; copy: SiteCopy }) {
+  const copyReady = usePublicCopyReady();
   const [selectedPhoto, setSelectedPhoto] = useState(0);
   const activeImage = project.gallery[selectedPhoto] ?? project.image;
   const completed = formatCompletedAt(project.completed_at);
@@ -76,9 +80,9 @@ function ProjectDetail({ project, copy }: { project: PublicProject; copy: SiteCo
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8 sm:px-8 lg:px-12 lg:py-12">
       <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-        <a href="/" className="transition-colors hover:text-ink">{copy.projects.breadcrumbHome}</a>
+        <a href="/" className="transition-colors hover:text-ink">{copyReady ? copy.projects.breadcrumbHome : <Skeleton aria-hidden="true" className="inline-block h-3 w-10" />}</a>
         <span>/</span>
-        <a href="/realizacje" className="transition-colors hover:text-ink">{copy.projects.breadcrumbProjects}</a>
+        <a href="/realizacje" className="transition-colors hover:text-ink">{copyReady ? copy.projects.breadcrumbProjects : <Skeleton aria-hidden="true" className="inline-block h-3 w-16" />}</a>
         <span>/</span>
         <span className="text-ink">{project.title}</span>
       </nav>
@@ -87,11 +91,11 @@ function ProjectDetail({ project, copy }: { project: PublicProject; copy: SiteCo
         <div className="min-w-0 space-y-4">
           {/* Zdjęcia realizacji są prawdziwymi fotografiami, nie renderami na
               jednolitym tle - dlatego object-cover, bez mix-blend-multiply. */}
-          <div className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)]">
+          <GalleryImageButton images={project.gallery.length ? project.gallery : [project.image]} index={selectedPhoto} title={project.title} labels={copy.gallery} className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)]">
             {activeImage
               ? <OptimizedImage src={activeImage} alt={project.title} priority className="size-full object-cover transition-all duration-300" />
               : <div className="size-full bg-ink-wash" aria-hidden="true" />}
-          </div>
+          </GalleryImageButton>
           {project.gallery.length > 1 && (
             <div className="flex gap-3 overflow-x-auto overscroll-x-contain pb-2">
               {project.gallery.map((img, index) => (

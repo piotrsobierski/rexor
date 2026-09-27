@@ -9,10 +9,10 @@ declare(strict_types=1);
  */
 function publicCatalog(PDO $pdo): array
 {
-    $categories = $pdo->query('SELECT slug, name, short_description, description_html, default_image_path, icon_key FROM bike_categories WHERE is_published = TRUE ORDER BY sort_order')->fetchAll();
+    $categories = $pdo->query('SELECT slug, name, short_description, description_html, default_image_path, hero_image_path, icon_key FROM bike_categories WHERE is_published = TRUE ORDER BY sort_order')->fetchAll();
     $models = $pdo->query(
         "SELECT m.id, m.category_id, bc.slug AS category_slug, m.slug, m.name, m.short_description, m.description_html, m.computed_base_price_gross, " .
-        "m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.default_image_path, m.specifications " .
+        "m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.default_image_path, m.specifications, m.status, m.is_recommended " .
         "FROM bike_models m JOIN bike_categories bc ON bc.id = m.category_id WHERE m.status <> 'archived' ORDER BY m.sort_order"
     )->fetchAll();
 
@@ -20,6 +20,7 @@ function publicCatalog(PDO $pdo): array
 
     foreach ($models as &$model) {
         $modelId = (int) $model['id'];
+        $model['is_recommended'] = (bool) $model['is_recommended'];
         $mediaStatement->execute(['model' => $modelId]);
         $model['media'] = $mediaStatement->fetchAll();
 

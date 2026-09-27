@@ -73,6 +73,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn, mediaSrc } from '@/lib/utils';
 import { compressUploadImage } from '@/lib/image-compression';
+import { CroppedImageInput, RecropButton } from '@/components/image-crop-dialog';
 import { isAdminTabSlug, type AdminTabSlug } from '@/lib/admin-tabs';
 import { mergeCopy, type SiteCopy } from '@/lib/copy';
 
@@ -1163,20 +1164,30 @@ function PartsEditor({
                           >
                             <Trash2 className="size-3" />
                           </button>
+                          <RecropButton
+                            imageUrl={mediaSrc(String(row.image_path))}
+                            fileName={`czesc-${row.sku ?? row.id}`}
+                            aspect={1}
+                            previewVariant="square"
+                            objectFit="contain"
+                            previewLabel={String(row.name ?? '')}
+                            dialogTitle="Popraw kadr zdjęcia części"
+                            className="absolute -bottom-1.5 -right-1.5 grid size-5 place-items-center rounded-full border border-line bg-white p-0 text-ink opacity-0 shadow transition-opacity group-hover/thumb:opacity-100 hover:bg-ink-wash [&>svg]:size-3"
+                            onCropped={(file) => void uploadPartImage(row, file)}
+                          />
                         </div>
                       ) : (
-                        <Label className="flex size-12 cursor-pointer items-center justify-center rounded-lg border border-dashed border-line text-ink-muted hover:border-line-strong hover:text-ink">
+                        <CroppedImageInput
+                          aspect={1}
+                          previewVariant="square"
+                          objectFit="contain"
+                          dialogTitle="Dopasuj zdjęcie części"
+                          disabled={!isSavedRecordId(row.id)}
+                          className="flex size-12 items-center justify-center rounded-lg border border-dashed border-line text-ink-muted hover:border-line-strong hover:text-ink"
+                          onCropped={(file) => void uploadPartImage(row, file)}
+                        >
                           <Upload className="size-4" />
-                          <input
-                            type="file"
-                            disabled={!isSavedRecordId(row.id)}
-                            accept="image/jpeg,image/png,image/webp,image/avif"
-                            className="sr-only"
-                            onChange={(event) =>
-                              void uploadPartImage(row, event.target.files?.[0])
-                            }
-                          />
-                        </Label>
+                        </CroppedImageInput>
                       )}
                     </TableCell>
                     <TableCell className="w-48 max-w-48">
@@ -1460,10 +1471,44 @@ function CategoriesEditor({
     await patch('categories', row.id, { default_image_path: '' });
   }
 
+  async function uploadHeroImage(row: Row, file?: File) {
+    if (!isSavedRecordId(row.id)) {
+      setMessage('Najpierw zapisz element, aby móc dodać zdjęcie.');
+      return;
+    }
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', await compressUploadImage(file));
+    form.append('ownerType', 'category');
+    form.append('ownerId', String(row.id));
+    form.append('role', 'hero');
+    form.append('altText', String(row.name));
+    setMessage('Wysyłam zdjęcie…');
+    try {
+      const result = await request('/admin/media', {
+        method: 'POST',
+        body: form,
+      });
+      await patch('categories', row.id, {
+        hero_image_path: String(result.url),
+      });
+      setMessage('Baner kategorii zaktualizowany.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Nie udało się dodać zdjęcia.',
+      );
+    }
+  }
+
+  async function removeHeroImage(row: Row) {
+    if (!window.confirm('Usunąć dedykowany baner tej kategorii? Strona kategorii wróci do zdjęcia karty.')) return;
+    await patch('categories', row.id, { hero_image_path: '' });
+  }
+
   return (
     <Panel
       title="Kategorie"
-      description="Nazwa, krótki opis i zdjęcie widoczne na stronie głównej oraz na liście kategorii."
+      description="Nazwa, krótki opis, zdjęcie karty na stronie głównej i osobny baner na stronie kategorii."
     >
       <div className="mb-6 rounded-2xl border border-line p-5 sm:p-6">
         <h3 className="text-sm font-semibold tracking-tight text-ink">
@@ -1501,47 +1546,130 @@ function CategoriesEditor({
         {rows.map((row) => (
           <article
             key={row.id}
-            className="grid gap-4 rounded-2xl border border-line p-5 sm:grid-cols-[160px_1fr] sm:p-6"
+            className="grid gap-5 rounded-2xl border border-line p-5 sm:p-6"
           >
-            <div className="grid gap-2">
-              <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--muted)]">
-                {row.default_image_path ? (
-                  <img
-                    src={mediaSrc(String(row.default_image_path))}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <div className="grid size-full place-items-center text-center text-xs text-ink-subtle">
-                    Brak zdjęcia
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-1.5">
-                <Label className="inline-flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium">
-                  <Upload className="size-3.5" /> Zmień
-                  <input
-                    type="file"
-                    disabled={!isSavedRecordId(row.id)}
-                    accept="image/jpeg,image/png,image/webp,image/avif"
-                    className="sr-only"
-                    onChange={(event) =>
-                      void uploadImage(row, event.target.files?.[0])
-                    }
-                  />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label className="text-xs font-semibold text-ink">
+                  Zdjęcie kafelka (4:3) — strona główna
                 </Label>
-                {row.default_image_path && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 px-2"
-                    onClick={() => void removeImage(row)}
+                <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--muted)]">
+                  {row.default_image_path ? (
+                    <img
+                      src={mediaSrc(String(row.default_image_path))}
+                      alt=""
+                      className="size-full object-contain"
+                    />
+                  ) : (
+                    <div className="grid size-full place-items-center text-center text-xs text-ink-subtle">
+                      Brak zdjęcia
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-1.5">
+                  <CroppedImageInput
+                    aspect={4 / 3}
+                    previewVariant="tile"
+                    objectFit="contain"
+                    previewLabel={String(row.name ?? '')}
+                    dialogTitle="Dopasuj zdjęcie kafelka kategorii"
+                    disabled={!isSavedRecordId(row.id)}
+                    className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium"
+                    onCropped={(file) => void uploadImage(row, file)}
                   >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                )}
+                    <Upload className="size-3.5" /> Zmień
+                  </CroppedImageInput>
+                  {row.default_image_path && (
+                    <>
+                      <RecropButton
+                        imageUrl={mediaSrc(String(row.default_image_path))}
+                        fileName={`kategoria-${row.slug ?? row.id}`}
+                        aspect={4 / 3}
+                        previewVariant="tile"
+                        objectFit="contain"
+                        previewLabel={String(row.name ?? '')}
+                        dialogTitle="Popraw kadr zdjęcia kafelka"
+                        className="h-8 px-2"
+                        onCropped={(file) => void uploadImage(row, file)}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2"
+                        onClick={() => void removeImage(row)}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <p className="text-[0.68rem] text-ink-subtle">
+                  Kafelek kategorii na liście na stronie głównej.
+                </p>
               </div>
+              <div className="grid gap-2">
+                <Label className="text-xs font-semibold text-ink">
+                  Baner strony kategorii (21:9)
+                </Label>
+                <div className="aspect-[21/9] overflow-hidden rounded-xl bg-[var(--muted)]">
+                  {row.hero_image_path ? (
+                    <img
+                      src={mediaSrc(String(row.hero_image_path))}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <div className="grid size-full place-items-center text-center text-xs text-ink-subtle">
+                      Brak banera — użyty zostanie kafelek obok
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-1.5">
+                  <CroppedImageInput
+                    aspect={21 / 9}
+                    previewVariant="banner"
+                    objectFit="cover"
+                    previewLabel={String(row.name ?? '')}
+                    dialogTitle="Dopasuj baner kategorii"
+                    disabled={!isSavedRecordId(row.id)}
+                    className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium"
+                    onCropped={(file) => void uploadHeroImage(row, file)}
+                  >
+                    <Upload className="size-3.5" /> Zmień
+                  </CroppedImageInput>
+                  {row.hero_image_path && (
+                    <>
+                      <RecropButton
+                        imageUrl={mediaSrc(String(row.hero_image_path))}
+                        fileName={`kategoria-baner-${row.slug ?? row.id}`}
+                        aspect={21 / 9}
+                        previewVariant="banner"
+                        objectFit="cover"
+                        previewLabel={String(row.name ?? '')}
+                        dialogTitle="Popraw kadr banera kategorii"
+                        className="h-8 px-2"
+                        onCropped={(file) => void uploadHeroImage(row, file)}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2"
+                        onClick={() => void removeHeroImage(row)}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <p className="text-[0.68rem] text-ink-subtle">
+                  Szerokie zdjęcie u góry strony kategorii. Puste = kafelek
+                  obok, przycięty do paska (może wyglądać gorzej).
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
               <div className="grid gap-1.5">
                 <Label className="text-xs text-ink-muted">
                   Znaczek (ikona)
@@ -1597,8 +1725,7 @@ function CategoriesEditor({
                   ponownie zaznaczoną ikonę, aby wrócić do domyślnej.
                 </p>
               </div>
-            </div>
-            <div className="grid gap-3">
+              <div className="grid gap-3">
               <div className="grid gap-1">
                 <Label
                   className="text-xs text-ink-muted"
@@ -1677,6 +1804,7 @@ function CategoriesEditor({
                   <Trash2 className="size-3.5" /> Usuń
                 </Button>
               </div>
+            </div>
             </div>
           </article>
         ))}
@@ -2189,7 +2317,7 @@ function ModelsEditor({
     );
   }, [rows, specifications]);
 
-  async function upload(model: Row, files?: FileList | null) {
+  async function upload(model: Row, files?: FileList | File[] | null) {
     if (!isSavedRecordId(model.id)) {
       setMessage('Najpierw zapisz element, aby móc dodać zdjęcie.');
       return;
@@ -2584,6 +2712,18 @@ function ModelsEditor({
                     </NativeSelect>
                   </div>
                 </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch
+                    checked={adminFlagEnabled(drafts[row.id]?.is_recommended)}
+                    onCheckedChange={(checked) =>
+                      setDrafts({
+                        ...drafts,
+                        [row.id]: { ...drafts[row.id], is_recommended: checked },
+                      })
+                    }
+                  />
+                  Polecany na stronie głównej (tylko opublikowane modele)
+                </label>
                 <div className="grid gap-1">
                   <Label
                     className="text-xs text-ink-muted"
@@ -2730,6 +2870,7 @@ function ModelsEditor({
                         category_id:
                           drafts[row.id]?.category_id ?? row.category_id,
                         status: drafts[row.id]?.status ?? row.status,
+                        is_recommended: adminFlagEnabled(drafts[row.id]?.is_recommended ?? row.is_recommended),
                         short_description:
                           drafts[row.id]?.short_description ??
                           row.short_description,
@@ -2748,23 +2889,22 @@ function ModelsEditor({
                   >
                     <Save className="size-4" /> Zapisz model
                   </Button>
-                  <Label
+                  <CroppedImageInput
+                    aspect={4 / 3}
+                    previewVariant="tile"
+                    objectFit="contain"
+                    previewLabel={String(row.name ?? '')}
+                    dialogTitle="Dopasuj zdjęcie do galerii modelu"
+                    disabled={!isSavedRecordId(row.id)}
+                    multiple
                     className={buttonVariants({
                       variant: 'outline',
                       size: 'sm',
-                      className: 'cursor-pointer',
                     })}
+                    onCropped={(file) => void upload(row, [file])}
                   >
                     <Upload className="size-4" /> Dodaj zdjęcia do galerii
-                    <input
-                      type="file"
-                      disabled={!isSavedRecordId(row.id)}
-                      accept="image/jpeg,image/png,image/webp,image/avif"
-                      multiple
-                      className="sr-only"
-                      onChange={(event) => void upload(row, event.target.files)}
-                    />
-                  </Label>
+                  </CroppedImageInput>
                   <Button
                     size="sm"
                     variant="outline"
@@ -2966,7 +3106,7 @@ function FramesEditor({
   async function upload(
     frame: Row,
     files: File | FileList | null | undefined,
-    role: 'gallery' | 'geometry',
+    role: 'default' | 'gallery' | 'geometry',
   ) {
     if (!isSavedRecordId(frame.id)) {
       setMessage('Najpierw zapisz element, aby móc dodać zdjęcie.');
@@ -2994,7 +3134,7 @@ function FramesEditor({
           method: 'POST',
           body: JSON.stringify({ mediaId: Number(result.id), role }),
         });
-        if (role === 'gallery' && !defaultImagePath) {
+        if (role === 'default' || (role === 'gallery' && !defaultImagePath)) {
           defaultImagePath = String(result.url);
           await request(`/admin/frames/${frame.id}`, {
             method: 'PATCH',
@@ -3008,7 +3148,7 @@ function FramesEditor({
         role === 'geometry' ? 'grafiki geometrii' : 'zdjęć do galerii';
       setMessage(
         selected.length === 1
-          ? `${role === 'geometry' ? 'Grafika geometrii dodana.' : 'Zdjęcie dodane do galerii.'}`
+          ? `${role === 'geometry' ? 'Grafika geometrii dodana.' : role === 'default' ? 'Zdjęcie główne zapisane.' : 'Zdjęcie dodane do galerii.'}`
           : `Dodano ${selected.length} ${target}.`,
       );
     } catch (error) {
@@ -3229,7 +3369,7 @@ function FramesEditor({
       <div className="grid gap-6">
         {list.visible.map((row) => {
           const frameMedia = media.filter((item) => item.frame_id === row.id);
-          const gallery = frameMedia.filter((item) => item.role !== 'geometry');
+          const gallery = frameMedia.filter((item) => item.role !== 'geometry' && item.role !== 'default');
           const geometryImages = frameMedia.filter(
             (item) => item.role === 'geometry',
           );
@@ -3238,10 +3378,10 @@ function FramesEditor({
           const frameSizes = sizes.filter((size) => Number(size.frame_id) === Number(row.id));
           const categoryName = categories.find((c) => Number(c.id) === Number(row.category_id))?.name;
           const statusLabel = row.status === 'published' ? 'Opublikowana' : row.status === 'archived' ? 'Zarchiwizowana' : 'Szkic';
-          const thumbnail = gallery[0]
-            ? mediaSrc(gallery[0].storage_path)
-            : row.default_image_path
-              ? mediaSrc(String(row.default_image_path))
+          const thumbnail = row.default_image_path
+            ? mediaSrc(String(row.default_image_path))
+            : gallery[0]
+              ? mediaSrc(gallery[0].storage_path)
               : null;
           return (
             <details
@@ -3282,7 +3422,64 @@ function FramesEditor({
                   </ul>
                 </div>
               )}
-              <div className="flex gap-3 overflow-x-auto pb-3">
+              <div className="mb-4 grid gap-2 sm:w-64">
+                <Label className="text-xs font-semibold text-ink">
+                  Zdjęcie główne ramy (4:3)
+                </Label>
+                <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--muted)]">
+                  {row.default_image_path ? (
+                    <img
+                      src={mediaSrc(String(row.default_image_path))}
+                      alt=""
+                      className="size-full object-contain"
+                    />
+                  ) : (
+                    <div className="grid size-full place-items-center text-center text-xs text-ink-subtle">
+                      Brak zdjęcia
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-1.5">
+                  <CroppedImageInput
+                    aspect={4 / 3}
+                    previewVariant="tile"
+                    objectFit="contain"
+                    previewLabel={String(row.name ?? '')}
+                    dialogTitle="Dopasuj zdjęcie główne ramy"
+                    disabled={!isSavedRecordId(row.id)}
+                    className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium"
+                    onCropped={(file) => void upload(row, file, 'default')}
+                  >
+                    <Upload className="size-3.5" /> Zmień
+                  </CroppedImageInput>
+                  {row.default_image_path && (
+                    <>
+                      <RecropButton
+                        imageUrl={mediaSrc(String(row.default_image_path))}
+                        fileName={`rama-${row.slug ?? row.id}`}
+                        aspect={4 / 3}
+                        previewVariant="tile"
+                        objectFit="contain"
+                        previewLabel={String(row.name ?? '')}
+                        dialogTitle="Popraw kadr zdjęcia głównego ramy"
+                        className="h-8 px-2"
+                        onCropped={(file) => void upload(row, file, 'default')}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2"
+                        onClick={() => void patch('frames', row.id, { default_image_path: '' })}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <Label className="text-xs text-ink-muted">Galeria zdjęć</Label>
+              <div className="mt-1.5 flex gap-3 overflow-x-auto pb-3">
                 {gallery.length === 0 && (
                   <div className="grid h-28 w-40 shrink-0 place-items-center rounded-xl bg-[var(--muted)] text-center text-xs text-ink-subtle">
                     Brak zdjęć
@@ -3715,19 +3912,19 @@ function FramesEditor({
                   <Button size="sm" onClick={() => void saveFrame(row)}>
                     <Save /> Zapisz ramę
                   </Button>
-                  <Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium">
+                  <CroppedImageInput
+                    aspect={4 / 3}
+                    previewVariant="tile"
+                    objectFit="contain"
+                    previewLabel={String(row.name ?? '')}
+                    dialogTitle="Dopasuj zdjęcie do galerii ramy"
+                    disabled={!isSavedRecordId(row.id)}
+                    multiple
+                    className="inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-sm font-medium"
+                    onCropped={(file) => void upload(row, file, 'gallery')}
+                  >
                     <Upload className="size-4" /> Dodaj zdjęcia do galerii
-                    <input
-                      type="file"
-                      disabled={!isSavedRecordId(row.id)}
-                      accept="image/jpeg,image/png,image/webp,image/avif"
-                      multiple
-                      className="sr-only"
-                      onChange={(event) =>
-                        void upload(row, event.target.files, 'gallery')
-                      }
-                    />
-                  </Label>
+                  </CroppedImageInput>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -4191,18 +4388,31 @@ function ProjectsEditor({
                     )}
                   </div>
                   <div className="flex gap-1.5">
-                    <Label className="inline-flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium">
+                    <CroppedImageInput
+                      aspect={4 / 3}
+                      previewVariant="tile"
+                      objectFit="cover"
+                      previewLabel={String(row.title ?? '')}
+                      dialogTitle="Dopasuj zdjęcie główne realizacji"
+                      disabled={!isSavedRecordId(row.id)}
+                      className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium"
+                      onCropped={(file) => void upload(row, file, 'cover')}
+                    >
                       <Upload className="size-3.5" /> Zmień
-                      <input
-                        type="file"
-                        disabled={!isSavedRecordId(row.id)}
-                        accept="image/jpeg,image/png,image/webp,image/avif"
-                        className="sr-only"
-                        onChange={(event) =>
-                          void upload(row, event.target.files?.[0], 'cover')
-                        }
+                    </CroppedImageInput>
+                    {(cover || row.cover_image_path) && (
+                      <RecropButton
+                        imageUrl={cover ? mediaSrc(cover.storage_path) : mediaSrc(String(row.cover_image_path))}
+                        fileName={`realizacja-${row.slug ?? row.id}`}
+                        aspect={4 / 3}
+                        previewVariant="tile"
+                        objectFit="cover"
+                        previewLabel={String(row.title ?? '')}
+                        dialogTitle="Popraw kadr zdjęcia głównego realizacji"
+                        className="h-8 px-2"
+                        onCropped={(file) => void upload(row, file, 'cover')}
                       />
-                    </Label>
+                    )}
                     {cover && (
                       <Button
                         type="button"
@@ -4583,19 +4793,19 @@ function ProjectsEditor({
                   <Button size="sm" onClick={() => void saveProject(row)}>
                     <Save /> Zapisz realizację
                   </Button>
-                  <Label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium">
+                  <CroppedImageInput
+                    aspect={4 / 3}
+                    previewVariant="tile"
+                    objectFit="cover"
+                    previewLabel={String(row.title ?? '')}
+                    dialogTitle="Dopasuj zdjęcie do galerii realizacji"
+                    disabled={!isSavedRecordId(row.id)}
+                    multiple
+                    className="inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-sm font-medium"
+                    onCropped={(file) => void upload(row, file, 'gallery')}
+                  >
                     <Upload className="size-4" /> Dodaj zdjęcia do galerii
-                    <input
-                      type="file"
-                      disabled={!isSavedRecordId(row.id)}
-                      accept="image/jpeg,image/png,image/webp,image/avif"
-                      multiple
-                      className="sr-only"
-                      onChange={(event) =>
-                        void upload(row, event.target.files, 'gallery')
-                      }
-                    />
-                  </Label>
+                  </CroppedImageInput>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -5708,30 +5918,42 @@ function BrandingEditor({
           </span>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium">
-            <input
-              type="file"
-              accept="image/png,image/webp,image/avif,image/jpeg"
-              className="hidden"
-              disabled={uploading}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (file) void upload(file);
-              }}
-            />
+          <CroppedImageInput
+            aspect={1}
+            previewVariant="square"
+            objectFit="contain"
+            dialogTitle="Dopasuj ikonę strony"
+            disabled={uploading}
+            accept="image/png,image/webp,image/avif,image/jpeg"
+            className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium"
+            onCropped={(file) => void upload(file)}
+          >
             {uploading ? 'Wgrywam…' : 'Wgraj ikonę'}
-          </label>
+          </CroppedImageInput>
           {faviconPath && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setFaviconPath('');
-                void save('');
-              }}
-            >
-              Przywróć domyślną
-            </Button>
+            <>
+              <RecropButton
+                imageUrl={previewUrl}
+                fileName="favicon"
+                aspect={1}
+                previewVariant="square"
+                objectFit="contain"
+                dialogTitle="Popraw kadr ikony strony"
+                disabled={uploading}
+                onCropped={(file) => void upload(file)}
+              >
+                Popraw kadr
+              </RecropButton>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFaviconPath('');
+                  void save('');
+                }}
+              >
+                Przywróć domyślną
+              </Button>
+            </>
           )}
         </div>
       </div>

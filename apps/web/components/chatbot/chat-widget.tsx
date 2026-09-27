@@ -4,8 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { MessageSquareText, X, Sparkles } from 'lucide-react';
 import { ChatWindow } from './chat-window';
+import { usePublicCopy, usePublicCopyReady } from '@/lib/use-public-copy';
 
 export function ChatWidget() {
+  const copy = usePublicCopy();
+  // Dymek pojawia się dopiero, gdy teksty są potwierdzone z API - bez tego
+  // na wolnym łączu pokazałby wartość z builda i podmienił ją w locie.
+  const copyReady = usePublicCopyReady();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [showNotificationBadge, setShowNotificationBadge] = useState(false);
@@ -44,7 +49,7 @@ export function ChatWidget() {
       )}
 
       {/* Dymek podpowiedzi przed otwarciem */}
-      {!isOpen && showNotificationBadge && (
+      {!isOpen && copyReady && showNotificationBadge && (
         <div
           onClick={handleOpen}
           className="mb-3 flex max-w-[280px] cursor-pointer items-center gap-2.5 rounded-2xl border border-line bg-white/95 backdrop-blur-md px-3.5 py-2.5 shadow-[0_10px_25px_rgba(0,0,0,0.12)] transition-all hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-2"
@@ -53,9 +58,9 @@ export function ChatWidget() {
             <Sparkles className="size-3.5 text-amber-400" />
           </div>
           <div className="text-xs">
-            <p className="font-semibold text-ink">Doradca Rexor AI</p>
+            <p className="font-semibold text-ink">{copy.chat.badgeTitle}</p>
             <p className="text-ink-muted text-[11px] leading-tight">
-              Masz pytania o E82, E55, baterie lub zasięg? Kliknij tutaj!
+              {copy.chat.teaser}
             </p>
           </div>
           <button
@@ -64,7 +69,7 @@ export function ChatWidget() {
               setShowNotificationBadge(false);
             }}
             className="text-ink-muted hover:text-ink p-0.5 rounded-md hover:bg-black/5"
-            aria-label="Zamknij podpowiedź"
+            aria-label={copy.chat.teaserCloseAria}
           >
             <X className="size-3.5" />
           </button>
@@ -74,7 +79,7 @@ export function ChatWidget() {
       {/* Pływający przycisk z ikoną czatbota */}
       <button
         onClick={() => (isOpen ? handleClose() : handleOpen())}
-        aria-label={isOpen ? 'Zamknij czat z doradcą' : 'Otwórz czat z doradcą Rexor AI'}
+        aria-label={isOpen ? copy.chat.launcherAriaClose : copy.chat.launcherAriaOpen}
         aria-expanded={isOpen}
         className={`group relative flex size-14 items-center justify-center rounded-2xl shadow-[0_10px_28px_rgba(0,0,0,0.2)] transition-all duration-300 hover:scale-105 active:scale-95 ${
           isOpen

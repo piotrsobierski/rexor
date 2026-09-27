@@ -54,6 +54,8 @@ export type BikeModel = {
   category: string;
   /** Slug kategorii z bazy (bike_categories.slug) — do filtrowania i linkowania /rowery/{slug}. */
   categorySlug: string;
+  /** Explicitly selected, published homepage recommendation. */
+  recommended?: boolean;
   eyebrow: string;
   description: string;
   descriptionHtml?: string;

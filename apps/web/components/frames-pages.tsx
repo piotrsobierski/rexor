@@ -8,13 +8,15 @@ import { Button } from '@/components/ui/button';
 import { ContactForm } from '@/components/contact-form';
 import { FilteredCollection, type CollectionItem } from '@/components/filtered-collection';
 import { OptimizedImage } from '@/components/optimized-image';
+import { GalleryImageButton } from '@/components/gallery-lightbox';
 import { PageFrame } from '@/components/page-frame';
 import { ProductDetailSkeleton } from '@/components/page-loading';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { formatPrice } from '@/lib/catalog';
 import { frameHref, type ApiFrame, type PublicFrame } from '@/lib/frames';
 import { usePublicCatalog, type PublicCatalogData } from '@/lib/use-public-catalog';
-import { usePublicCopy } from '@/lib/use-public-copy';
+import { usePublicCopy, usePublicCopyReady } from '@/lib/use-public-copy';
 import { usePublicFrame, usePublicFrames } from '@/lib/use-public-frames';
 import { PaintDialog } from '@/components/paint-picker';
 import { bestRender, hasPhoto, usePaints } from '@/lib/paints';
@@ -24,8 +26,9 @@ const priceLabel = (frame: { price_gross: number | null }, copy: SiteCopy) =>
   frame.price_gross === null ? copy.frames.quotePrice : formatPrice(frame.price_gross);
 
 /** Lista wszystkich opublikowanych ram z filtrem kategorii wspólnym z /rowery. */
-export function FramesPage({ frames: initialFrames, catalog, copy: initialCopy }: { frames?: ApiFrame[]; catalog?: PublicCatalogData; copy?: unknown }) {
-  const copy = usePublicCopy(initialCopy);
+export function FramesPage({ frames: initialFrames, catalog }: { frames?: ApiFrame[]; catalog?: PublicCatalogData }) {
+  const copy = usePublicCopy();
+  const copyReady = usePublicCopyReady();
   // Kategorie biorą się z katalogu (te same co rowerowe), bo nazwa kategorii
   // jest etykietą filtra i nadtytułem kafelka.
   const { categories } = usePublicCatalog(catalog);
@@ -44,9 +47,9 @@ export function FramesPage({ frames: initialFrames, catalog, copy: initialCopy }
   }));
 
   return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
-    <p className="eyebrow">{copy.frames.eyebrow}</p>
-    <h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copy.frames.title}</h1>
-    <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-muted">{copy.frames.subtitle}</p>
+    <p className="eyebrow">{copyReady ? copy.frames.eyebrow : <Skeleton aria-hidden="true" className="h-3 w-16" />}</p>
+    <h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-[-0.06em] sm:text-7xl">{copyReady ? copy.frames.title : <Skeleton aria-hidden="true" className="h-12 w-2/3 sm:h-16" />}</h1>
+    <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-muted">{copyReady ? copy.frames.subtitle : <Skeleton aria-hidden="true" className="h-5 w-full max-w-2xl" />}</p>
 
     <FilteredCollection items={items} categories={categories} copy={copy} detailsCta={copy.frames.cardDetailsCta} emptyText={copy.frames.empty} loaded={loaded} />
 
@@ -71,8 +74,8 @@ export function FramesPage({ frames: initialFrames, catalog, copy: initialCopy }
  * przy twardym wejściu na adres useParams() zostaje na wartości "_" z powłoki,
  * bo klientowy stan parametrów wypełnia się tylko przy nawigacji routerem.
  */
-export function FrameDetailPage({ frame: initialFrame, catalog, copy: initialCopy }: { frame?: ApiFrame | null; catalog?: PublicCatalogData; copy?: unknown }) {
-  const copy = usePublicCopy(initialCopy);
+export function FrameDetailPage({ frame: initialFrame, catalog }: { frame?: ApiFrame | null; catalog?: PublicCatalogData }) {
+  const copy = usePublicCopy();
   const { categories } = usePublicCatalog(catalog);
   const pathname = usePathname();
   const slug = (pathname.split('/').filter(Boolean).pop() ?? '').toLowerCase();
@@ -92,26 +95,27 @@ export function FrameDetailPage({ frame: initialFrame, catalog, copy: initialCop
 }
 
 function FrameDetail({ frame, copy }: { frame: PublicFrame; copy: SiteCopy }) {
+  const copyReady = usePublicCopyReady();
   const [selectedPhoto, setSelectedPhoto] = useState(0);
   const activeImage = frame.gallery[selectedPhoto] ?? frame.image;
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8 sm:px-8 lg:px-12 lg:py-12">
       <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-        <a href="/" className="transition-colors hover:text-ink">{copy.frames.breadcrumbHome}</a>
+        <a href="/" className="transition-colors hover:text-ink">{copyReady ? copy.frames.breadcrumbHome : <Skeleton aria-hidden="true" className="inline-block h-3 w-10" />}</a>
         <span>/</span>
-        <a href="/ramy" className="transition-colors hover:text-ink">{copy.frames.breadcrumbFrames}</a>
+        <a href="/ramy" className="transition-colors hover:text-ink">{copyReady ? copy.frames.breadcrumbFrames : <Skeleton aria-hidden="true" className="inline-block h-3 w-12" />}</a>
         <span>/</span>
         <span className="text-ink">{frame.name}</span>
       </nav>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start lg:gap-14">
-        <div className="space-y-4">
-          <div className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)] p-6 sm:p-10">
+      <div className="mt-8 grid min-w-0 grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-14">
+        <div className="min-w-0 space-y-4">
+          <GalleryImageButton images={frame.gallery.length ? frame.gallery : [frame.image]} index={selectedPhoto} title={frame.name} labels={copy.gallery} className="aspect-[4/3] overflow-hidden rounded-[32px] bg-[var(--muted)] p-6 sm:p-10">
             {activeImage
               ? <OptimizedImage src={activeImage} alt={frame.name} priority className="size-full object-contain mix-blend-multiply transition-all duration-300" />
               : <div className="size-full rounded-2xl bg-ink-wash" aria-hidden="true" />}
-          </div>
+          </GalleryImageButton>
           {frame.gallery.length > 1 && (
             <div className="flex gap-3 overflow-x-auto pb-2">
               {frame.gallery.map((img, index) => (

@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, RotateCcw, Sparkles, Loader2 } from 'lucide-react';
 import { ChatMessageItem } from './chat-message-item';
+import { Skeleton } from '@/components/ui/skeleton';
+import { usePublicCopy, usePublicCopyReady } from '@/lib/use-public-copy';
 import type { ChatMessage } from '@/lib/chatbot/types';
 
 interface ChatWindowProps {
@@ -11,20 +13,30 @@ interface ChatWindowProps {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/api';
 
-const INITIAL_MESSAGE: ChatMessage = {
-  role: 'assistant',
-  content: `Cześć! Jestem **Doradcą Rexor** 🚴‍♂️
-
-Znam pełne specyfikacje naszych maszyn, geometrie, silniki Bafang M560 i M620, pakiety akumulatorowe (982 Wh i 1310 Wh), zasięgi w kilometrach oraz aktualne cenniki i możliwości konfiguratora.
-
-O co chciałbyś zapytać?`,
-};
-
 export function ChatWindow({ onClose }: ChatWindowProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
+  // Teksty okna czatu są edytowalne w panelu (zakładka „Teksty", sekcja
+  // Chat); prompt asystenta to osobne ustawienie w panelu.
+  const copy = usePublicCopy();
+  const copyReady = usePublicCopyReady();
+  // Powitanie jest pochodną copy, a nie zamrożonym stanem: przy eksporcie
+  // statycznym teksty z panelu przychodzą z API po zamontowaniu, więc stan
+  // zainicjalizowany raz na zawsze zostałby przy wartości z builda.
+  const greetingMessage = React.useMemo<ChatMessage>(
+    () => ({ role: 'assistant', content: copy.chat.greeting }),
+    [copy.chat.greeting],
+  );
+  const [messages, setMessages] = useState<ChatMessage[]>([greetingMessage]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Dopóki rozmowa się nie zaczęła, powitanie podąża za copy (np. gdy okno
+  // otwarto przed dojazdem tekstów z API). Po pierwszej wiadomości usera
+  // historia jest nienaruszalna.
+  const [conversationStarted, setConversationStarted] = useState(false);
+  useEffect(() => {
+    if (conversationStarted) return;
+    setMessages((previous) => (previous.length === 1 ? [greetingMessage] : previous));
+  }, [greetingMessage, conversationStarted]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -57,6 +69,7 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
     ];
 
     setMessages(newMessages);
+    setConversationStarted(true);
     setInput('');
     setError(null);
     setIsLoading(true);
@@ -82,11 +95,11 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
           { role: 'assistant', content: data.reply! },
         ]);
       } else {
-        throw new Error('Brak odpowiedzi od asystenta.');
+        throw new Error(copy.chat.noReplyError);
       }
     } catch (err: unknown) {
       console.error('[Chatbot error]:', err);
-      const errMsg = err instanceof Error ? err.message : 'Wystąpił problem z połączeniem.';
+      const errMsg = err instanceof Error ? err.message : copy.chat.genericError;
       setError(errMsg);
       setMessages([
         ...newMessages,
@@ -113,7 +126,10 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
   };
 
   const handleReset = () => {
-    setMessages([INITIAL_MESSAGE]);
+    setMessages([greetingMessage]);
+    // Po wyczyszczeniu powitanie znów podąża za copy, dopóki nie zacznie się
+    // nowa rozmowa.
+    setConversationStarted(false);
     setError(null);
     setInput('');
   };
@@ -129,26 +145,26 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm tracking-tight text-white">Doradca Rexor</span>
+              <span className="font-semibold text-sm tracking-tight text-white">{copyReady ? copy.chat.windowTitle : <Skeleton aria-hidden="true" className="h-4 w-24 bg-white/25" />}</span>
               <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-                Online
+                {copyReady ? copy.chat.onlineLabel : <Skeleton aria-hidden="true" className="h-3 w-10 bg-white/25" />}
               </span>
             </div>
-            <p className="text-[11px] text-white/60">Specyfikacje, baterie, zasięgi i cennik</p>
+            <p className="text-[11px] text-white/60">{copyReady ? copy.chat.windowSubtitle : <Skeleton aria-hidden="true" className="h-3 w-44 bg-white/25" />}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-1">
           <button
             onClick={handleReset}
-            title="Wyczyść rozmowę"
+            title={copy.chat.clearTitle}
             className="flex size-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
           >
             <RotateCcw className="size-4" />
           </button>
           <button
             onClick={onClose}
-            title="Zamknij czat"
+            title={copy.chat.closeTitle}
             className="flex size-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
           >
             <X className="size-5" />
@@ -158,7 +174,9 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
 
       {/* Lista wiadomości */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--muted)]/40 scroll-smooth">
-        {messages.map((m, idx) => (
+        {!copyReady && messages.length === 1
+          ? <div className="max-w-[85%] rounded-2xl bg-white border border-line px-4 py-3 space-y-2" aria-hidden="true"><Skeleton className="h-3 w-40" /><Skeleton className="h-3 w-56" /><Skeleton className="h-3 w-32" /></div>
+          : messages.map((m, idx) => (
           <ChatMessageItem key={idx} message={m} />
         ))}
 
@@ -169,7 +187,7 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
             </div>
             <div className="rounded-2xl bg-white border border-line px-4 py-3 text-sm text-ink-muted shadow-sm flex items-center gap-2">
               <Loader2 className="size-4 animate-spin text-ink" />
-              <span className="text-xs font-mono">Rexor analizuje specyfikację...</span>
+              <span className="text-xs font-mono">{copy.chat.analyzing}</span>
             </div>
           </div>
         )}
@@ -192,22 +210,22 @@ export function ChatWindow({ onClose }: ChatWindowProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Zadaj pytanie o Rexor E82, E55, zasięg, cennik..."
+            placeholder={copyReady ? copy.chat.inputPlaceholder : ''}
             disabled={isLoading}
             className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none"
           />
           <button
             onClick={() => { void handleSend(); }}
             disabled={!input.trim() || isLoading}
-            aria-label="Wyślij wiadomość"
+            aria-label={copy.chat.sendAria}
             className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-ink text-white hover:bg-black disabled:opacity-30 transition-all shadow-sm"
           >
             {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           </button>
         </div>
         <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-ink-muted">
-          <span>Enter = wyślij, Shift + Enter = nowa linia</span>
-          <span className="font-medium">Rexor Bikes • Custom e-MTB</span>
+          <span>{copyReady ? copy.chat.inputHint : <Skeleton aria-hidden="true" className="inline-block h-3 w-40" />}</span>
+          <span className="font-medium">{copyReady ? copy.chat.footer : <Skeleton aria-hidden="true" className="inline-block h-3 w-28" />}</span>
         </div>
       </div>
     </div>
