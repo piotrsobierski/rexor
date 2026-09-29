@@ -13,6 +13,37 @@ fakty sprawdzone od założeń i nie powtarza diagnostyki.
 
 ---
 
+## 2026-09-29 — Wizualizacja lakieru z innego modelu, gdy brak własnej
+
+### Zgłoszenie
+
+Klient chce wybierać kolor niezależnie od ramy w konfiguratorze;
+wizualizacja koloru na E55 przy innym rowerze (np. szosie) jest na razie OK.
+Wcześniej obraz należał wyłącznie do pary kolor + produkt, więc E82, CFR707
+i ramy nie miały żadnych wizualizacji (wszystkie 229 są na E55).
+
+### Zmiana
+
+- Nowe ustawienie globalne `paint_visibility.renderFallback` (domyślnie
+  włączone, bez migracji - brak klucza = włączone). Checkbox „Pokazuj
+  wizualizację z innego modelu, gdy brak własnej” w Lakiery → Ustawienia
+  globalne palet.
+- `paintPalettesFor()`: gdy kolor nie ma obrazów na danym produkcie, bierze
+  komplet obrazów jednego dawcy (najpierw modele wg `sort_order`, potem ramy)
+  z polem `fallbackFrom` (nazwa produktu). Zastępcze obrazy liczą się też do
+  filtra „tylko ze zdjęciem/wizualizacją” i trafiają do migawki konfiguracji.
+  Panel (includeAdminOnly) nadal widzi tylko własne obrazy produktu.
+- Konfigurator i picker dopisują „na Rexor E55” przy zastępczym obrazie;
+  tabela skutków w panelu uwzględnia ustawienie.
+
+### Testy
+
+- `/api/paints/model/e82` i `/frame/scott-spark-test`: 229 kolorów z obrazem
+  (z E55, `fallbackFrom = Rexor E55`); E55 bez zmian. Wyłączenie ustawienia
+  → 0, ponowne włączenie → 229. `tsc --noEmit` czysto.
+
+---
+
 ## 2026-09-29 — Uwagi klienta: baner kategorii, jedna wizualizacja, teksty lakieru, kolejność grup
 
 ### Zgłoszenie

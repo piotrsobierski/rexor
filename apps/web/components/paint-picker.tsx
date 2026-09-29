@@ -473,6 +473,7 @@ export function PaintDialog({
                   jest mocniejszym dowodem koloru niż render, więc nie może
                   jechać pod notką o wizualizacji przygotowanej komputerowo. */}
               <p className="mt-2 text-[11px] leading-relaxed text-ink-subtle">
+                {previewImage?.fallbackFrom && `Podgląd lakieru na ${previewImage.fallbackFrom} — ten sam kolor nałożymy na wybrany rower. `}
                 {previewImage?.variant === 'photo'
                   ? `Prawdziwe zdjęcie roweru w tym lakierze${previewImages.filter((image) => image.variant === 'photo').length > 1 ? ` (${previewImages.filter((image) => image.variant === 'photo').length} ujęcia)` : ''}, a nie wizualizacja. Odcień na ekranie zależy od światła w kadrze i kalibracji monitora.`
                   : previewHasRender
@@ -540,6 +541,7 @@ export function PaintDialog({
             {previewed.color.code ? ` · ${previewed.color.code}` : ''} · {previewed.palette.name}
             {' · '}
             {previewImage?.variant === 'photo' ? 'prawdziwe zdjęcie roweru w tym lakierze' : 'wizualizacja poglądowa, przygotowana komputerowo'}
+            {previewImage?.fallbackFrom ? ` · na ${previewImage.fallbackFrom}` : ''}
           </p>}
         </DialogContent>
       </Dialog>

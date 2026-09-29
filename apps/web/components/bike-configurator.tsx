@@ -453,7 +453,7 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               {/* Podpis slajdu lakieru: klient ma wiedzieć, czy patrzy na
                   wizualizację, czy na rower, który naprawdę stoi w tym kolorze. */}
               {paintSlide && chosenPaint && <span className="ml-auto rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white">
-                {paintSlide.variant === 'photo' ? 'zdjęcie' : 'wizualizacja'} · {chosenPaint.color.name}
+                {paintSlide.variant === 'photo' ? 'zdjęcie' : 'wizualizacja'} · {chosenPaint.color.name}{paintSlide.fallbackFrom ? ` · na ${paintSlide.fallbackFrom}` : ''}
               </span>}
               <span className={`rounded-full bg-ink-wash px-3 py-1.5 text-xs font-semibold tabular-nums text-ink-muted ${paintSlide ? '' : 'ml-auto'}`}>{galleryIndex + 1} / {gallery.length}</span>
             </div>

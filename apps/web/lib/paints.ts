@@ -10,7 +10,11 @@ export const PAINT_GROUP_SLUG = 'paint';
 /** Wizualizacja jest jedna (`ultra`); wariant „standard” wycofano migracją 041. */
 export type PaintVariant = 'ultra' | 'photo';
 
-export type PaintRender = { variant: PaintVariant; image: string; thumb: string | null; source: string | null };
+/**
+ * `fallbackFrom` - nazwa innego produktu, gdy lakier nie ma obrazu na tym
+ * (ustawienie „renderFallback”). Klient ma wiedzieć, na czym go ogląda.
+ */
+export type PaintRender = { variant: PaintVariant; image: string; thumb: string | null; source: string | null; fallbackFrom?: string | null };
 
 export type PaintColor = {
   id: number;

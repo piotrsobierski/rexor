@@ -117,22 +117,25 @@ function adminPaints(PDO $pdo): array
  */
 function saveAdminPaintSettings(PDO $pdo, array $input): array
 {
-    $filter = (string) ($input['colorFilter'] ?? 'all');
+    $current = paintSettings($pdo);
+    $filter = (string) ($input['colorFilter'] ?? $current['colorFilter']);
     if (!in_array($filter, PAINT_COLOR_FILTERS, true)) {
         throw new InvalidArgumentException('Nieznany filtr kolorów.');
     }
+    $renderFallback = array_key_exists('renderFallback', $input) ? (bool) $input['renderFallback'] : $current['renderFallback'];
 
     $pdo->prepare(
         "INSERT INTO site_settings (setting_key, value) VALUES ('paint_visibility', :value) " .
         'ON DUPLICATE KEY UPDATE value = VALUES(value)'
-    )->execute(['value' => json_encode(['colorFilter' => $filter], JSON_THROW_ON_ERROR)]);
+    )->execute(['value' => json_encode(['colorFilter' => $filter, 'renderFallback' => $renderFallback], JSON_THROW_ON_ERROR)]);
 
     $labels = [
         'all' => 'wszystkie kolory',
         'with_image' => 'tylko kolory ze zdjęciem albo renderem',
         'with_photo' => 'tylko kolory ze zdjęciem realnego roweru',
     ];
-    logActivity($pdo, 'paint_settings_saved', 'admin', currentAdmin()['email'] ?? null, "Widoczność lakierów: {$labels[$filter]}.", ['colorFilter' => $filter]);
+    $fallbackLabel = $renderFallback ? 'obraz z innego produktu, gdy brak własnego' : 'tylko obrazy danego produktu';
+    logActivity($pdo, 'paint_settings_saved', 'admin', currentAdmin()['email'] ?? null, "Widoczność lakierów: {$labels[$filter]}; {$fallbackLabel}.", ['colorFilter' => $filter, 'renderFallback' => $renderFallback]);
 
     return paintSettings($pdo);
 }

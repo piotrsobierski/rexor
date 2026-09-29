@@ -46,7 +46,11 @@ const PAINT_COLOR_FILTERS = ['all', 'with_image', 'with_photo'];
  * Czyta z domyślnymi wartościami, więc brak wiersza nie jest błędem i nie
  * wymagał migracji.
  *
- * @return array{colorFilter:string}
+ * `renderFallback` (domyślnie włączone): gdy lakier nie ma obrazu na TYM
+ * produkcie, pokazujemy obraz z innego modelu/ramy - klient wybiera kolor,
+ * a nie render konkretnej ramy (uwaga klienta z 29 września 2026).
+ *
+ * @return array{colorFilter:string, renderFallback:bool}
  */
 function paintSettings(PDO $pdo): array
 {
@@ -54,7 +58,10 @@ function paintSettings(PDO $pdo): array
     $stored = is_string($value) ? json_decode($value, true) : null;
     $filter = is_array($stored) ? (string) ($stored['colorFilter'] ?? 'all') : 'all';
 
-    return ['colorFilter' => in_array($filter, PAINT_COLOR_FILTERS, true) ? $filter : 'all'];
+    return [
+        'colorFilter' => in_array($filter, PAINT_COLOR_FILTERS, true) ? $filter : 'all',
+        'renderFallback' => is_array($stored) ? (bool) ($stored['renderFallback'] ?? true) : true,
+    ];
 }
 
 /** Czy kolor z takim kompletem obrazów przechodzi przez globalny filtr. */
@@ -109,7 +116,11 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
 
     // Panel ogląda komplet - filtr ma ukrywać kolory klientowi, a nie temu,
     // kto ma je uzupełnić o zdjęcia.
-    $colorFilter = $includeAdminOnly ? 'all' : paintSettings($pdo)['colorFilter'];
+    $settings = paintSettings($pdo);
+    $colorFilter = $includeAdminOnly ? 'all' : $settings['colorFilter'];
+    // Panel edytuje obrazy konkretnego produktu, więc zastępcze obrazy
+    // z innych produktów widzi tylko klient.
+    $renderFallback = !$includeAdminOnly && $settings['renderFallback'];
 
     $colorStatement = $pdo->prepare(
         'SELECT id, palette_id, slug, code, name, hex, finish, group_name, search_alt, price_gross_override, ' .
@@ -124,6 +135,17 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
         "WHERE c.palette_id = :palette AND r.{$definition['column']} = :owner AND r.is_public = TRUE " .
         'ORDER BY r.variant, r.sort_order, r.id'
     );
+    // Obrazy tego lakieru na innych produktach - najpierw modele (wg ich
+    // kolejności), potem ramy. Dawcą jest jeden, pierwszy produkt, żeby nie
+    // mieszać ujęć z różnych rowerów.
+    $fallbackStatement = $renderFallback ? $pdo->prepare(
+        'SELECT r.color_id, r.model_id, r.frame_id, r.variant, r.image_path, r.thumb_path, r.source, ' .
+        'COALESCE(m.name, f.name) AS owner_name ' .
+        'FROM paint_renders r JOIN paint_colors c ON c.id = r.color_id ' .
+        'LEFT JOIN bike_models m ON m.id = r.model_id LEFT JOIN frames f ON f.id = r.frame_id ' .
+        "WHERE c.palette_id = :palette AND r.is_public = TRUE AND NOT (r.{$definition['column']} <=> :owner) " .
+        'ORDER BY r.model_id IS NULL, m.sort_order, m.id, f.sort_order, f.id, r.variant, r.sort_order, r.id'
+    ) : null;
 
     $result = [];
     foreach ($palettes as $palette) {
@@ -150,11 +172,41 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
             }
         }
 
+        $fallbackRenders = [];
+        if ($fallbackStatement !== null) {
+            $fallbackStatement->execute(['palette' => $paletteId, 'owner' => $ownerId]);
+            $donors = [];
+            foreach ($fallbackStatement->fetchAll() as $render) {
+                $colorKey = (int) $render['color_id'];
+                if (isset($renders[$colorKey])) {
+                    continue;
+                }
+                $donor = $render['model_id'] !== null ? "m{$render['model_id']}" : "f{$render['frame_id']}";
+                $donors[$colorKey] ??= $donor;
+                if ($donors[$colorKey] !== $donor) {
+                    continue;
+                }
+                $entry = [
+                    'variant' => (string) $render['variant'],
+                    'image' => $render['image_path'],
+                    'thumb' => $render['thumb_path'],
+                    'source' => $render['source'],
+                    // Klient ma wiedzieć, że ogląda lakier na innym rowerze.
+                    'fallbackFrom' => $render['owner_name'],
+                ];
+                if ($entry['variant'] === 'photo') {
+                    $fallbackRenders[$colorKey]['photos'][] = $entry;
+                } else {
+                    $fallbackRenders[$colorKey][$entry['variant']] = $entry;
+                }
+            }
+        }
+
         $colorStatement->execute(['palette' => $paletteId]);
         $colors = [];
         foreach ($colorStatement->fetchAll() as $color) {
             $colorId = (int) $color['id'];
-            $colorRenders = $renders[$colorId] ?? [];
+            $colorRenders = $renders[$colorId] ?? $fallbackRenders[$colorId] ?? [];
             if (!paintColorPassesFilter($colorRenders, $colorFilter)) {
                 continue;
             }

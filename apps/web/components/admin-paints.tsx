@@ -90,7 +90,7 @@ const COLOR_FILTERS: Array<{ value: ColorFilter; label: string; help: string }> 
 ];
 
 type PaintsData = {
-  settings: { colorFilter: ColorFilter };
+  settings: { colorFilter: ColorFilter; renderFallback: boolean };
   palettes: Palette[];
   colors: Color[];
   renders: Render[];
@@ -281,6 +281,7 @@ function PaintSettingsPanel({
   const [rowSearch, setRowSearch] = useState('');
   const [onlyProblems, setOnlyProblems] = useState(false);
   const current = data.settings.colorFilter;
+  const renderFallback = data.settings.renderFallback ?? true;
 
   // Ile kolorów zostanie klientowi przy każdym z ustawień - dla każdego
   // produktu osobno. Wszystkie dane są już w panelu, więc liczymy na miejscu,
@@ -288,6 +289,10 @@ function PaintSettingsPanel({
   const impact = useMemo(() => {
     const paletteById = new Map(data.palettes.map((palette) => [palette.id, palette]));
     const activeColors = data.colors.filter((color) => color.isActive && (paletteById.get(color.paletteId)?.isActive ?? false));
+    const anyImages = new Map<number, Render[]>();
+    for (const render of data.renders) {
+      if (render.isPublic) anyImages.set(render.colorId, [...(anyImages.get(render.colorId) ?? []), render]);
+    }
     const products = [
       ...models.map((product) => ({ ...product, resource: 'model' as const })),
       ...frames.map((product) => ({ ...product, resource: 'frame' as const })),
@@ -309,6 +314,16 @@ function PaintSettingsPanel({
         if (product.resource === 'model' ? render.modelSlug !== product.slug : render.frameSlug !== product.slug) continue;
         imagesFor.set(render.colorId, [...(imagesFor.get(render.colorId) ?? []), render]);
       }
+      // Z włączonym zastępstwem kolor bez własnego obrazu dostaje obrazy
+      // innego produktu (API bierze jednego dawcę; do liczenia wystarczy
+      // „czy jakikolwiek produkt ma obraz / zdjęcie”).
+      if (renderFallback) {
+        for (const color of colors) {
+          if (imagesFor.has(color.id)) continue;
+          const borrowed = anyImages.get(color.id);
+          if (borrowed) imagesFor.set(color.id, borrowed);
+        }
+      }
 
       return {
         key: `${product.resource}:${product.slug}`,
@@ -318,15 +333,20 @@ function PaintSettingsPanel({
         withPhoto: colors.filter((color) => (imagesFor.get(color.id) ?? []).some((render) => render.variant === 'photo')).length,
       };
     });
-  }, [data, models, frames]);
+  }, [data, models, frames, renderFallback]);
 
-  async function choose(value: ColorFilter) {
-    if (value === current || saving) return;
+  async function save(settings: Partial<PaintsData['settings']>) {
+    if (saving) return;
     setSaving(true);
     try {
-      await request('/admin/paint-settings', { method: 'POST', body: JSON.stringify({ colorFilter: value }) });
+      await request('/admin/paint-settings', { method: 'POST', body: JSON.stringify({ colorFilter: current, renderFallback, ...settings }) });
       await reload();
     } catch (error) { setMessage((error as Error).message); } finally { setSaving(false); }
+  }
+
+  async function choose(value: ColorFilter) {
+    if (value === current) return;
+    await save({ colorFilter: value });
   }
 
   const visible = (row: (typeof impact)[number]) => (current === 'with_photo' ? row.withPhoto : current === 'with_image' ? row.withImage : row.all);
@@ -365,6 +385,25 @@ function PaintSettingsPanel({
         </span>
       </label>)}
     </div>
+
+    <h3 className="mt-6 text-xs font-semibold uppercase tracking-wider text-ink-subtle">Wizualizacje</h3>
+    <label className={`mt-2 flex cursor-pointer gap-3 rounded-2xl border p-4 transition-colors ${renderFallback ? 'border-ink bg-[#fafbfa]' : 'border-line hover:border-line-strong'}`}>
+      <input
+        type="checkbox"
+        className="mt-1 size-4 shrink-0 accent-black"
+        checked={renderFallback}
+        disabled={saving}
+        onChange={(event) => void save({ renderFallback: event.target.checked })}
+        data-testid="paint-render-fallback"
+      />
+      <span className="min-w-0">
+        <span className="block font-semibold">Pokazuj wizualizację z innego modelu, gdy brak własnej</span>
+        <span className="mt-0.5 block text-sm text-ink-muted">
+          Klient wybiera kolor niezależnie od ramy. Jeśli lakier nie ma zdjęcia ani wizualizacji na tym produkcie, pokażemy
+          obraz z innego modelu (np. E55) z dopiskiem, na jakim rowerze go ogląda. Liczy się to też do filtrów powyżej.
+        </span>
+      </span>
+    </label>
 
     <h3 className="mt-6 text-xs font-semibold uppercase tracking-wider text-ink-subtle">Co to znaczy dla poszczególnych produktów</h3>
     <p className="mt-1 max-w-3xl text-sm text-ink-muted">
