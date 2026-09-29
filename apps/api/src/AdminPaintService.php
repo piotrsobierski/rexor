@@ -204,7 +204,7 @@ function deleteAdminPaintPalette(PDO $pdo, int $id): array
     $used = $pdo->prepare('SELECT COUNT(*) FROM configuration_paint cp JOIN paint_colors c ON c.id = cp.color_id WHERE c.palette_id = :id');
     $used->execute(['id' => $id]);
     if ((int) $used->fetchColumn() > 0) {
-        throw new InvalidArgumentException('Ta paleta jest użyta w zapisanych konfiguracjach. Zamiast kasować, wyłącz ją.');
+        throw new InvalidArgumentException('Kolory z tej palety są w zapisanych zapytaniach klientów, a ich historia nie może zniknąć. Zamiast usuwać, wyłącz paletę (sekcja „Palety”).');
     }
     $pdo->prepare('DELETE FROM paint_palettes WHERE id = :id')->execute(['id' => $id]);
     logActivity($pdo, 'paint_palette_deleted', 'admin', currentAdmin()['email'] ?? null, "Usunięto paletę lakierów #{$id}.", ['id' => $id]);
@@ -287,8 +287,9 @@ function deleteAdminPaintColor(PDO $pdo, int $id): array
 {
     $used = $pdo->prepare('SELECT COUNT(*) FROM configuration_paint WHERE color_id = :id');
     $used->execute(['id' => $id]);
-    if ((int) $used->fetchColumn() > 0) {
-        throw new InvalidArgumentException('Ten kolor jest użyty w zapisanych konfiguracjach. Zamiast kasować, wyłącz go.');
+    $usedCount = (int) $used->fetchColumn();
+    if ($usedCount > 0) {
+        throw new InvalidArgumentException("Ten kolor wybrało {$usedCount} " . ($usedCount === 1 ? 'zapisane zapytanie klienta' : 'zapisanych zapytań klientów') . ', a ich historia nie może zniknąć. Zamiast usuwać, odznacz „aktywny w konfiguratorze” i zapisz kolor - klienci przestaną go widzieć.');
     }
     $pdo->prepare('DELETE FROM paint_colors WHERE id = :id')->execute(['id' => $id]);
     logActivity($pdo, 'paint_color_deleted', 'admin', currentAdmin()['email'] ?? null, "Usunięto kolor lakieru #{$id}.", ['id' => $id]);

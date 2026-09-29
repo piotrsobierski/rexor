@@ -673,6 +673,22 @@ function InfoTooltip({
   );
 }
 
+/**
+ * Błąd usuwania (np. „część jest przypisana do modelu X”) musi być nie do
+ * przeoczenia - pasek statusu u góry strony jest poza ekranem, gdy admin
+ * klika „Usuń” w przewiniętej liście. Stąd okno dialogowe, jak przy
+ * potwierdzeniu usunięcia.
+ */
+function reportBlockedDelete(
+  setMessage: (value: string) => void,
+  error: unknown,
+  fallback: string,
+) {
+  const text = error instanceof Error && error.message ? error.message : fallback;
+  setMessage(text);
+  window.alert(`Nie usunięto.\n\n${text}`);
+}
+
 function Panel({
   title,
   description,
@@ -957,9 +973,7 @@ function PartsEditor({
       await reload();
       setMessage('Część usunięta.');
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : 'Nie udało się usunąć części.',
-      );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć części.');
     }
   }
 
@@ -1535,11 +1549,7 @@ function CategoriesEditor({
       await reload();
       setMessage('Kategoria usunięta.');
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : 'Nie udało się usunąć kategorii.',
-      );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć kategorii.');
     }
   }
 
@@ -2560,9 +2570,7 @@ function ModelsEditor({
       await reload();
       setMessage('Model usunięty.');
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : 'Nie udało się usunąć modelu.',
-      );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć modelu.');
     }
   }
 
@@ -3383,9 +3391,7 @@ function FramesEditor({
       await reload();
       setMessage('Rama usunięta.');
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : 'Nie udało się usunąć ramy.',
-      );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć ramy.');
     }
   }
 
@@ -4137,9 +4143,7 @@ function FrameSizesPanel({
       await reload();
       setMessage('Rozmiar usunięty.');
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : 'Nie udało się usunąć rozmiaru.',
-      );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć rozmiaru.');
     }
   }
 
@@ -4395,11 +4399,7 @@ function ProjectsEditor({
       await reload();
       setMessage('Realizacja usunięta.');
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : 'Nie udało się usunąć realizacji.',
-      );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć realizacji.');
     }
   }
 
@@ -5178,11 +5178,7 @@ function BatteriesEditor({
       await reload();
       setMessage('Pakiet usunięty.');
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : 'Nie udało się usunąć pakietu.',
-      );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć pakietu.');
     }
   }
 
@@ -5664,11 +5660,7 @@ function PageEditor({
                     await reload();
                     setMessage('Strona usunięta.');
                   } catch (error) {
-                    setMessage(
-                      error instanceof Error
-                        ? error.message
-                        : 'Nie udało się usunąć strony.',
-                    );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć strony.');
                   }
                 }}
               >
@@ -7302,11 +7294,7 @@ function SizeRow({
       await reload();
       setMessage('Rozmiar usunięty.');
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : 'Nie udało się usunąć rozmiaru.',
-      );
+      reportBlockedDelete(setMessage, error, 'Nie udało się usunąć rozmiaru.');
     }
   }
 

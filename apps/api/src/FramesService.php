@@ -268,7 +268,7 @@ function deleteAdminFrameSize(PDO $pdo, int $id): array
     $siblings = $pdo->prepare('SELECT COUNT(*) FROM frame_sizes WHERE frame_id = :frame');
     $siblings->execute(['frame' => $row['frame_id']]);
     if ((int) $siblings->fetchColumn() <= 1) {
-        throw new InvalidArgumentException('To jedyny rozmiar tej ramy. Dodaj inny, zanim usuniesz ten - opublikowana rama musi mieć co najmniej jeden rozmiar.');
+        throw new InvalidArgumentException("Rozmiar „{$row['label']}” jest jedynym rozmiarem tej ramy, a opublikowana rama musi mieć co najmniej jeden. Najpierw dodaj inny rozmiar (zakładka „Ramy” → Rozmiary), potem usuń ten.");
     }
 
     $pdo->prepare('DELETE FROM frame_sizes WHERE id = :id')->execute(['id' => $id]);

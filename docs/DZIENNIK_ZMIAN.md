@@ -13,6 +13,21 @@ fakty sprawdzone od założeń i nie powtarza diagnostyki.
 
 ---
 
+## 2026-09-29 — Czytelne komunikaty blokady usuwania
+
+Komunikat o zależności pojawiał się szarym tekstem u góry strony - przy
+przewiniętej liście admin go nie widział i myślał, że „nic się nie stało”.
+Teraz nieudane usunięcie pokazuje okno „Nie usunięto.” z treścią
+(`reportBlockedDelete` w admin-panel, kolor lakieru w admin-paints).
+Treści w API wymieniają konkretne nazwy i drogę w panelu: część → modele,
+w których jest użyta, i zielone znaczki w „Części i ceny”; kategoria → nazwy
+modeli i ram; model/kolor → liczba zapytań klientów i co zrobić zamiast
+(status „Zarchiwizowany” / odznaczenie „aktywny w konfiguratorze”);
+jedyny rozmiar, domyślna bateria → nazwa i gdzie dodać/wskazać zastępstwo.
+Sprawdzone z CLI na lokalnej bazie (część, kategoria, domyślna bateria).
+
+---
+
 ## 2026-09-29 — Rozmiar i bateria w kolejności konfiguratora; model bez baterii
 
 ### Kolejność sekcji

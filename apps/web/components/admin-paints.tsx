@@ -739,7 +739,7 @@ function ColorRow({
       <div className="flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-2 text-sm"><Checkbox checked={draft.isActive} onCheckedChange={(checked) => setDraft({ ...draft, isActive: checked === true })} /> aktywny w konfiguratorze</label>
         <Button size="sm" onClick={async () => { try { await request(`/admin/paint-colors/${color.id}`, { method: 'PATCH', body: JSON.stringify(draft) }); await reload(); } catch (error) { setMessage((error as Error).message); } }}>Zapisz kolor</Button>
-        <Button size="sm" variant="ghost" className="text-red-600" onClick={async () => { if (!confirm(`Usunąć kolor „${color.name}”?`)) return; try { await request(`/admin/paint-colors/${color.id}`, { method: 'DELETE' }); await reload(); } catch (error) { setMessage((error as Error).message); } }}><Trash2 /> Usuń</Button>
+        <Button size="sm" variant="ghost" className="text-red-600" onClick={async () => { if (!confirm(`Usunąć kolor „${color.name}”?`)) return; try { await request(`/admin/paint-colors/${color.id}`, { method: 'DELETE' }); await reload(); } catch (error) { setMessage((error as Error).message); window.alert(`Nie usunięto.\n\n${(error as Error).message}`); } }}><Trash2 /> Usuń</Button>
       </div>
 
       <RendersEditor color={color} renders={renders} models={models} frames={frames} request={request} reload={reload} setMessage={setMessage} />

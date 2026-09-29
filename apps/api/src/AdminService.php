@@ -391,12 +391,15 @@ function createAdminPart(PDO $pdo, array $input): array
 
 function deleteAdminPart(PDO $pdo, int $id): array
 {
-    $usage = $pdo->prepare('SELECT COUNT(*) FROM model_parts WHERE part_id = :id');
+    $usage = $pdo->prepare('SELECT m.name FROM model_parts mp JOIN bike_models m ON m.id = mp.model_id WHERE mp.part_id = :id ORDER BY m.sort_order');
     $usage->execute(['id' => $id]);
-    $modelCount = (int) $usage->fetchColumn();
-    if ($modelCount > 0) {
+    $modelNames = $usage->fetchAll(PDO::FETCH_COLUMN);
+    if ($modelNames !== []) {
+        $partName = $pdo->prepare('SELECT name FROM parts WHERE id = :id');
+        $partName->execute(['id' => $id]);
         throw new InvalidArgumentException(
-            "Ta część jest przypisana do {$modelCount} " . ($modelCount === 1 ? 'modelu' : 'modeli') . '. Odepnij ją najpierw w zakładce „Osprzęt i cena modelu" albo klikając chip modelu w tabeli części.'
+            'Część „' . $partName->fetchColumn() . '” jest używana w ' . (count($modelNames) === 1 ? 'modelu: ' : 'modelach: ') . implode(', ', $modelNames) . '. '
+            . 'Najpierw ją odepnij: w zakładce „Części i ceny” kliknij zielone znaczki tych modeli przy tej części (zmienią się na szare), potem usuń ponownie.'
         );
     }
 
@@ -452,8 +455,8 @@ function deleteAdminModel(PDO $pdo, int $id): array
     $configurationCount = (int) $usage->fetchColumn();
     if ($configurationCount > 0) {
         throw new InvalidArgumentException(
-            "Model ma {$configurationCount} " . ($configurationCount === 1 ? 'zapisaną konfigurację klienta' : 'zapisanych konfiguracji klientów')
-            . '. Usunięcie modelu skasowałoby historię zapytań, więc zamiast tego ustaw status „archived” - model zniknie ze strony, a zapytania zostaną.'
+            "Model „{$name}” ma {$configurationCount} " . ($configurationCount === 1 ? 'zapisane zapytanie klienta' : 'zapisanych zapytań klientów')
+            . ', a ich historia nie może zniknąć. Zamiast usuwać, ustaw modelowi status „Zarchiwizowany” (zakładka „Modele” → pole Status) - model zniknie ze strony, a zapytania zostaną.'
         );
     }
 
@@ -523,16 +526,20 @@ function deleteAdminCategory(PDO $pdo, int $id): array
         throw new InvalidArgumentException('Nie znaleziono kategorii.');
     }
 
-    foreach ([['bike_models', 'modeli', 'model'], ['frames', 'ram', 'ramę']] as [$table, $plural, $singular]) {
-        $usage = $pdo->prepare("SELECT COUNT(*) FROM {$table} WHERE category_id = :id");
+    $blockers = [];
+    foreach ([['bike_models', 'modele', 'Modele'], ['frames', 'ramy', 'Ramy']] as [$table, $label, $tab]) {
+        $usage = $pdo->prepare("SELECT name FROM {$table} WHERE category_id = :id ORDER BY sort_order");
         $usage->execute(['id' => $id]);
-        $count = (int) $usage->fetchColumn();
-        if ($count > 0) {
-            throw new InvalidArgumentException(
-                "Kategoria zawiera {$count} " . ($count === 1 ? $singular : $plural)
-                . '. Przenieś je najpierw do innej kategorii albo usuń.'
-            );
+        $names = $usage->fetchAll(PDO::FETCH_COLUMN);
+        if ($names !== []) {
+            $blockers[] = "{$label}: " . implode(', ', $names) . " (zakładka „{$tab}”)";
         }
+    }
+    if ($blockers !== []) {
+        throw new InvalidArgumentException(
+            "Kategoria „{$name}” nie jest pusta - są w niej " . implode('; ', $blockers) . '. '
+            . 'Zmień im kategorię na inną albo je usuń, potem usuń kategorię. Jeśli chcesz ją tylko schować, wyłącz „Widoczna na stronie głównej”.'
+        );
     }
 
     $pdo->beginTransaction();
@@ -658,7 +665,7 @@ function deleteAdminSize(PDO $pdo, int $id): array
     $siblings = $pdo->prepare('SELECT COUNT(*) FROM model_sizes WHERE model_id = :model');
     $siblings->execute(['model' => $row['model_id']]);
     if ((int) $siblings->fetchColumn() <= 1) {
-        throw new InvalidArgumentException('To jedyny rozmiar tego modelu. Dodaj inny, zanim usuniesz ten - bez rozmiaru modelu nie da się skonfigurować.');
+        throw new InvalidArgumentException("Rozmiar „{$row['label']}” jest jedynym rozmiarem tego modelu, a bez rozmiaru klient nie złoży zamówienia. Najpierw dodaj inny rozmiar (zakładka „Modele” → Rozmiary i dopłaty), potem usuń ten.");
     }
 
     $pdo->prepare('DELETE FROM model_sizes WHERE id = :id')->execute(['id' => $id]);
@@ -693,7 +700,7 @@ function deleteAdminBattery(PDO $pdo, int $id): array
     $siblings = $pdo->prepare('SELECT COUNT(*) FROM model_batteries WHERE model_id = :model');
     $siblings->execute(['model' => $row['model_id']]);
     if ((int) $row['is_default'] === 1 && (int) $siblings->fetchColumn() > 1) {
-        throw new InvalidArgumentException('To pakiet domyślny - wskaż najpierw inny jako domyślny, bo od niego liczy się cena modelu.');
+        throw new InvalidArgumentException("Bateria „{$row['name']}” jest domyślna - od niej liczy się cena „od” modelu. Najpierw oznacz inną baterię tego modelu jako domyślną (zakładka „Baterie”), potem usuń tę.");
     }
 
     $pdo->prepare('DELETE FROM model_batteries WHERE id = :id')->execute(['id' => $id]);
