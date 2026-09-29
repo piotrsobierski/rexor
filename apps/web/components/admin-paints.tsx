@@ -455,7 +455,12 @@ function PaintSettingsPanel({
     {problems.length > 0 && <p className="mt-3 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
       Przy tym ustawieniu {problems.length === 1 ? 'jeden produkt nie ma' : `${problems.length} produktów nie ma`} ani jednego koloru do wyboru
       — sekcja lakierowania będzie u {problems.length === 1 ? 'niego' : 'nich'} pusta ({problems.slice(0, 3).map((row) => row.name).join(', ')}
-      {problems.length > 3 ? ` i ${problems.length - 3} więcej` : ''}). Wgraj zdjęcia albo wróć do łagodniejszego filtra.
+      {problems.length > 3 ? ` i ${problems.length - 3} więcej` : ''}).{' '}
+      {problems.some((row) => row.all === 0)
+        ? <>Część z nich nie ma przypiętej żadnej palety ({problems.filter((row) => row.all === 0).map((row) => row.name).join(', ')}) — jeśli mają używać tych
+          samych palet co rowery, zaznacz je niżej w sekcji „Palety”, w polu „Dostępna w” przy każdej palecie (Porsche, Volkswagen, fabryczna).
+          {problems.some((row) => row.all > 0) && ' Pozostałym wgraj zdjęcia albo wróć do łagodniejszego filtra.'}</>
+        : 'Wgraj zdjęcia, włącz „Pokazuj wizualizację z innego modelu” albo wróć do łagodniejszego filtra.'}
     </p>}
   </section>;
 }

@@ -13,6 +13,18 @@ fakty sprawdzone od założeń i nie powtarza diagnostyki.
 
 ---
 
+## 2026-09-29 — Komunikat o produktach bez kolorów wskazuje „Dostępna w”
+
+Ramy CFR-707, CFM-1002 i E-Gravel LCE086-D na QA mają `paint_available`, ale
+zero wierszy w `frame_paint_palettes`, więc panel pokazywał „brak kolorów”
+z radą „wgraj zdjęcia”, która nic nie zmienia. Komunikat w Ustawieniach
+globalnych palet rozróżnia teraz produkty bez palety (→ zaznacz je w sekcji
+Palety, pole „Dostępna w”) od produktów odciętych filtrem. Przy okazji
+sprawdzono na QA kolejność grup: konfigurator (Playwright) i API odzwierciedlają
+zmianę z panelu od razu.
+
+---
+
 ## 2026-09-29 — Wizualizacja lakieru z innego modelu, gdy brak własnej
 
 ### Zgłoszenie
