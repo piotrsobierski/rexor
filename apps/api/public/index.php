@@ -312,10 +312,10 @@ if ($method === 'PATCH' && preg_match('~^/admin/models/(\d+)/media/reorder$~', $
     jsonResponse(reorderModelMedia($pdo, (int) $matches[1], (array) ($payload['mediaIds'] ?? [])));
 }
 
-if ($method === 'PATCH' && $path === '/admin/part-groups/reorder') {
+if ($method === 'PATCH' && $path === '/admin/configurator-sections/reorder') {
     requireAdmin($pdo);
     $payload = requestJson();
-    jsonResponse(reorderPartGroups($pdo, (array) ($payload['groupIds'] ?? [])));
+    jsonResponse(reorderConfiguratorSections($pdo, (array) ($payload['order'] ?? [])));
 }
 
 // Ramy i realizacje w panelu. Wgrywanie pliku zostaje osobnym wywołaniem

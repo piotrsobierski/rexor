@@ -152,6 +152,7 @@ type Catalog = {
   models: Row[];
   parts: Row[];
   partGroups: Row[];
+  configuratorSections?: { size: number; battery: number };
   modelParts: ModelPartRow[];
   modelGroupSettings: GroupSettingsRow[];
   modelSizes: Row[];
@@ -521,6 +522,7 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
           <TabsContent value="equipment" className="grid gap-6">
             <PartGroupOrderEditor
               partGroups={catalog.partGroups}
+              fixedSections={catalog.configuratorSections ?? { size: -20, battery: -10 }}
               request={request}
               reload={loadCatalog}
               setMessage={setMessage}
@@ -690,24 +692,43 @@ function Panel({
 }
 
 /**
- * Kolejność sekcji (grup części) w konfiguratorze - wspólna dla wszystkich
- * modeli. Rozmiar i bateria zawsze idą pierwsze, dalej grupy w tej
- * kolejności; grupy bez części w danym modelu po prostu się nie pokazują.
+ * Kolejność sekcji konfiguratora - wspólna dla wszystkich modeli. Rozmiar
+ * i bateria są na tej samej liście co grupy części; sekcje, których model
+ * nie ma (brak baterii, grupa bez części, element stały), po prostu się nie
+ * pokazują.
  */
+type SectionItem = { key: string; name: string; sort: number; id: number };
+
 function PartGroupOrderEditor({
   partGroups,
+  fixedSections,
   request,
   reload,
   setMessage,
 }: {
   partGroups: Row[];
+  fixedSections: { size: number; battery: number };
   request: (path: string, options?: RequestInit) => Promise<any>;
   reload: () => Promise<void>;
   setMessage: (value: string) => void;
 }) {
-  const [order, setOrder] = useState<Row[]>(partGroups);
+  const initial = useMemo<SectionItem[]>(
+    () =>
+      [
+        { key: 'size', name: 'Rozmiar ramy', sort: fixedSections.size, id: 0 },
+        { key: 'battery', name: 'Bateria', sort: fixedSections.battery, id: 0 },
+        ...partGroups.map((group) => ({
+          key: `group:${group.id}`,
+          name: String(group.name),
+          sort: Number(group.sort_order),
+          id: Number(group.id),
+        })),
+      ].sort((a, b) => a.sort - b.sort || a.id - b.id),
+    [partGroups, fixedSections],
+  );
+  const [order, setOrder] = useState<SectionItem[]>(initial);
   const [saving, setSaving] = useState(false);
-  useEffect(() => setOrder(partGroups), [partGroups]);
+  useEffect(() => setOrder(initial), [initial]);
 
   async function move(index: number, direction: -1 | 1) {
     const target = index + direction;
@@ -717,9 +738,9 @@ function PartGroupOrderEditor({
     setOrder(next);
     setSaving(true);
     try {
-      await request('/admin/part-groups/reorder', {
+      await request('/admin/configurator-sections/reorder', {
         method: 'PATCH',
-        body: JSON.stringify({ groupIds: next.map((group) => Number(group.id)) }),
+        body: JSON.stringify({ order: next.map((item) => item.key) }),
       });
       await reload();
       setMessage('Zapisano kolejność w konfiguratorze.');
@@ -734,26 +755,26 @@ function PartGroupOrderEditor({
   return (
     <Panel
       title="Kolejność w konfiguratorze"
-      description="Kolejność, w jakiej klient przechodzi przez wyposażenie (wspólna dla wszystkich modeli). Rozmiar i bateria są zawsze na początku. Zmiana zapisuje się od razu."
+      description="Kolejność, w jakiej klient przechodzi przez konfigurator (wspólna dla wszystkich modeli), razem z rozmiarem i baterią. Sekcje, których dany model nie ma, są pomijane. Zmiana zapisuje się od razu."
     >
       <ol className="grid gap-1.5" data-testid="part-group-order">
-        {order.map((group, index) => (
+        {order.map((item, index) => (
           <li
-            key={group.id}
+            key={item.key}
             className="flex items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm"
           >
             <span className="w-6 text-right text-xs tabular-nums text-ink-subtle">
               {index + 1}.
             </span>
             <span className="min-w-0 flex-1 truncate font-medium">
-              {String(group.name)}
+              {item.name}
             </span>
             <Button
               type="button"
               size="sm"
               variant="outline"
               className="h-8 px-2"
-              aria-label={`Przesuń „${String(group.name)}” wyżej`}
+              aria-label={`Przesuń „${item.name}” wyżej`}
               disabled={index === 0 || saving}
               onClick={() => void move(index, -1)}
             >
@@ -764,7 +785,7 @@ function PartGroupOrderEditor({
               size="sm"
               variant="outline"
               className="h-8 px-2"
-              aria-label={`Przesuń „${String(group.name)}” niżej`}
+              aria-label={`Przesuń „${item.name}” niżej`}
               disabled={index === order.length - 1 || saving}
               onClick={() => void move(index, 1)}
             >
@@ -5251,7 +5272,7 @@ function BatteriesEditor({
 
               {rows.length === 0 && (
                 <p className="mt-3 text-sm text-ink-muted">
-                  Ten model nie ma jeszcze żadnego pakietu baterii.
+                  Ten model nie ma baterii — to poprawne dla roweru bez wspomagania. Konfigurator pominie sekcję baterii.
                 </p>
               )}
 

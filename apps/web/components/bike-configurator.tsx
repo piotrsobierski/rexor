@@ -152,6 +152,14 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
     [paintSlides, model.gallery],
   );
   const paintSlide = galleryIndex < paintSlides.length ? paintSlides[galleryIndex] : null;
+  // Kolejność sekcji ustawia panel (Wyposażenie): rozmiar, bateria i grupy
+  // na jednej liście. Bez niej (stare API) - dotychczasowy układ.
+  const orderedSections = useMemo(() => {
+    const visible = ['size', ...(model.batteries.length > 0 ? ['battery'] : []), ...model.groups.filter((group) => group.selectionMode !== 'fixed').map((group) => group.slug)];
+    const order = model.sectionOrder ?? [];
+    const position = (key: string) => { const index = order.indexOf(key); return index === -1 ? Number.MAX_SAFE_INTEGER : index; };
+    return visible.map((key, index) => ({ key, index })).sort((a, b) => position(a.key) - position(b.key) || a.index - b.index).map((item) => item.key);
+  }, [model]);
 
   useEffect(() => {
     setModelDescriptionOpen(window.matchMedia('(min-width: 1024px)').matches);
@@ -476,8 +484,8 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
               {gallery.length > 1 && <><CarouselPrevious size="icon-lg" className="left-3 z-20 border-line bg-surface/90 shadow-md hover:bg-surface sm:left-5" /><CarouselNext size="icon-lg" className="right-3 z-20 border-line bg-surface/90 shadow-md hover:bg-surface sm:right-5" /></>}
             </Carousel>
             <div className="stage-bar border-t border-line">
-              <span className="spec-pill"><Gauge /> {model.motor}</span>
-              <span className="spec-pill"><BatteryCharging /> {batteryLabel}</span>
+              {model.motor && <span className="spec-pill"><Gauge /> {model.motor}</span>}
+              {battery && batteryLabel && <span className="spec-pill"><BatteryCharging /> {batteryLabel}</span>}
             </div>
           </div>
           {(model.descriptionHtml || model.description) && (
@@ -506,9 +514,11 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
           <div className="flex items-start justify-between gap-5"><div><p className="eyebrow">{copy.configurator.projectEyebrow}</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">{copy.configurator.configTitlePrefix} {model.name.replace('Rexor ', '')}</h2></div><span className="rounded-full bg-[var(--accent-brand)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em]">{copy.configurator.grossBadge}</span></div>
           <Progress value={model.available ? 72 : 12} className="mt-5 h-1.5 bg-ink-wash [&>div]:bg-ink" />
           {!model.available ? <div className="mt-8 rounded-3xl bg-ink p-6 text-white"><Bike className="size-8 text-[var(--accent-brand)]" /><h3 className="mt-8 text-2xl font-semibold">{copy.configurator.unavailableTitle}</h3><p className="mt-3 leading-relaxed text-white/64">{copy.configurator.unavailableText}</p><Button render={<a href="/serwis" />} className="mt-6 w-full rounded-full bg-white text-ink hover:bg-white/90">{copy.configurator.unavailableCta} <ArrowRight data-icon="inline-end" /></Button></div> : <>
-            <section className="config-section" data-testid="size-section"><div className="section-heading"><div><span>01</span><h3>{copy.configurator.sizeSectionTitle}</h3></div><p>{copy.configurator.sizeSectionSubtitle}</p></div><RadioGroup value={size} onValueChange={changeSize} className="grid grid-cols-3 gap-2" data-testid="size-selector">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`} data-testid={`size-option-${item.code}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>
-            {model.batteries.length > 0 && <section className="config-section" data-testid="battery-section">
-              <div className="section-heading"><div><span>02</span><h3>{copy.configurator.batterySectionTitle}</h3></div><p>{copy.configurator.batterySectionSubtitle}</p></div>
+            {orderedSections.map((key, sectionIndex) => {
+              const number = String(sectionIndex + 1).padStart(2, '0');
+              if (key === 'size') return <section key="size" className="config-section" data-testid="size-section"><div className="section-heading"><div><span>{number}</span><h3>{copy.configurator.sizeSectionTitle}</h3></div><p>{copy.configurator.sizeSectionSubtitle}</p></div><RadioGroup value={size} onValueChange={changeSize} className="grid grid-cols-3 gap-2" data-testid="size-selector">{model.sizes.map((item) => <label key={item.code} className={`size-choice focus-ring ${size === item.code ? 'size-choice-active' : ''}`} data-testid={`size-option-${item.code}`}><RadioGroupItem value={item.code} className="choice-input" /><span>{item.code}</span>{item.priceDelta !== 0 && <span className="text-xs text-ink-muted tabular-nums">+{formatPrice(item.priceDelta)}</span>}</label>)}</RadioGroup></section>;
+              if (key === 'battery') return <section key="battery" className="config-section" data-testid="battery-section">
+              <div className="section-heading"><div><span>{number}</span><h3>{copy.configurator.batterySectionTitle}</h3></div><p>{copy.configurator.batterySectionSubtitle}</p></div>
               <RadioGroup value={battery?.code ?? ''} onValueChange={changeBattery} className="gap-2" data-testid="battery-selector">
                 {model.batteries.map((item) => { const selected = battery?.code === item.code; const delta = item.grossPrice - (defaultBattery?.grossPrice ?? item.grossPrice); return <label key={item.code} className={`option-choice focus-ring ${selected ? 'option-choice-active' : ''}`} data-testid={`battery-option-${item.code}`}>
                   <RadioGroupItem value={item.code} className="choice-input" />
@@ -576,11 +586,12 @@ export function BikeConfigurator({ catalog }: { catalog?: PublicCatalogData }) {
                   </div>
                 </details>
               )}
-            </section>}
-            {model.groups.filter((group) => group.selectionMode !== 'fixed').map((group, groupIndex) => {
+            </section>;
+              const group = model.groups.find((item) => item.slug === key);
+              if (!group) return null;
               const choices = groupChoices(group, copy.configurator);
               const defaultPrice = groupDefaultPrice(group);
-              const heading = <div className="section-heading"><div><span>{String(groupIndex + (model.batteries.length > 0 ? 3 : 2)).padStart(2, '0')}</span><h3>{group.name}</h3></div><p>{group.helper}</p></div>;
+              const heading = <div className="section-heading"><div><span>{number}</span><h3>{group.name}</h3></div><p>{group.helper}</p></div>;
               // Lakierowanie ma własną sekcję: obok zakresu robót stoi wybór
               // koloru, który nie jest częścią z cennika, tylko osobnym bytem.
               if (group.slug === PAINT_GROUP_SLUG) {

@@ -109,6 +109,7 @@ function adminCatalog(PDO $pdo): array
         'branding' => getBranding($pdo),
         'mailRouting' => getMailRouting($pdo),
         'configurationEmailTemplate' => getConfigurationEmailTemplate($pdo),
+        'configuratorSections' => configuratorFixedSections($pdo),
     ];
     $flagFields = [
         'categories' => ['is_published', 'show_hero_image'],
@@ -687,12 +688,11 @@ function deleteAdminBattery(PDO $pdo, int $id): array
         throw new InvalidArgumentException('Nie znaleziono pakietu baterii.');
     }
 
+    // Ostatnią baterię można usunąć - model bez baterii jest poprawny.
+    // Domyślnej przy innych pakietach nie: najpierw trzeba wskazać następczynię.
     $siblings = $pdo->prepare('SELECT COUNT(*) FROM model_batteries WHERE model_id = :model');
     $siblings->execute(['model' => $row['model_id']]);
-    if ((int) $siblings->fetchColumn() <= 1) {
-        throw new InvalidArgumentException('To jedyny pakiet baterii tego modelu. Dodaj inny, zanim usuniesz ten.');
-    }
-    if ((int) $row['is_default'] === 1) {
+    if ((int) $row['is_default'] === 1 && (int) $siblings->fetchColumn() > 1) {
         throw new InvalidArgumentException('To pakiet domyślny - wskaż najpierw inny jako domyślny, bo od niego liczy się cena modelu.');
     }
 
@@ -1210,35 +1210,50 @@ function reorderModelMedia(PDO $pdo, int $modelId, array $mediaIds): array
 }
 
 /**
- * Kolejność grup części (sekcji) w konfiguratorze. Lista musi zawierać
- * wszystkie grupy - częściowa lista zostawiłaby pozostałe na starych
- * numerach i kolejność rozjechałaby się po cichu.
+ * Kolejność sekcji konfiguratora: rozmiar, bateria i grupy części na jednej
+ * liście. Grupy trzymają pozycję w `part_groups.sort_order`, rozmiar
+ * i bateria (to nie są grupy części) w `site_settings.configurator_sections`
+ * na tej samej skali. Lista musi zawierać wszystkie pozycje - częściowa
+ * zostawiłaby resztę na starych numerach i kolejność rozjechałaby się po cichu.
+ *
+ * @param list<string> $keys 'size', 'battery' albo 'group:<id>'
  */
-function reorderPartGroups(PDO $pdo, array $groupIds): array
+function reorderConfiguratorSections(PDO $pdo, array $keys): array
 {
-    $groupIds = array_values(array_unique(array_map('intval', $groupIds)));
-    $existing = array_map('intval', $pdo->query('SELECT id FROM part_groups')->fetchAll(PDO::FETCH_COLUMN));
-    sort($existing);
-    $sorted = $groupIds;
-    sort($sorted);
-    if ($sorted !== $existing) {
-        throw new InvalidArgumentException('Lista grup nie zgadza się z grupami części w bazie. Odśwież panel.');
+    $keys = array_values(array_unique(array_map('strval', $keys)));
+    $groupIds = array_map('intval', $pdo->query('SELECT id FROM part_groups')->fetchAll(PDO::FETCH_COLUMN));
+    $expected = array_merge(['size', 'battery'], array_map(static fn (int $id): string => "group:{$id}", $groupIds));
+    $sortedKeys = $keys;
+    sort($sortedKeys);
+    sort($expected);
+    if ($sortedKeys !== $expected) {
+        throw new InvalidArgumentException('Lista sekcji nie zgadza się z grupami części w bazie. Odśwież panel.');
     }
 
     $update = $pdo->prepare('UPDATE part_groups SET sort_order = :sort WHERE id = :id');
+    $fixed = [];
     $pdo->beginTransaction();
     try {
-        foreach ($groupIds as $index => $groupId) {
-            $update->execute(['sort' => ($index + 1) * 10, 'id' => $groupId]);
+        foreach ($keys as $index => $key) {
+            $sort = ($index + 1) * 10;
+            if (str_starts_with($key, 'group:')) {
+                $update->execute(['sort' => $sort, 'id' => (int) substr($key, 6)]);
+            } else {
+                $fixed[$key] = $sort;
+            }
         }
+        $pdo->prepare(
+            "INSERT INTO site_settings (setting_key, value) VALUES ('configurator_sections', :value) " .
+            'ON DUPLICATE KEY UPDATE value = VALUES(value)'
+        )->execute(['value' => json_encode($fixed, JSON_THROW_ON_ERROR)]);
         $pdo->commit();
     } catch (Throwable $error) {
         $pdo->rollBack();
         throw $error;
     }
-    logActivity($pdo, 'part_groups_reordered', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono kolejność grup w konfiguratorze.', ['groupIds' => $groupIds]);
+    logActivity($pdo, 'configurator_sections_reordered', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono kolejność sekcji w konfiguratorze.', ['order' => $keys]);
 
-    return ['groupIds' => $groupIds];
+    return ['order' => $keys];
 }
 
 /**
@@ -1274,9 +1289,10 @@ function adminModelPricing(PDO $pdo): array
         if (empty(modelSizes($pdo, $modelId))) {
             $readinessIssues[] = 'Brak aktywnego rozmiaru - dodaj co najmniej jeden w zakładce „Modele”.';
         }
-        if (empty($activeBatteries)) {
-            $readinessIssues[] = 'Brak aktywnej baterii - dodaj co najmniej jedną w zakładce „Baterie”.';
-        } elseif ($defaultBattery === null) {
+        // Model bez baterii jest poprawny (np. rower bez wspomagania) -
+        // brak baterii to nie brak danych. Pilnujemy tylko, żeby przy
+        // bateriach była wskazana domyślna, bo od niej liczy się cena „od”.
+        if (!empty($activeBatteries) && $defaultBattery === null) {
             $readinessIssues[] = 'Żadna bateria nie jest oznaczona jako domyślna - ustaw to w zakładce „Baterie”.';
         }
         if (empty($groups)) {

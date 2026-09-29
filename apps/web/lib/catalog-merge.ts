@@ -20,6 +20,7 @@ export type ApiModel = {
   media: Array<{ storage_path: string; role: string }>;
   sizes?: BikeSize[];
   batteries?: BikeBattery[];
+  sectionOrder?: string[];
   groups?: OptionGroup[];
   specifications?: { facts?: string[]; [key: string]: unknown } | null;
 };
@@ -87,6 +88,7 @@ export function mergeCatalog(data: { models: ApiModel[]; categories: PublicCateg
         batteries: apiModel.batteries ?? [],
         available: (apiModel.groups?.length ?? 0) > 0 && apiModel.base_price !== null,
         groups: apiModel.groups ?? [],
+        sectionOrder: apiModel.sectionOrder,
       };
     }),
   };

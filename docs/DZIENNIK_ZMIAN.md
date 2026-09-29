@@ -13,6 +13,41 @@ fakty sprawdzone od założeń i nie powtarza diagnostyki.
 
 ---
 
+## 2026-09-29 — Rozmiar i bateria w kolejności konfiguratora; model bez baterii
+
+### Kolejność sekcji
+
+Rozmiar i bateria nie muszą już stać na początku: są pozycjami tej samej
+listy „Kolejność w konfiguratorze” (Wyposażenie) co grupy części. Grupy
+trzymają pozycję w `part_groups.sort_order`, rozmiar i bateria w
+`site_settings.configurator_sections` (ta sama skala; brak wpisu = przed
+grupami, jak dotąd). Endpoint `PATCH /admin/configurator-sections/reorder`
+(`order: ['size','battery','group:<id>',…]`, wymagany komplet) zastąpił
+`/admin/part-groups/reorder`. `/api/catalog` zwraca przy modelu
+`sectionOrder`, konfigurator sortuje sekcje według niej i numeruje od nowa.
+
+### Model bez baterii (uwaga klienta nr 3)
+
+Backend już wcześniej pozwalał dodać, opublikować i zamówić model bez
+baterii (sprawdzone). Klient widział czerwone „Do uzupełnienia przed
+publikacją: brak aktywnej baterii” i „Wycena” zamiast ceny, a ostatniej
+baterii nie dało się usunąć. Zmiany:
+- brak baterii nie jest już problemem gotowości (zostaje tylko „brak
+  domyślnej”, gdy baterie są);
+- ostatnią baterię można usunąć (domyślnej przy innych pakietach nadal nie);
+- konfigurator nie pokazuje pustych znaczków baterii/silnika, strona modelu
+  nie pokazuje baterii modelu bez baterii.
+Baterie zostają osobną zakładką - przeniesienie do Części zgubiłoby Wh
+(szacowane zasięgi) i osobny zapis baterii w konfiguracji.
+
+### Testy
+
+Lokalnie z CLI: niepełna lista odrzucona, bateria na koniec i przywrócenie;
+model bez baterii bez problemów gotowości (cena 6000), z baterią 9000, po
+usunięciu ostatniej baterii znów 6000 bez błędów. `tsc --noEmit` czysto.
+
+---
+
 ## 2026-09-29 — Komunikat o produktach bez kolorów wskazuje „Dostępna w”
 
 Ramy CFR-707, CFM-1002 i E-Gravel LCE086-D na QA mają `paint_available`, ale

@@ -246,7 +246,7 @@ export function BikeModelPage({ catalog, modelSlug: modelSlugProp }: { catalog?:
                     <Gauge className="size-4 text-ink-subtle" /> {model.motor}
                   </span>
                 )}
-                {model.battery && (
+                {model.battery && model.batteries.length > 0 && (
                   <span className="inline-flex items-center gap-2 rounded-xl bg-ink-wash px-3.5 py-2 text-sm font-medium text-ink">
                     <BatteryCharging className="size-4 text-ink-subtle" /> {model.battery}
                   </span>

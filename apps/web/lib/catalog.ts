@@ -76,6 +76,8 @@ export type BikeModel = {
   batteries: BikeBattery[];
   available: boolean;
   groups: OptionGroup[];
+  /** Kolejność sekcji konfiguratora z panelu: 'size', 'battery' i slugi grup. */
+  sectionOrder?: string[];
 };
 
 export const bikeModels: BikeModel[] = [
