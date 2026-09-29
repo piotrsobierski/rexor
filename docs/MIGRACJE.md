@@ -34,6 +34,12 @@ Skrót wdrożeniowy `php scripts/startup.php` uruchamia migracje z `--apply`. Sk
 
 ## Wykonane zmiany schematu poza migracją bazową
 
+- `041_client_feedback_hero_render_copy_order.sql` (29 września 2026) -
+  `bike_categories.show_hero_image` (domyślnie ukryty baner), usunięcie
+  wariantu renderu `standard` (awans na `ultra`, gdy ultra brak), puste
+  nadpisania `copy.configurator.paintPickHint`/`paintSingleColorNote`
+  oraz „Lakierowanie” na początku kolejności grup. Wykonana lokalnie na
+  MySQL 8.0.
 - `033_paint_photos.sql` (16 września 2026) - dokłada wariant `photo` do
   `paint_renders.variant` oraz kolumnę `sort_order` (kolejność ujęć), a indeksy
   wariantu rozszerza o tę kolumnę. Zdjęcie realnego roweru ma pierwszeństwo

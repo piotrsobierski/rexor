@@ -141,8 +141,8 @@ function paintPalettesFor(PDO $pdo, string $resource, int $ownerId, bool $includ
                 'thumb' => $render['thumb_path'],
                 'source' => $render['source'],
             ];
-            // Wizualizacji jest po jednej na wariant, zdjęć wiele - stąd
-            // `photos` jako lista, a `standard`/`ultra` jako pojedyncze pola.
+            // Wizualizacja jest jedna (`ultra`), zdjęć wiele - stąd `photos`
+            // jako lista, a `ultra` jako pojedyncze pole.
             if ($variant === 'photo') {
                 $renders[$colorKey]['photos'][] = $entry;
             } else {
@@ -252,12 +252,11 @@ function resolvePaintSelection(PDO $pdo, string $resource, int $ownerId, ?string
             if ($color['slug'] !== $colorSlug) {
                 continue;
             }
-            // Prawdziwe zdjęcie bije każdą wizualizację, a "ultra" bije
-            // "standard" - ta sama kolejność co w `bestRender()` po stronie
-            // web. To, co widział klient, trafia do migawki konfiguracji.
+            // Prawdziwe zdjęcie bije wizualizację - ta sama kolejność co
+            // w `bestRender()` po stronie web. To, co widział klient, trafia
+            // do migawki konfiguracji.
             $render = $color['renders']['photos'][0]['image']
                 ?? $color['renders']['ultra']['image']
-                ?? $color['renders']['standard']['image']
                 ?? null;
 
             return [

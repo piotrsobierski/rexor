@@ -132,7 +132,9 @@ export function CategoryPage({ catalog, categorySlug }: { catalog?: PublicCatalo
     </section></PageFrame>;
   }
 
-  const categoryImage = publicMediaUrl(category.hero_image_path || category.default_image_path);
+  // Baner jest opcjonalny (migracja 041) - domyślnie klient od razu widzi
+  // listę rowerów, a admin włącza zdjęcie per kategoria.
+  const categoryImage = category.show_hero_image ? publicMediaUrl(category.hero_image_path || category.default_image_path) : null;
   return <PageFrame><section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8 lg:px-12 lg:py-20">
     {categoryImage && <div className="mb-8 aspect-[21/9] w-full overflow-hidden rounded-[28px] bg-[var(--muted)]"><OptimizedImage src={categoryImage} alt="" priority className="size-full object-cover" /></div>}
     <p className="eyebrow">{copyReady ? copy.category.eyebrow : <Skeleton aria-hidden="true" className="h-3 w-20" />}</p>

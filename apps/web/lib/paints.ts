@@ -7,7 +7,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8081/
 /** Slug części z grupy „paint”, która oznacza lakierowanie standardowe. */
 export const PAINT_GROUP_SLUG = 'paint';
 
-export type PaintVariant = 'standard' | 'ultra' | 'photo';
+/** Wizualizacja jest jedna (`ultra`); wariant „standard” wycofano migracją 041. */
+export type PaintVariant = 'ultra' | 'photo';
 
 export type PaintRender = { variant: PaintVariant; image: string; thumb: string | null; source: string | null };
 
@@ -23,11 +24,11 @@ export type PaintColor = {
   /** Dopłata brutto za ten kolor; zwykle cena palety, czasem nadpisana. */
   priceGross: number;
   /**
-   * Obrazy lakieru na TYM produkcie. `standard` i `ultra` to wizualizacje
-   * komputerowe - po jednej z każdego wariantu. `photos` to zdjęcia gotowego
-   * roweru, których może być kilka (kilka ujęć tego samego egzemplarza).
+   * Obrazy lakieru na TYM produkcie. `ultra` to jedyna wizualizacja
+   * komputerowa. `photos` to zdjęcia gotowego roweru, których może być kilka
+   * (kilka ujęć tego samego egzemplarza).
    */
-  renders: { standard?: PaintRender; ultra?: PaintRender; photos?: PaintRender[] };
+  renders: { ultra?: PaintRender; photos?: PaintRender[] };
 };
 
 export type PaintPalette = {
@@ -68,13 +69,13 @@ export const FINISH_LABELS: Record<PaintColor['finish'], string> = {
  * Wszystkie obrazy lakieru na produkcie, w kolejności pokazywania.
  *
  * Prawdziwe zdjęcie bije każdą wizualizację: pokazuje lakier w świetle,
- * a nie w renderze, więc idzie pierwsze. Dalej „ultra”, potem „standard”.
+ * a nie w renderze, więc idzie pierwsze. Dalej jedna wizualizacja „ultra”.
  * Ta sama kolejność rozstrzyga migawkę konfiguracji po stronie API
  * (`resolvePaintSelection`) - jedno źródło prawdy dla obu stron.
  */
 export function paintImages(color: PaintColor): PaintRender[] {
   const photos = color.renders.photos ?? [];
-  const renders = [color.renders.ultra, color.renders.standard].filter((item): item is PaintRender => Boolean(item));
+  const renders = [color.renders.ultra].filter((item): item is PaintRender => Boolean(item));
   return [...photos, ...renders];
 }
 

@@ -154,15 +154,15 @@ test.describe('rexor admin paints (ADM-06)', () => {
       const targetChip = page.getByRole('button', { name: /Rexor E55/ }).first();
       if (await targetChip.count()) await targetChip.click();
       // `div >> filter({has: ...})` also matches ancestor divs that wrap all
-      // three slots, not just the "standard" one -- `.first()` on the file
+      // both slots, not just the visualization one -- `.first()` on the file
       // input then grabs whichever slot renders first in the DOM (the photo
       // slot), not the intended one. Walk up from the slot's own heading to
       // its specific card instead.
-      const standardSlotInput = page
-        .getByText('Wizualizacja standard', { exact: true })
+      const renderSlotInput = page
+        .getByText('Wizualizacja', { exact: true })
         .locator('xpath=ancestor::div[contains(@class, "rounded-2xl") and contains(@class, "border-2")][1]')
         .locator('input[type="file"]');
-      await standardSlotInput.setInputFiles({ name: 'qa-d-render.png', mimeType: 'image/png', buffer: TEST_PNG });
+      await renderSlotInput.setInputFiles({ name: 'qa-d-render.png', mimeType: 'image/png', buffer: TEST_PNG });
       await expect(page.getByText('to widzi klient')).toBeVisible({ timeout: 10_000 });
       await page.screenshot({ path: `${evidence}/04-render-uploaded.png`, fullPage: true });
 

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { usePublicCopy, usePublicCopyReady } from '@/lib/use-public-copy';
 import {
   COLOR_FILTER_NOTES,
   FINISH_LABELS,
@@ -68,6 +69,12 @@ export function PaintSection({
   includedLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const copy = usePublicCopy();
+  // Bez tej bramki domyślny tekst mignąłby, zanim dojadą nadpisania z panelu
+  // (np. pusty = ukryty).
+  const copyReady = usePublicCopyReady();
+  const pickHint = copyReady ? copy.configurator.paintPickHint : '';
+  const singleColorNote = copyReady ? copy.configurator.paintSingleColorNote : '';
   const chosen = findColor(palettes, selection);
   // Administrator może wyłączyć wszystkie palety dla modelu. Wtedy nie
   // pokazujemy pustego wyboru koloru, tylko mówimy, co dalej.
@@ -126,17 +133,18 @@ export function PaintSection({
         <span className="grid size-14 shrink-0 place-items-center rounded-xl border border-dashed border-line-strong text-ink-subtle"><Palette className="size-6" /></span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Wybierz kolor</span>
-          <span className="mt-0.5 block text-sm text-ink-muted">
-            {paintState === 'error' ? 'Nie udało się pobrać palet lakierów.' : 'Kolor producenta w cenie; palety Porsche i Volkswagen przy lakierowaniu jednokolorowym.'}
-          </span>
+          {/* Podpowiedź jest edytowalna w panelu (Teksty); pusta = ukryta. */}
+          {(paintState === 'error' || pickHint) && <span className="mt-0.5 block text-sm text-ink-muted">
+            {paintState === 'error' ? 'Nie udało się pobrać palet lakierów.' : pickHint}
+          </span>}
         </span>
       </button>}
     </div>}
 
-    <p className="mt-3 flex gap-2 text-xs leading-relaxed text-ink-muted">
+    {singleColorNote && <p className="mt-3 flex gap-2 text-xs leading-relaxed text-ink-muted">
       <Info className="mt-0.5 size-3.5 shrink-0" />
-      <span>Konfigurator obejmuje jeden kolor. Malowanie dwukolorowe, przejścia i wzory wyceniamy indywidualnie — opisz pomysł w uwagach przy zapisie projektu, a ustalimy zakres i cenę.</span>
-    </p>
+      <span>{singleColorNote}</span>
+    </p>}
 
     <PaintDialog
       open={open}

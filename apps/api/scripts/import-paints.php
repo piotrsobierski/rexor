@@ -258,12 +258,13 @@ foreach ($manifest['colors'] ?? [] as $hex => $entry) {
     }
     $colorId = $colorIdByKey["{$paletteSlug}|{$colorSlug}"] ?? null;
 
+    // Jedna wizualizacja na produkt (migracja 041): bierzemy wersję ultra,
+    // a zwykłą tylko wtedy, gdy ultra nie ma - zapisaną jako „ultra".
     $variants = [];
-    if (isset($entry['file'])) {
-        $variants['standard'] = ['file' => $entry['file'], 'thumb' => $entry['thumb'] ?? null, 'source' => $entry['model'] ?? null];
-    }
     if (isset($entry['ultra']['file'])) {
         $variants['ultra'] = ['file' => $entry['ultra']['file'], 'thumb' => $entry['ultra']['thumb'] ?? null, 'source' => $entry['ultra']['model'] ?? null];
+    } elseif (isset($entry['file'])) {
+        $variants['ultra'] = ['file' => $entry['file'], 'thumb' => $entry['thumb'] ?? null, 'source' => $entry['model'] ?? null];
     }
 
     foreach ($variants as $variant => $files) {
@@ -318,7 +319,7 @@ foreach ($manifest['colors'] ?? [] as $hex => $entry) {
 $mode = $apply ? 'Zaimportowano' : 'Podgląd (bez zapisu)';
 echo "{$mode}:\n";
 echo "  kolory:               {$imported['colors']}\n";
-echo "  rendery standard:     {$imported['renders']}\n";
+echo "  wizualizacje:         {$imported['renders']}\n";
 echo "  rendery ultra:        {$imported['ultra']}\n";
 echo "  zdjęcia referencyjne: {$imported['references']}\n";
 if ($imported['ambiguous'] !== []) {

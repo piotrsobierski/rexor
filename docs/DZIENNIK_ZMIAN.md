@@ -13,6 +13,47 @@ fakty sprawdzone od założeń i nie powtarza diagnostyki.
 
 ---
 
+## 2026-09-29 — Uwagi klienta: baner kategorii, jedna wizualizacja, teksty lakieru, kolejność grup
+
+### Zgłoszenie
+
+1. Po wejściu w kategorię zdjęcie zajmuje za dużo miejsca - klient ma od razu
+   widzieć ofertę rowerów.
+2. W wizualizacji lakieru widać „dwa odcienie” - to dwa rendery (standard
+   i ultra) tego samego koloru pokazywane jako osobne slajdy.
+3. Teksty „Konfigurator obejmuje jeden kolor…” i „Kolor producenta w cenie;
+   palety Porsche i Volkswagen…” mają być edytowalne i na razie puste.
+4. Admin ma ustalać kolejność wyposażenia w konfiguratorze - do lakieru
+   klient przewijał kilkanaście pozycji.
+
+### Zmiana (migracja `041_client_feedback_hero_render_copy_order.sql`)
+
+- `bike_categories.show_hero_image` (domyślnie FALSE, wszystkie kategorie
+  ustawione na „nie wyświetlaj”). Przełącznik przy banerze w panelu
+  (Kategorie); strona kategorii pokazuje baner tylko przy włączonej fladze.
+- Wariant renderu „standard” wycofany: migracja awansuje standard→ultra tam,
+  gdzie ultra nie było, resztę usuwa (pliki na dysku zostają). API przyjmuje
+  już tylko `ultra`/`photo`, panel ma jeden slot „Wizualizacja”,
+  `import-paints.php` bierze ultra, a zwykły render tylko jako zapas.
+- `copy.configurator.paintPickHint` i `paintSingleColorNote` w `copy.ts`
+  (edytowalne w zakładce Teksty); migracja ustawia oba na pusty tekst, a pusty
+  tekst ukrywa element.
+- `PATCH /admin/part-groups/reorder` + sekcja „Kolejność w konfiguratorze”
+  w zakładce Wyposażenie (strzałki góra/dół, zapis od razu). Kolejność jest
+  wspólna dla modeli; rozmiar i bateria zawsze pierwsze. Migracja przesuwa
+  „Lakierowanie” na początek listy.
+
+### Testy
+
+- Migracja wykonana lokalnie (MySQL 8.0): 229 renderów ultra, 0 standard,
+  `show_hero_image = 0` wszędzie, copy z pustymi tekstami, `paint` pierwsze
+  w `/api/catalog`.
+- `reorderPartGroups` z CLI: niepełna lista odrzucona, zamiana i przywrócenie
+  kolejności działają. `tsc --noEmit` czysto.
+- Playwright `test-adm-paints.spec.ts` poprawiony pod nowy slot, nieuruchomiony.
+
+---
+
 ## 2026-09-21 — Teksty z panelu nie wgrywały się na wyeksportowanej stronie; szkielety zamiast mignięć
 
 ### Objaw

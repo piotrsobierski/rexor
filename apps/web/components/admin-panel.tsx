@@ -518,7 +518,13 @@ export function AdminPanel({ initialTab }: { initialTab?: string } = {}) {
               setMessage={setMessage}
             />
           </TabsContent>
-          <TabsContent value="equipment">
+          <TabsContent value="equipment" className="grid gap-6">
+            <PartGroupOrderEditor
+              partGroups={catalog.partGroups}
+              request={request}
+              reload={loadCatalog}
+              setMessage={setMessage}
+            />
             <ModelEquipmentEditor
               catalog={catalog}
               patch={patch}
@@ -680,6 +686,94 @@ function Panel({
       <p className="mt-1 text-sm text-ink-muted">{description}</p>
       <div className="mt-6">{children}</div>
     </section>
+  );
+}
+
+/**
+ * Kolejność sekcji (grup części) w konfiguratorze - wspólna dla wszystkich
+ * modeli. Rozmiar i bateria zawsze idą pierwsze, dalej grupy w tej
+ * kolejności; grupy bez części w danym modelu po prostu się nie pokazują.
+ */
+function PartGroupOrderEditor({
+  partGroups,
+  request,
+  reload,
+  setMessage,
+}: {
+  partGroups: Row[];
+  request: (path: string, options?: RequestInit) => Promise<any>;
+  reload: () => Promise<void>;
+  setMessage: (value: string) => void;
+}) {
+  const [order, setOrder] = useState<Row[]>(partGroups);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => setOrder(partGroups), [partGroups]);
+
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= order.length || saving) return;
+    const next = [...order];
+    [next[index], next[target]] = [next[target], next[index]];
+    setOrder(next);
+    setSaving(true);
+    try {
+      await request('/admin/part-groups/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ groupIds: next.map((group) => Number(group.id)) }),
+      });
+      await reload();
+      setMessage('Zapisano kolejność w konfiguratorze.');
+    } catch (error) {
+      setOrder(order);
+      setMessage((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Panel
+      title="Kolejność w konfiguratorze"
+      description="Kolejność, w jakiej klient przechodzi przez wyposażenie (wspólna dla wszystkich modeli). Rozmiar i bateria są zawsze na początku. Zmiana zapisuje się od razu."
+    >
+      <ol className="grid gap-1.5" data-testid="part-group-order">
+        {order.map((group, index) => (
+          <li
+            key={group.id}
+            className="flex items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm"
+          >
+            <span className="w-6 text-right text-xs tabular-nums text-ink-subtle">
+              {index + 1}.
+            </span>
+            <span className="min-w-0 flex-1 truncate font-medium">
+              {String(group.name)}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-2"
+              aria-label={`Przesuń „${String(group.name)}” wyżej`}
+              disabled={index === 0 || saving}
+              onClick={() => void move(index, -1)}
+            >
+              <ChevronUp className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-2"
+              aria-label={`Przesuń „${String(group.name)}” niżej`}
+              disabled={index === order.length - 1 || saving}
+              onClick={() => void move(index, 1)}
+            >
+              <ChevronDown className="size-4" />
+            </Button>
+          </li>
+        ))}
+      </ol>
+    </Panel>
   );
 }
 
@@ -1663,8 +1757,24 @@ function CategoriesEditor({
                     </>
                   )}
                 </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <Switch
+                    checked={adminFlagEnabled(
+                      drafts[row.id]?.show_hero_image ?? row.show_hero_image,
+                    )}
+                    onCheckedChange={(checked) => {
+                      setDrafts({
+                        ...drafts,
+                        [row.id]: { ...drafts[row.id], show_hero_image: checked },
+                      });
+                      void patch('categories', row.id, { show_hero_image: checked });
+                    }}
+                  />
+                  Wyświetlaj baner na stronie kategorii
+                </label>
                 <p className="text-[0.68rem] text-ink-subtle">
-                  Szerokie zdjęcie u góry strony kategorii. Puste = kafelek
+                  Szerokie zdjęcie u góry strony kategorii. Domyślnie ukryte —
+                  klient od razu widzi listę rowerów. Puste zdjęcie = kafelek
                   obok, przycięty do paska (może wyglądać gorzej).
                 </p>
               </div>

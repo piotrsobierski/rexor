@@ -248,6 +248,9 @@ export const defaultCopy = {
     priceIndividual: 'wycena indywidualna',
     saveCta: 'Zapisz i przejdź do podsumowania',
     grossPriceNote: 'Cena brutto · zgodność potwierdzi Rexor',
+    // Teksty przy wyborze lakieru. Pusty tekst w panelu = element ukryty.
+    paintPickHint: 'Kolor producenta w cenie; palety Porsche i Volkswagen przy lakierowaniu jednokolorowym.',
+    paintSingleColorNote: 'Konfigurator obejmuje jeden kolor. Malowanie dwukolorowe, przejścia i wzory wyceniamy indywidualnie — opisz pomysł w uwagach przy zapisie projektu, a ustalimy zakres i cenę.',
     noneOptionName: 'Bez dodatku',
     noneOptionDetail: 'Nie dodawaj tego elementu.',
     customerPartDetail: 'Zgodność potwierdzi Rexor',

@@ -358,9 +358,10 @@ function saveAdminPaintRender(PDO $pdo, array $input): array
         throw new InvalidArgumentException('Nie znaleziono koloru.');
     }
 
-    $variant = (string) ($input['variant'] ?? 'standard');
-    if (!in_array($variant, ['standard', 'ultra', 'photo'], true)) {
-        throw new InvalidArgumentException('Wariant obrazu to „standard”, „ultra” albo „photo”.');
+    // Jedna wizualizacja na produkt - wariant „standard" wycofany migracją 041.
+    $variant = (string) ($input['variant'] ?? 'ultra');
+    if (!in_array($variant, ['ultra', 'photo'], true)) {
+        throw new InvalidArgumentException('Wariant obrazu to „ultra” (wizualizacja) albo „photo” (zdjęcie).');
     }
     $imagePath = trim((string) ($input['imagePath'] ?? ''));
     if (!preg_match('~^/(uploads|media)/~', $imagePath)) {

@@ -66,7 +66,7 @@ function normalizeAdminFlags(array $rows, array $fields): array
 function adminCatalog(PDO $pdo): array
 {
     $catalog = [
-        'categories' => $pdo->query('SELECT id, slug, name, short_description, description_html, default_image_path, hero_image_path, icon_key, is_published, sort_order FROM bike_categories ORDER BY sort_order')->fetchAll(),
+        'categories' => $pdo->query('SELECT id, slug, name, short_description, description_html, default_image_path, hero_image_path, show_hero_image, icon_key, is_published, sort_order FROM bike_categories ORDER BY sort_order')->fetchAll(),
         'models' => $pdo->query('SELECT m.id, m.category_id, m.slug, m.name, m.short_description, m.description_html, m.computed_base_price_gross, m.frame_price_gross, m.assembly_price_gross, m.margin_percent, m.default_image_path, m.status, m.is_recommended, COUNT(mm.media_id) AS media_count FROM bike_models m LEFT JOIN model_media mm ON mm.model_id = m.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll(),
         'partGroups' => $pdo->query('SELECT id, slug, name, description, sort_order, is_required FROM part_groups ORDER BY sort_order, id')->fetchAll(),
         'modelParts' => $pdo->query('SELECT mp.model_id, mp.part_id, pg.slug AS group_slug, p.group_id, mp.is_default, mp.is_customer_configurable, mp.customer_supplied_allowed, mp.customer_supplied_gross_price, mp.gross_price_override, mp.sort_order, mp.notes FROM model_parts mp JOIN parts p ON p.id = mp.part_id JOIN part_groups pg ON pg.id = p.group_id ORDER BY mp.model_id, pg.sort_order, mp.sort_order')->fetchAll(),
@@ -111,7 +111,7 @@ function adminCatalog(PDO $pdo): array
         'configurationEmailTemplate' => getConfigurationEmailTemplate($pdo),
     ];
     $flagFields = [
-        'categories' => ['is_published'],
+        'categories' => ['is_published', 'show_hero_image'],
         'models' => ['is_recommended'],
         'partGroups' => ['is_required'],
         'modelParts' => ['is_default', 'is_customer_configurable', 'customer_supplied_allowed'],
@@ -134,7 +134,7 @@ function adminCatalog(PDO $pdo): array
 function updateAdminRecord(PDO $pdo, string $resource, int $id, array $input): array
 {
     $definitions = [
-        'categories' => ['table' => 'bike_categories', 'fields' => ['name', 'short_description', 'description_html', 'default_image_path', 'hero_image_path', 'icon_key', 'is_published', 'sort_order']],
+        'categories' => ['table' => 'bike_categories', 'fields' => ['name', 'short_description', 'description_html', 'default_image_path', 'hero_image_path', 'show_hero_image', 'icon_key', 'is_published', 'sort_order']],
         'models' => ['table' => 'bike_models', 'fields' => ['category_id', 'name', 'short_description', 'description_html', 'frame_price_gross', 'assembly_price_gross', 'margin_percent', 'default_image_path', 'status', 'is_recommended', 'sort_order', 'specifications']],
         'parts' => ['table' => 'parts', 'fields' => ['name', 'group_id', 'description', 'gross_price', 'price_status', 'image_path', 'is_active']],
         'sizes' => ['table' => 'model_sizes', 'fields' => ['label', 'price_delta_gross', 'sort_order', 'is_active']],
@@ -1207,6 +1207,38 @@ function reorderModelMedia(PDO $pdo, int $modelId, array $mediaIds): array
     }
 
     return ['modelId' => $modelId, 'mediaIds' => $mediaIds];
+}
+
+/**
+ * Kolejność grup części (sekcji) w konfiguratorze. Lista musi zawierać
+ * wszystkie grupy - częściowa lista zostawiłaby pozostałe na starych
+ * numerach i kolejność rozjechałaby się po cichu.
+ */
+function reorderPartGroups(PDO $pdo, array $groupIds): array
+{
+    $groupIds = array_values(array_unique(array_map('intval', $groupIds)));
+    $existing = array_map('intval', $pdo->query('SELECT id FROM part_groups')->fetchAll(PDO::FETCH_COLUMN));
+    sort($existing);
+    $sorted = $groupIds;
+    sort($sorted);
+    if ($sorted !== $existing) {
+        throw new InvalidArgumentException('Lista grup nie zgadza się z grupami części w bazie. Odśwież panel.');
+    }
+
+    $update = $pdo->prepare('UPDATE part_groups SET sort_order = :sort WHERE id = :id');
+    $pdo->beginTransaction();
+    try {
+        foreach ($groupIds as $index => $groupId) {
+            $update->execute(['sort' => ($index + 1) * 10, 'id' => $groupId]);
+        }
+        $pdo->commit();
+    } catch (Throwable $error) {
+        $pdo->rollBack();
+        throw $error;
+    }
+    logActivity($pdo, 'part_groups_reordered', 'admin', currentAdmin()['email'] ?? null, 'Zmieniono kolejność grup w konfiguratorze.', ['groupIds' => $groupIds]);
+
+    return ['groupIds' => $groupIds];
 }
 
 /**

@@ -53,7 +53,7 @@ type Render = {
   colorId: number;
   modelSlug: string | null;
   frameSlug: string | null;
-  variant: 'standard' | 'ultra' | 'photo';
+  variant: 'ultra' | 'photo';
   imagePath: string;
   thumbPath: string | null;
   source: string | null;
@@ -62,8 +62,7 @@ type Render = {
 };
 
 const VARIANT_LABELS: Record<Render['variant'], string> = {
-  standard: 'wizualizacja standard',
-  ultra: 'wizualizacja ultra',
+  ultra: 'wizualizacja',
   photo: 'zdjęcie',
 };
 
@@ -657,8 +656,8 @@ function ColorRow({
   useEffect(() => { setDraft({ ...color }); }, [color]);
 
   const effectivePrice = color.priceGrossOverride ?? palette?.priceGross ?? 0;
-  // Ta sama kolejność co w konfiguratorze: zdjęcie bije „ultra”, „ultra” bije
-  // „standard” - miniatura w panelu pokazuje to, co zobaczy klient.
+  // Ta sama kolejność co w konfiguratorze: zdjęcie bije wizualizację -
+  // miniatura w panelu pokazuje to, co zobaczy klient.
   const thumb = renders.find((render) => render.variant === 'photo')
     ?? renders.find((render) => render.variant === 'ultra')
     ?? renders[0];
@@ -731,7 +730,7 @@ function ColorRow({
   </div>;
 }
 
-/** Trzy zestawy obrazów w kolejności, w jakiej konfigurator po nie sięga. */
+/** Dwa zestawy obrazów w kolejności, w jakiej konfigurator po nie sięga. */
 const SLOTS: Array<{
   variant: Render['variant'];
   title: string;
@@ -748,15 +747,8 @@ const SLOTS: Array<{
   },
   {
     variant: 'ultra',
-    title: 'Wizualizacja ultra',
+    title: 'Wizualizacja',
     rank: '2. wybór',
-    rule: 'Jedna na produkt — nowe wgranie podmienia poprzednią.',
-    multiple: false,
-  },
-  {
-    variant: 'standard',
-    title: 'Wizualizacja standard',
-    rank: '3. wybór',
     rule: 'Jedna na produkt — nowe wgranie podmienia poprzednią.',
     multiple: false,
   },
@@ -766,7 +758,7 @@ const SLOTS: Array<{
 const renderTarget = (render: Render) => (render.modelSlug !== null ? `model:${render.modelSlug}` : `frame:${render.frameSlug}`);
 
 /**
- * Jeden z trzech zestawów obrazów dla wybranego produktu.
+ * Jeden z dwóch zestawów obrazów dla wybranego produktu.
  *
  * Pliki wchodzą przeciągnięciem albo kliknięciem - w obu wypadkach trafiają
  * dokładnie do tego wariantu, więc nie da się wgrać zdjęcia „w miejsce”
@@ -908,7 +900,7 @@ function RendersEditor({
     <p className="mt-1 text-xs text-ink-muted">
       Obraz należy do pary kolor + produkt: obraz E55 nie pokaże tego lakieru na E82. Najpierw wybierz produkt,
       potem przeciągnij plik do właściwego zestawu. Konfigurator bierze pierwszy zestaw, w którym coś jest:
-      <strong className="font-semibold text-ink"> zdjęcie → ultra → standard</strong>.
+      <strong className="font-semibold text-ink"> zdjęcie → wizualizacja</strong>.
     </p>
 
     <div className="mt-4 flex flex-wrap items-center gap-3">
